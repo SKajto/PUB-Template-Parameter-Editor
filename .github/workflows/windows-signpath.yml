@@ -40,9 +40,13 @@ jobs:
         working-directory: desktop
         run: npm run typecheck
 
-      - name: Lint
+      - name: Run oxlint
         working-directory: desktop
-        run: npm run lint
+        run: npx oxlint
+
+      - name: Check formatting
+        working-directory: desktop
+        run: npx oxfmt --check
 
       - name: Build unsigned Windows ZIP for SignPath
         working-directory: desktop
