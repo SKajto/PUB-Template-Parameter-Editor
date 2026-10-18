@@ -14,6 +14,15 @@ The editor stages default-value, access-classification, and supported descriptio
 - Detect concurrent changes and keep backups and a recovery journal for save batches.
 - Work offline; template processing stays on the local computer.
 
+## Project documentation
+
+This project was created with assistance from Hermes Agent and GPT-6-Luna.
+
+- `AGENTS.md`, `START_HERE.md`, and `CODEX_START_PROMPT.md` provide coding-agent instructions and onboarding context.
+- `REQUIREMENTS.md` defines product behavior and acceptance criteria; `ARCHITECTURE.md` describes the technical design; `PLAN.md` records milestone structure and verification notes.
+- `docs/TEST_MATRIX.md` lists verification scenarios. `docs/NATIVE_DTA_FINDINGS.md` and `docs/SAMPLE_FINDINGS.md` summarize format observations and preservation limits.
+- `desktop/README.md` contains application development and packaging instructions.
+
 ## Development
 
 The Electron application is in `desktop/`. Run these commands from that directory:
