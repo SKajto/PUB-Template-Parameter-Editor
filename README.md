@@ -14,12 +14,6 @@ The editor stages default-value, access-classification, and supported descriptio
 - Detect concurrent changes and keep backups and a recovery journal for save batches.
 - Work offline; template processing stays on the local computer.
 
-## Status and compatibility
-
-The native adapter is based on the observed ZIP-backed DTA variant and preserves unrelated source content within the tested format subset. Other DTA variants remain read-only until their preservation behavior is proven. PUB compatibility has not yet been verified by opening edited templates and generating output in PUB.
-
-A Linux x64 package has been built and launched through WSLg on Ubuntu 26.04.1. A save-path issue on WSL's `/mnt/c` mount was corrected and passed a synthetic local save test. Ubuntu 24.04 runtime validation and a complete Review Save GUI check on the rebuilt package remain open. The current Windows development signing certificate is self-signed and is not a trusted public publisher; SignPath Foundation setup is planned.
-
 ## Development
 
 The Electron application is in `desktop/`. Run these commands from that directory:
