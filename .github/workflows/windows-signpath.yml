@@ -1,0 +1,94 @@
+name: Windows build and SignPath signing
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  build-windows:
+    name: Test and build unsigned Windows package
+    runs-on: windows-latest
+    outputs:
+      unsigned-artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Install dependencies
+        working-directory: desktop
+        run: npm ci
+
+      - name: Run unit tests
+        working-directory: desktop
+        run: npm test
+
+      - name: Typecheck
+        working-directory: desktop
+        run: npm run typecheck
+
+      - name: Lint
+        working-directory: desktop
+        run: npm run lint
+
+      - name: Build unsigned Windows ZIP for SignPath
+        working-directory: desktop
+        env:
+          PUB_EDITOR_SKIP_LOCAL_SIGNING: 'true'
+        run: npm run make
+
+      # Upload the application ZIP itself; configure SignPath's default artifact
+      # configuration to sign the packaged application EXE inside that ZIP.
+      - name: Upload unsigned Windows package
+        id: upload-unsigned
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-unsigned
+          path: desktop/out/make/zip/win32/x64/PUB Template Parameter Editor-win32-x64-*.zip
+          if-no-files-found: error
+          retention-days: 7
+          archive: false
+
+  sign-windows:
+    name: Submit Windows package to SignPath
+    needs: build-windows
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.SIGNPATH_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Submit signing request
+        id: sign
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          github-artifact-id: ${{ needs.build-windows.outputs.unsigned-artifact-id }}
+          github-token: ${{ github.token }}
+          wait-for-completion: true
+          skip-decompress: true
+          output-artifact-directory: signed-output
+
+      - name: Publish signed package as workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-signed
+          path: signed-output/**
+          if-no-files-found: error
+          retention-days: 14

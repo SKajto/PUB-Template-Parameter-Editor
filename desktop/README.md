@@ -50,10 +50,22 @@ Current artifacts:
 
 The ZIP container itself is not Authenticode-signed; the application executable inside it is.
 
+## GitHub Actions and SignPath Foundation
+
+For SignPath Foundation, select **GitHub Actions** as the build system. `.github/workflows/windows-signpath.yml` runs tests and builds the unsigned Windows ZIP on GitHub-hosted Windows runners. Pull requests do not submit signing requests; signing runs only on `main` after `SIGNPATH_ENABLED` is set to `true`.
+
+After the SignPath project is created and linked to the repository, configure the SignPath GitHub App and create these GitHub Actions settings:
+
+- Repository secret `SIGNPATH_API_TOKEN` with submitter permission for the SignPath project and signing policy.
+- Repository variables `SIGNPATH_ORGANIZATION_ID`, `SIGNPATH_PROJECT_SLUG`, and `SIGNPATH_SIGNING_POLICY_SLUG` using the values from SignPath.
+- Repository variable `SIGNPATH_ENABLED` set to `true` only after the IDs, token, and artifact configuration are ready.
+
+The workflow uploads the Forge ZIP directly (`archive: false`). Set the project's default SignPath Artifact Configuration to process that ZIP and Authenticode-sign the packaged `PUB Template Parameter Editor.exe` while retaining the other package contents. The SignPath action's `skip-decompress` setting is enabled for this direct ZIP input. The signed output is published as the `windows-signed` GitHub Actions artifact; it is not automatically attached to a GitHub Release.
+
 ## Current safety and limits
 
 - Electron renderer sandboxing is enabled; context isolation is enabled and Node integration is disabled.
 - Filesystem access remains in the main process behind a narrow typed preload API. Renderer edits are drafts; only Review Save reaches the main-process file writer. The native ZIP writer accepts the exact observed sample structure and fails closed on unsupported ZIP variants.
 - Production dependencies currently report 0 npm audit vulnerabilities. The full development dependency tree reports 11 findings (2 moderate, 7 high, 2 critical); dependency cleanup is unresolved.
-- The project root has a local Git repository but no remote. Do not push it to the unrelated GetDocs remote configured in the user's parent directory.
+- Keep signing certificates and private keys out of Git. The local `.cert/` directory is ignored; store the SignPath API token only in GitHub Actions secrets.
 - See the root `PLAN.md` for milestone status and `docs/NATIVE_DTA_FINDINGS.md` for actual native DTA sample evidence and ZIP preservation limits.

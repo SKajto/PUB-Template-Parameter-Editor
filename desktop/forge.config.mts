@@ -16,7 +16,12 @@ const configDirectory = dirname(fileURLToPath(import.meta.url));
 const config: ForgeConfig = {
   hooks: {
     postPackage: async (_config, options) => {
-      if (options.platform !== 'win32') return;
+      if (
+        options.platform !== 'win32' ||
+        process.env.PUB_EDITOR_SKIP_LOCAL_SIGNING === 'true'
+      ) {
+        return;
+      }
       const signingScript = join(
         configDirectory,
         'scripts',
