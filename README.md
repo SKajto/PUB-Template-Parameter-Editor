@@ -42,10 +42,6 @@ The Ubuntu packaging host needs the `zip` utility. From the repository root, run
 
 See [`desktop/README.md`](desktop/README.md) for detailed development and packaging notes, [`PLAN.md`](PLAN.md) for milestone status, and [`docs/TEST_MATRIX.md`](docs/TEST_MATRIX.md) for verification scenarios.
 
-## Proprietary templates
-
-Do not add or upload proprietary `.dta` templates. The root `.gitignore` excludes `.dta` files at every directory depth; no template samples are distributed in this repository.
-
 ## License
 
 This project is licensed under the GNU General Public License, version 3 only (GPL-3.0-only). See [`LICENSE`](LICENSE).
