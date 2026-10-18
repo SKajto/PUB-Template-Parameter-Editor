@@ -19,7 +19,15 @@ Build the desktop application described in REQUIREMENTS.md. Use ARCHITECTURE.md 
 
 ## Commands
 
-No application scaffold exists yet. During M0 replace this paragraph with the actual verified dependency-install, development, typecheck, lint, unit/integration test, Electron GUI test, Windows package and Linux package commands. Do not imply that placeholder commands already work.
+Run desktop application commands from desktop/:
+
+- npm ci installs the locked dependencies.
+- npm start launches the development GUI. Workflow checks are manual; there is no automated Electron end-to-end suite yet.
+- npm test, npm run typecheck, and npm run lint run the tests and static checks.
+- npm run make creates the Windows x64 ZIP on Windows; signing requires a suitable certificate in the current user’s certificate store.
+- On Ubuntu x64, run npm ci then npm run make -- --platform=linux --arch=x64. The build host needs the zip utility. WSL Ubuntu 26.04.1 has been tested; Ubuntu 24.04 remains unverified.
+
+From the repository root, python -m unittest discover -s tools/tests -v runs the sample-inspector tests. Do not commit or upload proprietary .dta templates.
 
 ## Completion report
 
