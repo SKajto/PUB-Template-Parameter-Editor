@@ -12,11 +12,9 @@ permissions:
   contents: read
 
 jobs:
-  build-windows:
-    name: Test and build unsigned Windows package
-    runs-on: windows-latest
-    outputs:
-      unsigned-artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
+  checks:
+    name: Test and lint
+    runs-on: ubuntu-latest
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -40,13 +38,30 @@ jobs:
         working-directory: desktop
         run: npm run typecheck
 
-      - name: Run oxlint
+      - name: Lint and format
         working-directory: desktop
-        run: npx oxlint
+        run: npm run lint
 
-      - name: Check formatting
+  build-windows:
+    name: Build unsigned Windows package
+    needs: checks
+    runs-on: windows-latest
+    outputs:
+      unsigned-artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Install dependencies
         working-directory: desktop
-        run: npx oxfmt --check
+        run: npm ci
 
       - name: Build unsigned Windows ZIP for SignPath
         working-directory: desktop
