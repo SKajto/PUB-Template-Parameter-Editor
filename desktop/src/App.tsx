@@ -1,11 +1,13 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type KeyboardEvent,
   type PointerEvent,
 } from 'react';
+import packageInfo from '../package.json';
 import type {
   EditableField,
   ParameterDeclaration,
@@ -36,6 +38,20 @@ import {
 
 type AccessFilter = 'all' | 'internal' | 'external';
 type PendingNavigation = 'close' | 'folder' | 'read';
+
+const RUNTIME_LIBRARIES = [
+  { name: 'Electron', version: '44.7.2', license: 'MIT' },
+  { name: 'React', version: '19.3.1', license: 'MIT' },
+  { name: 'React DOM', version: '19.3.1', license: 'MIT' },
+  { name: 'crc-32', version: '1.2.2', license: 'Apache-2.0' },
+  {
+    name: 'electron-squirrel-startup',
+    version: '1.0.1',
+    license: 'Apache-2.0',
+  },
+  { name: 'saxes', version: '6.0.0', license: 'ISC' },
+  { name: 'yauzl', version: '3.4.0', license: 'MIT' },
+] as const;
 
 const INITIAL_STATE: WorkspaceState = {
   folderPath: null,
@@ -142,6 +158,9 @@ export function App() {
   const [progress, setProgress] = useState<ReadProgress | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
+  const aboutTriggerRef = useRef<HTMLButtonElement>(null);
+  const aboutCloseRef = useRef<HTMLButtonElement>(null);
 
   const resizeDetailsPanel = (event: PointerEvent<HTMLDivElement>): void => {
     event.preventDefault();
@@ -189,6 +208,19 @@ export function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = effectiveTheme(workspace.theme);
   }, [workspace.theme]);
+
+  useEffect(() => {
+    if (!isAboutOpen) return;
+    aboutCloseRef.current?.focus();
+    const handleKeyDown = (event: globalThis.KeyboardEvent): void => {
+      if (event.key === 'Escape') setIsAboutOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      aboutTriggerRef.current?.focus();
+    };
+  }, [isAboutOpen]);
 
   useEffect(
     () =>
@@ -1763,8 +1795,113 @@ export function App() {
             ? `Reading ${progress.completed}/${progress.total}: ${progress.fileName}`
             : 'Offline · Review Save writes selected changes'}
         </span>
-        <span>Version 0.1.0</span>
+        <span>
+          <button
+            aria-haspopup="dialog"
+            aria-label={`About ${packageInfo.productName}, version ${packageInfo.version}`}
+            className="footer-about-button"
+            onClick={() => setIsAboutOpen(true)}
+            ref={aboutTriggerRef}
+            type="button"
+          >
+            Version {packageInfo.version}
+          </button>
+        </span>
       </footer>
+      {isAboutOpen && (
+        <div
+          className="about-overlay"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setIsAboutOpen(false);
+          }}
+        >
+          <section
+            aria-labelledby="about-title"
+            aria-modal="true"
+            className="about-dialog"
+            role="dialog"
+          >
+            <header className="about-heading">
+              <div>
+                <p className="eyebrow">ABOUT THIS APPLICATION</p>
+                <h2 id="about-title">{packageInfo.productName}</h2>
+              </div>
+              <button
+                aria-label="Close About"
+                className="about-icon-button"
+                onClick={() => setIsAboutOpen(false)}
+                ref={aboutCloseRef}
+                type="button"
+              >
+                ×
+              </button>
+            </header>
+            <div className="about-content">
+              <section className="about-summary">
+                <p>{packageInfo.description}</p>
+                <dl>
+                  <div>
+                    <dt>Version</dt>
+                    <dd>{packageInfo.version}</dd>
+                  </div>
+                  <div>
+                    <dt>Mode</dt>
+                    <dd>Offline desktop application</dd>
+                  </div>
+                </dl>
+              </section>
+              <section className="about-section">
+                <h3>Application license</h3>
+                <p>
+                  GNU General Public License v3.0 only{' '}
+                  <code>(GPL-3.0-only)</code>
+                </p>
+                <p className="about-note">
+                  Provided without warranty. Redistribution is permitted under
+                  the license terms. The complete license text is included as
+                  <code> LICENSE</code> in the application package and source
+                  distribution.
+                </p>
+              </section>
+              <section className="about-section">
+                <h3>Runtime libraries and licenses</h3>
+                <div className="about-library-list" role="table">
+                  <div className="about-library-header" role="row">
+                    <span role="columnheader">Component</span>
+                    <span role="columnheader">Version</span>
+                    <span role="columnheader">License</span>
+                  </div>
+                  {RUNTIME_LIBRARIES.map((library) => (
+                    <div
+                      className="about-library-row"
+                      key={library.name}
+                      role="row"
+                    >
+                      <span role="cell">{library.name}</span>
+                      <span role="cell">{library.version}</span>
+                      <span role="cell">{library.license}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="about-note">
+                  License identifiers are shown as declared by each bundled
+                  package.
+                </p>
+              </section>
+            </div>
+            <footer className="about-actions">
+              <span>Thank you for using {packageInfo.productName}.</span>
+              <button
+                className="primary-button"
+                onClick={() => setIsAboutOpen(false)}
+                type="button"
+              >
+                Close
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

@@ -47,6 +47,7 @@ const config: ForgeConfig = {
   },
   packagerConfig: {
     asar: true,
+    extraResource: [join(configDirectory, '..', 'LICENSE')],
   },
   rebuildConfig: {},
   makers: [new MakerZIP({}, ['win32', 'linux'])],
