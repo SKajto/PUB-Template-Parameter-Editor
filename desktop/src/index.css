@@ -1556,13 +1556,16 @@ button {
   line-height: 1.55;
 }
 .about-summary dl {
-  display: flex;
-  gap: 24px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 24px;
   margin: 3px 0 0;
 }
 .about-summary dl > div {
   display: flex;
-  gap: 7px;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
   font-size: 10px;
 }
 .about-summary dt {
@@ -1572,6 +1575,7 @@ button {
   margin: 0;
   color: #354256;
   font-weight: 650;
+  overflow-wrap: anywhere;
 }
 .about-section h3 {
   margin: 0;
@@ -1682,6 +1686,9 @@ button {
   .about-content {
     padding-right: 16px;
     padding-left: 16px;
+  }
+  .about-summary dl {
+    grid-template-columns: minmax(0, 1fr);
   }
   .about-library-header,
   .about-library-row {

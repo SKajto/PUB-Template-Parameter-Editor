@@ -3,7 +3,13 @@
   "productName": "PUB Template Parameter Editor",
   "version": "0.1.0",
   "private": true,
-  "description": "Offline desktop shell for inspecting PUB template parameters",
+  "description": "Offline desktop editor for inspecting, comparing, and reviewing changes to IBM PUB .dta templates.",
+  "author": "SKajto",
+  "homepage": "https://github.com/SKajto/PUB-Template-Parameter-Editor",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SKajto/PUB-Template-Parameter-Editor.git"
+  },
   "keywords": [],
   "license": "GPL-3.0-only",
   "main": ".webpack/main/index.cjs",

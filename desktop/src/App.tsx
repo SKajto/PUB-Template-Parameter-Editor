@@ -44,11 +44,6 @@ const RUNTIME_LIBRARIES = [
   { name: 'React', version: '19.3.1', license: 'MIT' },
   { name: 'React DOM', version: '19.3.1', license: 'MIT' },
   { name: 'crc-32', version: '1.2.2', license: 'Apache-2.0' },
-  {
-    name: 'electron-squirrel-startup',
-    version: '1.0.1',
-    license: 'Apache-2.0',
-  },
   { name: 'saxes', version: '6.0.0', license: 'ISC' },
   { name: 'yauzl', version: '3.4.0', license: 'MIT' },
 ] as const;
@@ -1845,8 +1840,16 @@ export function App() {
                     <dd>{packageInfo.version}</dd>
                   </div>
                   <div>
-                    <dt>Mode</dt>
-                    <dd>Offline desktop application</dd>
+                    <dt>Author / maintainer</dt>
+                    <dd>{packageInfo.author}</dd>
+                  </div>
+                  <div>
+                    <dt>Project</dt>
+                    <dd>{packageInfo.homepage}</dd>
+                  </div>
+                  <div>
+                    <dt>Operation</dt>
+                    <dd>Offline; templates stay on this computer</dd>
                   </div>
                 </dl>
               </section>
