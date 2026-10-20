@@ -25,4 +25,4 @@ Original template files are intentionally not redistributed in this package. Sup
 
 ## Native DTA evidence
 
-Four native `.dta` files are now available under `examples/`. They were inspected from their original bytes; their container, `template.xml` declaration counts, and ZIP rewrite limitations are documented separately in `docs/NATIVE_DTA_FINDINGS.md`. The three XML exports above remain useful for XML mapping only and are not evidence about native archive preservation.
+Native-format fixtures are kept local and are not tracked. The sanitized `docs/NATIVE_DTA_FINDINGS.md` describes only the adapter's supported scope and preservation limits. The XML exports above remain separate from native archive validation.

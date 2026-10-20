@@ -13,10 +13,10 @@ const document = (description = 'Old &amp; safe'): string =>
   `<?xml version="1.0"?>\n<template><dataset><variables><variable><feature tag="definition"><property name='name' value='reportTitle'/><property name="description"><expression type="constant">${description}</expression></property><property name="type" value="user"/><property name='access' value='external'/><property name="default" value="before &quot;quoted&quot;"/><property name="central variable" value=""/></feature></variable></variables></dataset></template>`;
 
 const nativeSamples = [
-  'requirements_specification_sample.dta',
-  'requirements_specification_sample_landscape.dta',
-  'solution_configuration_specification.dta',
-  'configuration_specification_sample_landscape.dta',
+  'sample-01.dta',
+  'sample-02.dta',
+  'sample-03.dta',
+  'sample-04.dta',
 ].map((name) => resolve(__dirname, '../../../examples', name));
 
 async function readNativeTemplateXml(filePath: string): Promise<string> {

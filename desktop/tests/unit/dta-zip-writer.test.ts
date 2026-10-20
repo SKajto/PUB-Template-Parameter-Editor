@@ -15,10 +15,10 @@ import { replaceNativeTemplateXml } from '../../src/core/dta-zip-writer';
 import { saveBatch } from '../../src/main/save-service';
 
 const sampleNames = [
-  'requirements_specification_sample.dta',
-  'requirements_specification_sample_landscape.dta',
-  'solution_configuration_specification.dta',
-  'configuration_specification_sample_landscape.dta',
+  'sample-01.dta',
+  'sample-02.dta',
+  'sample-03.dta',
+  'sample-04.dta',
 ];
 const samplePaths = sampleNames.map((name) =>
   resolve(__dirname, '../../../examples', name),

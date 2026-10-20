@@ -65,7 +65,7 @@ The workflow uploads the Forge ZIP directly (`archive: false`). Set the project'
 ## Current safety and limits
 
 - Electron renderer sandboxing is enabled; context isolation is enabled and Node integration is disabled.
-- Filesystem access remains in the main process behind a narrow typed preload API. Renderer edits are drafts; only Review Save reaches the main-process file writer. The native ZIP writer accepts the exact observed sample structure and fails closed on unsupported ZIP variants.
+- Filesystem access remains in the main process behind a narrow typed preload API. Renderer edits are drafts; only Review Save reaches the main-process file writer. The native ZIP writer accepts only its supported ZIP variant and fails closed on unsupported layouts.
 - Production dependencies currently report 0 npm audit vulnerabilities. The full development dependency tree reports 11 findings (2 moderate, 7 high, 2 critical); dependency cleanup is unresolved.
 - Keep signing certificates and private keys out of Git. The local `.cert/` directory is ignored; store the SignPath API token only in GitHub Actions secrets.
-- See the root `PLAN.md` for milestone status and `docs/NATIVE_DTA_FINDINGS.md` for actual native DTA sample evidence and ZIP preservation limits.
+- See the root `PLAN.md` for milestone status and `docs/NATIVE_DTA_FINDINGS.md` for sanitized adapter scope and ZIP preservation limits.
