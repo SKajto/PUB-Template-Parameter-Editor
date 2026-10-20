@@ -21,7 +21,8 @@
     "lint": "oxlint && oxfmt --check",
     "lint:fix": "oxlint --fix && oxfmt --write",
     "test": "tsx --test tests/unit/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "licenses": "node scripts/generate-third-party-notices.mjs"
   },
   "devDependencies": {
     "@electron-forge/cli": "^8.0.1",

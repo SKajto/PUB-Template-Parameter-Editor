@@ -29,6 +29,7 @@ Run commands from this directory:
 | `npm start`                                   | Runs the development GUI; resizable panels, Compare selection, and bulk no-op Apply were visually checked                                  |
 | `npm run typecheck`                           | Verified; passed                                                                                                                           |
 | `npm run lint`                                | Verified; passed                                                                                                                           |
+| `npm run licenses`                            | Regenerates bundled third-party license notices from the locked runtime packages                                                           |
 | `npm test`                                    | 39 tests total; 33 pass and 6 sample-dependent tests skip when proprietary local DTA fixtures are absent                                   |
 | `npm run make`                                | Verified on Windows x64; creates a ZIP containing the Authenticode-signed app executable (self-signed, not publicly trusted)               |
 | `npm run make -- --platform=linux --arch=x64` | Native WSL Ubuntu 26.04.1 x64 build; extracted app executable has mode 755 and user verified WSLg startup. Ubuntu 24.04 remains unverified |

@@ -8,6 +8,7 @@ import {
   type PointerEvent,
 } from 'react';
 import packageInfo from '../package.json';
+import runtimeLibraries from './runtime-libraries.json';
 import type {
   EditableField,
   ParameterDeclaration,
@@ -38,15 +39,6 @@ import {
 
 type AccessFilter = 'all' | 'internal' | 'external';
 type PendingNavigation = 'close' | 'folder' | 'read';
-
-const RUNTIME_LIBRARIES = [
-  { name: 'Electron', version: '44.9.1', license: 'MIT' },
-  { name: 'React', version: '19.3.1', license: 'MIT' },
-  { name: 'React DOM', version: '19.3.1', license: 'MIT' },
-  { name: 'crc-32', version: '1.2.2', license: 'Apache-2.0' },
-  { name: 'saxes', version: '6.0.0', license: 'ISC' },
-  { name: 'yauzl', version: '3.4.0', license: 'MIT' },
-] as const;
 
 const INITIAL_STATE: WorkspaceState = {
   folderPath: null,
@@ -1867,14 +1859,14 @@ export function App() {
                 </p>
               </section>
               <section className="about-section">
-                <h3>Runtime libraries and licenses</h3>
+                <h3>Bundled components and licenses</h3>
                 <div className="about-library-list" role="table">
                   <div className="about-library-header" role="row">
                     <span role="columnheader">Component</span>
                     <span role="columnheader">Version</span>
                     <span role="columnheader">License</span>
                   </div>
-                  {RUNTIME_LIBRARIES.map((library) => (
+                  {runtimeLibraries.map((library) => (
                     <div
                       className="about-library-row"
                       key={library.name}
@@ -1887,8 +1879,9 @@ export function App() {
                   ))}
                 </div>
                 <p className="about-note">
-                  License identifiers are shown as declared by each bundled
-                  package.
+                  Full third-party license texts and attributions are in{' '}
+                  <code>resources/THIRD_PARTY_NOTICES.txt</code>. Electron’s
+                  Chromium notices are in <code>LICENSES.chromium.html</code>.
                 </p>
               </section>
             </div>

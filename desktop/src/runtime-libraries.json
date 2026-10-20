@@ -1,0 +1,47 @@
+[
+  {
+    "name": "Electron",
+    "version": "44.9.1",
+    "license": "MIT"
+  },
+  {
+    "name": "crc-32",
+    "version": "1.2.2",
+    "license": "Apache-2.0"
+  },
+  {
+    "name": "React",
+    "version": "19.3.1",
+    "license": "MIT"
+  },
+  {
+    "name": "React DOM",
+    "version": "19.3.1",
+    "license": "MIT"
+  },
+  {
+    "name": "scheduler",
+    "version": "0.28.0",
+    "license": "MIT"
+  },
+  {
+    "name": "saxes",
+    "version": "6.0.0",
+    "license": "ISC"
+  },
+  {
+    "name": "xmlchars",
+    "version": "2.2.0",
+    "license": "MIT"
+  },
+  {
+    "name": "yauzl",
+    "version": "3.4.0",
+    "license": "MIT"
+  },
+  {
+    "name": "pend",
+    "version": "1.2.0",
+    "license": "MIT"
+  }
+]

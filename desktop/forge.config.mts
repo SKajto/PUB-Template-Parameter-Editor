@@ -15,6 +15,13 @@ const configDirectory = dirname(fileURLToPath(import.meta.url));
 
 const config: ForgeConfig = {
   hooks: {
+    generateAssets: async () => {
+      execFileSync(
+        process.execPath,
+        [join(configDirectory, 'scripts', 'generate-third-party-notices.mjs')],
+        { cwd: configDirectory, stdio: 'inherit' },
+      );
+    },
     postPackage: async (_config, options) => {
       if (
         options.platform !== 'win32' ||
@@ -47,7 +54,10 @@ const config: ForgeConfig = {
   },
   packagerConfig: {
     asar: true,
-    extraResource: [join(configDirectory, '..', 'LICENSE')],
+    extraResource: [
+      join(configDirectory, '..', 'LICENSE'),
+      join(configDirectory, 'THIRD_PARTY_NOTICES.txt'),
+    ],
   },
   rebuildConfig: {},
   makers: [new MakerZIP({}, ['win32', 'linux'])],
