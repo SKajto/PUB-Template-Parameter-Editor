@@ -40,7 +40,7 @@ type AccessFilter = 'all' | 'internal' | 'external';
 type PendingNavigation = 'close' | 'folder' | 'read';
 
 const RUNTIME_LIBRARIES = [
-  { name: 'Electron', version: '44.7.2', license: 'MIT' },
+  { name: 'Electron', version: '44.9.1', license: 'MIT' },
   { name: 'React', version: '19.3.1', license: 'MIT' },
   { name: 'React DOM', version: '19.3.1', license: 'MIT' },
   { name: 'crc-32', version: '1.2.2', license: 'Apache-2.0' },

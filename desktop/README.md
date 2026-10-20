@@ -10,7 +10,7 @@ Versions used for this build:
 
 - Node.js 24.21.0
 - npm 11.19.0
-- Electron 44.7.2
+- Electron 44.9.1
 - Electron Forge 8.0.1
 - React 19.3.1
 - TypeScript 6.0.3
@@ -66,6 +66,6 @@ The workflow uploads the Forge ZIP directly (`archive: false`). Set the project'
 
 - Electron renderer sandboxing is enabled; context isolation is enabled and Node integration is disabled.
 - Filesystem access remains in the main process behind a narrow typed preload API. Renderer edits are drafts; only Review Save reaches the main-process file writer. The native ZIP writer accepts only its supported ZIP variant and fails closed on unsupported layouts.
-- Production dependencies currently report 0 npm audit vulnerabilities. The full development dependency tree reports 11 findings (2 moderate, 7 high, 2 critical); dependency cleanup is unresolved.
+- Production dependencies report 0 npm audit vulnerabilities. The full development tree still reports 6 high findings in the Forge Webpack development-server chain (`braces`); npm offers no compatible fix, so do not use `npm audit fix --force`.
 - Keep signing certificates and private keys out of Git. The local `.cert/` directory is ignored; store the SignPath API token only in GitHub Actions secrets.
 - See the root `PLAN.md` for milestone status and `docs/NATIVE_DTA_FINDINGS.md` for sanitized adapter scope and ZIP preservation limits.
