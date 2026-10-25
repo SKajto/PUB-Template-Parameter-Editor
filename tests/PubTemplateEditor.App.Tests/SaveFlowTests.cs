@@ -298,6 +298,86 @@ public sealed class SaveFlowTests : IDisposable
         Assert.Contains("OLD_B", File.ReadAllText(second), StringComparison.Ordinal);
     }
 
+    private static string? SamplesDir()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        for (int i = 0; i < 8 && dir is not null; i++, dir = dir.Parent)
+        {
+            string candidate = Path.Combine(dir.FullName, "examples");
+            if (Directory.Exists(candidate) && File.Exists(Path.Combine(candidate, "example.dta")))
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    [Fact]
+    public async Task ASavedChangeInARealContainerSurvivesASecondSaveWithoutLookingLikeAnOutsideEdit()
+    {
+        string? samples = SamplesDir();
+        Assert.NotNull(samples);
+
+        string templates = Sub("templates");
+        string path = Path.Combine(templates, "example.dta");
+        File.Copy(Path.Combine(samples!, "example.dta"), path);
+
+        // Every other entry of the container must come back byte for byte.
+        var entriesBefore = ReadEntries(path);
+        string state = Sub("state");
+
+        WorkspaceViewModel vm = await ReadAllAsync(templates, state);
+        Stage(vm, vm.VisibleParameters[0].Name, "SHELL_ROUND_TRIP");
+        await SaveAsync(vm);
+
+        _host.Do(() =>
+        {
+            Assert.True(vm.LastSaveOutcome == "Written", $"{vm.LastSaveOutcome}: {vm.ActionError} {vm.SaveOutcomeSummary}");
+            Assert.Equal(0, vm.StagedChangeCount);
+        });
+
+        var entriesAfter = ReadEntries(path);
+        Assert.Equal(entriesBefore.Keys, entriesAfter.Keys);
+        foreach ((string name, byte[] before) in entriesBefore)
+        {
+            if (!string.Equals(name, "template.xml", StringComparison.OrdinalIgnoreCase))
+            {
+                Assert.True(before.SequenceEqual(entriesAfter[name]), $"{name} must keep its bytes");
+            }
+        }
+
+        // A second edit of the same file saves again cleanly: the reload after the first save keeps the
+        // baseline honest, so the editor does not mistake its own write for an outside edit.
+        Stage(vm, vm.VisibleParameters[0].Name, "SECOND_SAVE");
+        await SaveAsync(vm);
+
+        _host.Do(() =>
+        {
+            Assert.True(vm.LastSaveOutcome == "Written", $"second save: {vm.LastSaveOutcome}: {vm.ActionError} {vm.SaveOutcomeSummary}");
+            Assert.Equal(0, vm.StagedChangeCount);
+            Assert.Equal("SECOND_SAVE", vm.VisibleParameters[0].Declaration.DefaultValue.LogicalValue);
+        });
+
+        Assert.Equal(2, Directory.GetFiles(Path.Combine(state, "backups")).Length);
+    }
+
+    private static System.Collections.Generic.Dictionary<string, byte[]> ReadEntries(string path)
+    {
+        using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        using var zip = new System.IO.Compression.ZipArchive(fs, System.IO.Compression.ZipArchiveMode.Read);
+        var map = new System.Collections.Generic.Dictionary<string, byte[]>(StringComparer.Ordinal);
+        foreach (System.IO.Compression.ZipArchiveEntry entry in zip.Entries)
+        {
+            using var s = entry.Open();
+            using var ms = new MemoryStream();
+            s.CopyTo(ms);
+            map[entry.FullName] = ms.ToArray();
+        }
+
+        return map;
+    }
+
     [Fact]
     public async Task TheSaveButtonIsDisabledWhileASaveIsRunning()
     {
@@ -313,13 +393,12 @@ public sealed class SaveFlowTests : IDisposable
         {
             vm.OpenReviewCommand.Execute(null);
             save = vm.SaveReviewCommand.ExecuteAsync(null);
-        });
 
-        await Task.Delay(50);
-        _host.Do(() =>
-        {
-            Assert.True(vm.IsSaving, "the guard flag is set while the write runs");
+            // Still the same dispatcher turn, so the write cannot have finished here: the guard has to
+            // be holding, and a second save attempt has nowhere to go.
+            Assert.True(vm.IsSaving, "the guard flag is set as soon as the save starts");
             Assert.False(vm.SaveReviewCommand.CanExecute(null));
+            Assert.False(vm.CanSaveReview);
             Assert.Contains("already running", vm.SaveUnavailableReason, StringComparison.Ordinal);
         });
 

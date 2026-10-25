@@ -388,7 +388,7 @@ Open gates:
 ### 2026-10-25 — S4 write-back: patcher, save service and the review save action
 
 Executed commands and results
-- `dotnet test` -> Core 74, Integration 32, App/WPF 49 = 155 tests, 0 failed, 0 build warnings (SDK 10.0.402).
+- `dotnet test` -> Core 74, Integration 33, App/WPF 50 = 157 tests, 0 failed, 0 build warnings (SDK 10.0.402).
 - `dotnet publish src/PubTemplateEditor.App -c Release -p:PublishProfile=PortableWin_x64` ->
   `src/PubTemplateEditor.App/bin/Release/net10.0-windows/win-x64/publish/PubTemplateEditor.exe`, 131,174,963 bytes,
   no loose .pdb (DebugType=embedded).
@@ -452,7 +452,10 @@ Tests added
   mid-batch write failure showing the earlier file already saved.
 - App/WPF: 6 save-flow tests through the shell (write + reload, outside edit refused with the draft kept
   and the review open, only ticked rows written while the rest stay staged, disabled/Explains-itself
-  states, disabled while a save runs, two templates reported separately). One obsolete test that asserted
+  states, disabled while a save runs, two templates reported separately, and a save of a copy of the real
+  `example.dta` container: the other container entries come back byte for byte, and a second save of the
+  same file goes through cleanly instead of looking like an outside edit. The in-flight guard is asserted
+  inside the same dispatcher turn, so it cannot race with a fast write. One obsolete test that asserted
   "writing is not part of this build" was replaced by the real enabled/refused behaviour.
 
 Open gates for S4
