@@ -1,0 +1,127 @@
+<Window x:Class="DTAParamEditor.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="DTA Parameter Editor"
+        Width="1180" Height="740"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        TextOptions.TextFormattingMode="Ideal"
+        UseLayoutRounding="True"
+        FontSize="{DynamicResource UiFontSize}">
+    <Window.InputBindings>
+        <KeyBinding Modifiers="Control" Key="O" Command="{Binding OpenFolderCommand}"/>
+        <KeyBinding Key="F5" Command="{Binding ReadParametersCommand}"/>
+        <KeyBinding Modifiers="Control" Key="F" Command="{Binding FocusFilterCommand}"/>
+    </Window.InputBindings>
+
+    <DockPanel>
+        <!-- Toolbar -->
+        <ToolBarTray DockPanel.Dock="Top">
+            <ToolBar>
+                <Button Command="{Binding OpenFolderCommand}" Content="Open folder…"
+                        ToolTip="Choose the template folder (Ctrl+O)"/>
+                <Separator/>
+                <Button Command="{Binding ReadParametersCommand}" Content="Read parameters"
+                        Style="{StaticResource AccentButtonStyle}"
+                        ToolTip="Parse declarations of the checked templates (F5)"/>
+                <Separator/>
+                <Button Command="{Binding SelectAllForReadCommand}" Content="Select all"/>
+                <Button Command="{Binding ClearReadSelectionCommand}" Content="Clear selection"/>
+                <Separator/>
+                <TextBox x:Name="FilterBox" Width="220" Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Filter explorer by file name"/>
+                <Separator/>
+                <Button Command="{Binding ToggleThemeCommand}" Content="Toggle light/dark"/>
+            </ToolBar>
+        </ToolBarTray>
+
+        <!-- Status bar -->
+        <StatusBar DockPanel.Dock="Bottom">
+            <StatusBar.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <DockPanel HorizontalAlignment="Stretch"/>
+                </ItemsPanelTemplate>
+            </StatusBar.ItemsPanel>
+            <StatusBarItem>
+                <ProgressBar Width="160" Value="{Binding Progress}" Minimum="0" Maximum="1"
+                             Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}"/>
+            </StatusBarItem>
+            <StatusBarItem DockPanel.Dock="Right">
+                <TextBlock Text="{Binding TotalFileCount}" Margin="0,0,8,0"/>
+            </StatusBarItem>
+            <Separator DockPanel.Dock="Right"/>
+            <StatusBarItem DockPanel.Dock="Right">
+                <TextBlock Text="{Binding SelectedReadCount}" Margin="0,0,8,0"/>
+            </StatusBarItem>
+            <Separator DockPanel.Dock="Right"/>
+            <StatusBarItem DockPanel.Dock="Right">
+                <TextBlock Text="selected:" Foreground="{DynamicResource MutedForegroundBrush}" Margin="0,0,4,0"/>
+            </StatusBarItem>
+            <Separator DockPanel.Dock="Right"/>
+            <StatusBarItem>
+                <TextBlock Text="{Binding StatusMessage}" TextTrimming="CharacterEllipsis"
+                           Foreground="{DynamicResource MutedForegroundBrush}"/>
+            </StatusBarItem>
+        </StatusBar>
+
+        <!-- Main split -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="300" MinWidth="180"/>
+                <ColumnDefinition Width="6"/>
+                <ColumnDefinition Width="*" MinWidth="380"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Explorer -->
+            <Border Grid.Column="0" Background="{DynamicResource PanelBackgroundBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,1,1">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="TEMPLATES" Margin="10,8"
+                               Foreground="{DynamicResource MutedForegroundBrush}"
+                               FontWeight="SemiBold"/>
+                    <ListBox ItemsSource="{Binding VisibleFiles}"
+                             SelectedItem="{Binding SelectedItem}"
+                             BorderThickness="0"
+                             HorizontalContentAlignment="Stretch">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <CheckBox Grid.Column="0" IsChecked="{Binding IsSelectedForRead}"
+                                              VerticalAlignment="Center"
+                                              ToolTip="Include in Read parameters"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding FileName}" Margin="6,0"
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTip="{Binding FilePath}"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding StatusDisplay}"
+                                               Foreground="{DynamicResource MutedForegroundBrush}"
+                                               FontSize="11" Margin="6,0,0,0"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Stretch"
+                          Background="{DynamicResource BorderBrush}"/>
+
+            <!-- Parameter panel (populated in S2; informative placeholder for S1) -->
+            <Border Grid.Column="2" Background="{DynamicResource PanelBackgroundBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="{Binding ActiveTemplateInfo}"
+                               Margin="10,8" FontWeight="SemiBold"/>
+                    <TextBlock Margin="24" TextWrapping="Wrap" MaxWidth="520"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Foreground="{DynamicResource MutedForegroundBrush}"
+                               Text="Declarations of the focused template appear here. The parameter table, editing, comparison and save review are added in the next milestones (S2–S4)."/>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </DockPanel>
+</Window>

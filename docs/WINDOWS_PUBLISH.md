@@ -1,0 +1,75 @@
+# Windows portable publishing and Store channel boundary
+
+## Delivery contract
+
+The new project uses Microsoft Store MSIX as the primary distribution channel; read docs/GITHUB_STORE_RELEASE.md for packaging and submission. This document retains the one-EXE portable build profile. The app remains self-contained and does not require a separately installed .NET Desktop Runtime/SDK. Store packages also contain manifests, visual assets and required notices; they need not be reduced to one internal EXE.
+
+For the portable channel, distribute PubTemplateEditor.exe. Its application resources, project assemblies and runtime are bundled. Native components may extract under the user's %TEMP%/.net directory; settings and journals use user application data. No elevated setup or writes beside the EXE are required. Test packaged mode separately; a portable launch does not prove the Store install/identity lifecycle.
+
+## App project settings
+
+The .csproj.example in examples/ is a reference, not an implemented project. Incorporate its settings into the actual application project, preserving appropriate project references and resource metadata. Core/Infrastructure project assemblies must be bundled, and debug symbol settings must not accidentally create runtime prerequisites. Use patched .NET 10 LTS and set a verified SDK version in global.json during implementation.
+
+```xml
+<PropertyGroup>
+  <OutputType>WinExe</OutputType>
+  <TargetFramework>net10.0-windows</TargetFramework>
+  <UseWPF>true</UseWPF>
+  <AssemblyName>PubTemplateEditor</AssemblyName>
+  <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+  <SelfContained>true</SelfContained>
+  <PublishSingleFile>true</PublishSingleFile>
+  <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  <PublishTrimmed>false</PublishTrimmed>
+  <PublishAot>false</PublishAot>
+  <DebugType>embedded</DebugType>
+  <ApplicationManifest>app.manifest</ApplicationManifest>
+</PropertyGroup>
+```
+
+Embed WPF resources through the appropriate build actions rather than copying external theme/content directories. Do not set IncludeAllContentForSelfExtract as a blanket workaround. Do not turn on trimming or AOT for this WPF baseline. Do not suppress single-file compatibility warnings without understanding and resolving their cause.
+
+## Intended commands
+
+These commands assume the proposed project layout has been created. They were not run when producing this planning package. Adapt them to the real repository and record the commands actually verified. Run publishing in an empty output directory to expose unintended companion files.
+
+```powershell
+dotnet --info
+dotnet restore src/PubTemplateEditor.App/PubTemplateEditor.App.csproj -r win-x64
+dotnet build src/PubTemplateEditor.App/PubTemplateEditor.App.csproj -c Release -r win-x64 --no-restore
+dotnet test tests/PubTemplateEditor.Core.Tests/PubTemplateEditor.Core.Tests.csproj -c Release
+dotnet test tests/PubTemplateEditor.Integration.Tests/PubTemplateEditor.Integration.Tests.csproj -c Release
+dotnet publish src/PubTemplateEditor.App/PubTemplateEditor.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -p:PublishAot=false -p:DebugType=embedded -o artifacts/publish/win-x64
+Get-ChildItem artifacts/publish/win-x64 -Recurse -File
+Get-FileHash artifacts/publish/win-x64/PubTemplateEditor.exe -Algorithm SHA256
+```
+
+Do not substitute dotnet run for published-EXE acceptance. Build success is not a Windows runtime test. A WPF build produced on a non-Windows host also requires real Windows execution; if cross-compilation is used, verify the SDK requirements and record that it did not run the Windows UI.
+
+## Acceptance checks
+
+1. Enumerate the clean publish directory. Explain and resolve every unexpected DLL/config/theme/resource file needed at runtime. Store optional developer symbols and metadata separately.
+2. Copy only PubTemplateEditor.exe to an empty directory on a supported Windows machine without separately installed .NET/SDK or development tools. Launch directly by double-click as a standard user.
+3. Exercise both themes, native folder selection, persisted preferences, file reading and editing, comparison, bulk staging and review/save using test copies. Run offline.
+4. Repeat with the executable directory read-only, leaving user application data, TEMP and the selected template test folder writable. No UAC prompt or manual extraction configuration should be required.
+5. Observe runtime extraction and record startup time, artifact size, actual supported OS build and bundled runtime patch. Do not assert zero extracted libraries.
+6. Test the same EXE in the intended managed environment under its existing policy. If blocked, record exact event/rule, path, new hash and whether the host EXE or an extracted component was blocked. Diagnose the actual observed result and do not apply device-policy changes yourself.
+7. Record available results and unverified gates separately. Continue independent development when managed startup is blocked; release readiness must still state the restriction.
+
+## Signing and servicing
+
+For primary Microsoft Store MSIX distribution, the Store signs/re-signs after certification and manages package installation/updates. No publisher-provided CA-trusted signing certificate is required for that submission route. This does not give a pre-Store GitHub CI artifact a trusted Store signature or Authenticode-sign the optional portable EXE. Test actual Store-installed execution under organization policy.
+
+Direct MSIX sideload distribution and portable EXE signing are separate channels with their own trust requirements. Do not introduce certificate installation, developer mode or policy changes on the user's managed PC as a prerequisite for normal Store delivery. If a separate approved development environment is used for package testing, record its trust setup accurately.
+
+Rebuild the self-contained payload for supported runtime security patches. Submit a new correctly versioned Store package through the documented release pipeline. Do not implement an updater that modifies files inside the installed MSIX directory. Record source tag, commit, tool/runtime versions and artifact hashes for each channel.
+
+## Official documentation verified 25 October 2026
+
+- .NET single-file deployment, native extraction, resources and symbols: https://learn.microsoft.com/en-us/dotnet/core/deploying/single-file/overview
+- .NET support policy, .NET 10 LTS: https://dotnet.microsoft.com/en-us/platform/support/policy
+- WPF capabilities and Windows-only platform: https://learn.microsoft.com/en-us/dotnet/desktop/wpf/overview/
+- WPF trimming limitations: https://learn.microsoft.com/en-us/dotnet/core/deploying/trimming/incompatibilities
+- Defender ASR rule reference: https://learn.microsoft.com/en-us/defender-endpoint/attack-surface-reduction-rules-reference
+
+These sources establish platform and deployment behavior. PUB mappings remain grounded in the supplied samples and any additional evidence available in the actual project.

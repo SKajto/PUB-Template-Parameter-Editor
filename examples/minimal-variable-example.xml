@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic structural illustration only. This is not a complete PUB template. -->
+<template>
+  <dataset>
+    <variables>
+      <variable>
+        <feature tag="definition">
+          <property name="name" value="exampleParameter"/>
+          <property name="description"><expression type="constant">Example description</expression></property>
+          <property name="type" value="user"/>
+          <property name="access" value="external"/>
+          <property name="default" value="Example value"/>
+          <property name="central variable" value=""/>
+        </feature>
+      </variable>
+    </variables>
+  </dataset>
+</template>

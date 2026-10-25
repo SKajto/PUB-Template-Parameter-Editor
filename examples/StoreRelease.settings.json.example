@@ -1,0 +1,14 @@
+{
+  "_comment": "Non-secret draft configuration only. Submission validation must reject every REPLACE value.",
+  "productId": "REPLACE_WITH_REAL_STORE_PRODUCT_ID",
+  "packageIdentityName": "REPLACE_WITH_PARTNER_CENTER_IDENTITY_NAME",
+  "publisher": "REPLACE_WITH_EXACT_PARTNER_CENTER_PUBLISHER",
+  "publisherDisplayName": "REPLACE_WITH_REAL_DISPLAY_NAME",
+  "sourceRepositoryUrl": "REPLACE_WITH_PUBLIC_GITHUB_REPOSITORY_URL",
+  "licenseExpression": "GPL-3.0-only",
+  "licenseChoiceStatus": "provisional unless owner explicitly selects GPL-3.0-or-later",
+  "storePriceDecision": "not-selected",
+  "architecture": "x64",
+  "targetFramework": "net10.0-windows",
+  "versionPolicy": "vMAJOR.MINOR.PATCH -> MAJOR.MINOR.PATCH.0 after Store range/order validation"
+}

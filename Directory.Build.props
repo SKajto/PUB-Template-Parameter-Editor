@@ -1,0 +1,16 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>13.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <VersionPrefix>0.1.0</VersionPrefix>
+    <Company>DTA ParamEditor contributors</Company>
+    <Product>DTA Parameter Editor</Product>
+    <Copyright>Copyright (C) DTA ParamEditor contributors</Copyright>
+    <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
+    <RepositoryType>git</RepositoryType>
+    <!-- GitHub remote URL is supplied by the owner; leave unset until it is real. -->
+  </PropertyGroup>
+</Project>

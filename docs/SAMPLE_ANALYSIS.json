@@ -1,0 +1,86 @@
+[
+  {
+    "filename": "template_latest.xml",
+    "bytes": 2152556,
+    "declaration_path": "/template/dataset/variables/variable",
+    "declared_variables": 218,
+    "access": {
+      "internal": 152,
+      "external": 66
+    },
+    "duplicate_names": [],
+    "property_shapes": [
+      {
+        "properties": [
+          "access",
+          "central variable",
+          "default",
+          "description",
+          "name",
+          "type"
+        ],
+        "count": 218
+      }
+    ],
+    "description_expression_types": {
+      "constant": 218
+    },
+    "special_fields": []
+  },
+  {
+    "filename": "template_new.xml",
+    "bytes": 2152556,
+    "declaration_path": "/template/dataset/variables/variable",
+    "declared_variables": 218,
+    "access": {
+      "internal": 152,
+      "external": 66
+    },
+    "duplicate_names": [],
+    "property_shapes": [
+      {
+        "properties": [
+          "access",
+          "central variable",
+          "default",
+          "description",
+          "name",
+          "type"
+        ],
+        "count": 218
+      }
+    ],
+    "description_expression_types": {
+      "constant": 218
+    },
+    "special_fields": []
+  },
+  {
+    "filename": "template_old.xml",
+    "bytes": 2149862,
+    "declaration_path": "/template/dataset/variables/variable",
+    "declared_variables": 216,
+    "access": {
+      "internal": 152,
+      "external": 64
+    },
+    "duplicate_names": [],
+    "property_shapes": [
+      {
+        "properties": [
+          "access",
+          "central variable",
+          "default",
+          "description",
+          "name",
+          "type"
+        ],
+        "count": 216
+      }
+    ],
+    "description_expression_types": {
+      "constant": 216
+    },
+    "special_fields": []
+  }
+]
