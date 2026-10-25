@@ -448,7 +448,8 @@ Tests added
   it hashed to before. 9 save tests on temporary copies only: entry-level byte preservation for the
   other container entries, plain-XML in-place write, conflict refusal before any write, foreign-file
   change, name never written, journal and backup contents, per-file batch reporting, preflight writes
-  nothing, and a read-only file producing a reported failure with the original intact.
+  nothing, a read-only file producing a reported failure with the original intact, and an injected
+  mid-batch write failure showing the earlier file already saved.
 - App/WPF: 6 save-flow tests through the shell (write + reload, outside edit refused with the draft kept
   and the review open, only ticked rows written while the rest stay staged, disabled/Explains-itself
   states, disabled while a save runs, two templates reported separately). One obsolete test that asserted
@@ -461,8 +462,13 @@ Open gates for S4
 - Native PUB round-trip evidence: a template saved by this app opened in PUB. Requires PUB on this
   machine; not available, so native compatibility remains unproven and the container framing difference
   (rewritten by System.IO.Compression, documented in `DtaContainer`) is the known risk to check there.
-- Cancellation in the middle of a batch and an injected mid-batch failure are implemented in code but not
-  yet covered by a test; they are recorded as unverified rather than assumed.
+- Cancellation in the middle of a batch is implemented (per-file `CancellationToken` plus the command's
+  own token) but not covered by a test; recorded as unverified rather than assumed. An injected mid-batch
+  write failure is now covered: with the second file read-only, the first file is confirmed saved and the
+  second reports a failure with its own bytes unchanged, no `~*.tmp` leftover and an `aborted` journal line.
+- A read-only target is reported as `Failed` (not silently `Rejected`), and the backup file name carries a
+  short unique suffix so saving the same template twice within one second cannot collide with its own
+  earlier backup.
 
 ## Deferred scope
 

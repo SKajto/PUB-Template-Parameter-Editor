@@ -317,6 +317,57 @@ public sealed class TemplateSaveServiceTests : IDisposable
     }
 
     [Fact]
+    public void AMidBatchWriteFailureLeavesTheEarlierFileSavedAndTheRestUntouched()
+    {
+        // The batch is explicitly not atomic. The second file is blocked the way a locked file blocks
+        // it in practice, so the first file is already saved when the second one fails.
+        string first = CopySample("example.dta");
+        string second = Path.Combine(_root, "second.dta");
+        File.Copy(Path.Combine(FindSamplesDir()!, "example.dta"), second);
+
+        TemplateReaderService reader = new();
+        TemplateRecord firstRecord = reader.Load(first, CancellationToken.None);
+        TemplateRecord secondRecord = reader.Load(second, CancellationToken.None);
+        VariableDeclaration firstTarget = firstRecord.Declarations.First(d => d.DefaultValue.Capability == FieldCapability.Editable);
+        VariableDeclaration secondTarget = secondRecord.Declarations.First(d => d.DefaultValue.Capability == FieldCapability.Editable);
+        string secondHashBefore = HashService.Sha256Hex(File.ReadAllBytes(second));
+
+        File.SetAttributes(second, FileAttributes.ReadOnly);
+        List<SaveFileResult> results;
+        try
+        {
+            results =
+            [
+                Service().SaveOne(new SaveRequest(firstRecord, [Change(firstRecord, firstTarget, FieldKind.DefaultValue, "FIRST_SAVED")])),
+                Service().SaveOne(new SaveRequest(secondRecord, [Change(secondRecord, secondTarget, FieldKind.DefaultValue, "SECOND_BLOCKED")])),
+            ];
+        }
+        finally
+        {
+            File.SetAttributes(second, FileAttributes.Normal);
+        }
+
+        Assert.Equal(SaveOutcome.Written, results[0].Outcome);
+        Assert.Equal(SaveOutcome.Failed, results[1].Outcome);
+        Assert.Contains("did not complete", results[1].Message, StringComparison.Ordinal);
+
+        TemplateRecord firstReread = reader.Load(first, CancellationToken.None);
+        Assert.Equal("FIRST_SAVED",
+            firstReread.Declarations.Single(d => d.DeclarationId == firstTarget.DeclarationId).DefaultValue.LogicalValue);
+        Assert.Equal(secondHashBefore, HashService.Sha256Hex(File.ReadAllBytes(second)));
+        TemplateRecord secondReread = reader.Load(second, CancellationToken.None);
+        Assert.Equal(secondTarget.DefaultValue.LogicalValue,
+            secondReread.Declarations.Single(d => d.DeclarationId == secondTarget.DeclarationId).DefaultValue.LogicalValue);
+
+        // No half-written template file is left behind: only the journal records the attempt.
+        Assert.Empty(Directory.GetFiles(Path.GetDirectoryName(second)!, "~*.tmp"));
+
+        string journal = File.ReadAllText(Service().JournalPath);
+        Assert.Contains("confirmed", journal, StringComparison.Ordinal);
+        Assert.Contains("aborted", journal, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PreflightReportsEveryFileWithoutWritingAnything()
     {
         string first = CopySample();

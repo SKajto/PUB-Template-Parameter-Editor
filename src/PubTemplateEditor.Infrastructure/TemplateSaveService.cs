@@ -131,8 +131,10 @@ public sealed class TemplateSaveService
         {
             Directory.CreateDirectory(_stateDirectory);
             Directory.CreateDirectory(BackupDirectory);
+            // The guid keeps two saves of the same file inside one second from colliding; a collision
+            // would turn a perfectly good save into a failure.
             backupPath = Path.Combine(BackupDirectory,
-                $"{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Path.GetFileName(path)}.bak");
+                $"{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Path.GetFileName(path)}-{journalId[..8]}.bak");
 
             AppendJournal(journalId, path, "prepared", beforeHash, expectedHash, backupPath);
 
