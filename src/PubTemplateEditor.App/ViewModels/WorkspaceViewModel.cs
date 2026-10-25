@@ -35,6 +35,9 @@ public sealed class WorkspaceViewModel : ViewModelBase
         SelectAllForReadCommand = new RelayCommand(() => SetAllChecked(true), () => VisibleFiles.Count > 0);
         ClearReadSelectionCommand = new RelayCommand(() => SetAllChecked(false), () => VisibleFiles.Count > 0);
         ToggleThemeCommand = new RelayCommand(ToggleTheme);
+        // Licences must stay reachable offline from inside the app (GPL distribution rule).
+        // The view decides how to present them; the view model stays free of window types.
+        OpenLicensesCommand = new RelayCommand(() => LicensesRequested?.Invoke());
 
         // FILE-01: restore remembered folder; a missing folder produces a clear message.
         if (!string.IsNullOrWhiteSpace(loadedSettings.LastFolder))
@@ -56,6 +59,7 @@ public sealed class WorkspaceViewModel : ViewModelBase
     public RelayCommand SelectAllForReadCommand { get; }
     public RelayCommand ClearReadSelectionCommand { get; }
     public RelayCommand ToggleThemeCommand { get; }
+    public RelayCommand OpenLicensesCommand { get; }
 
     public string? FolderPath
     {
@@ -131,6 +135,9 @@ public sealed class WorkspaceViewModel : ViewModelBase
 
     /// <summary>Set by the view so Ctrl+F can move keyboard focus to the filter box.</summary>
     public event Action? FilterFocusRequested;
+
+    /// <summary>Raised when the user asks for the offline licence/notices view.</summary>
+    public event Action? LicensesRequested;
 
     private void OpenFolder()
     {

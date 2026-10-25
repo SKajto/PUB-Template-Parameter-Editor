@@ -10,3 +10,4 @@ samples/
 publish/
 *.nupkg
 MSIX/
+.reference/

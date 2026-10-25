@@ -1,0 +1,38 @@
+<Window x:Class="PubTemplateEditor.App.LicensesWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Licence and bundled components"
+        Width="820" Height="620"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        FontSize="{DynamicResource UiFontSize}">
+    <DockPanel>
+        <TextBlock x:Name="SourceLine" DockPanel.Dock="Bottom" Margin="10,8"
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource MutedForegroundBrush}"/>
+        <TabControl x:Name="NoticeTabs" BorderThickness="0" Background="{DynamicResource WindowBackgroundBrush}">
+        <TabItem Header="GNU GPL v3">
+            <TextBox x:Name="LicenseText" IsReadOnly="True" IsReadOnlyCaretVisible="False"
+                     AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+                     HorizontalScrollBarVisibility="Disabled" FontFamily="Consolas, Courier New"
+                     Background="{DynamicResource PanelBackgroundBrush}"
+                     Foreground="{DynamicResource ForegroundBrush}" BorderThickness="0" Padding="10" />
+        </TabItem>
+        <TabItem Header="Notice">
+            <TextBox x:Name="NoticeText" IsReadOnly="True" IsReadOnlyCaretVisible="False"
+                     AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+                     HorizontalScrollBarVisibility="Disabled" FontFamily="Consolas, Courier New"
+                     Background="{DynamicResource PanelBackgroundBrush}"
+                     Foreground="{DynamicResource ForegroundBrush}" BorderThickness="0" Padding="10" />
+        </TabItem>
+        <TabItem Header="Third-party">
+            <TextBox x:Name="ThirdPartyText" IsReadOnly="True" IsReadOnlyCaretVisible="False"
+                     AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+                     HorizontalScrollBarVisibility="Disabled" FontFamily="Consolas, Courier New"
+                     Background="{DynamicResource PanelBackgroundBrush}"
+                     Foreground="{DynamicResource ForegroundBrush}" BorderThickness="0" Padding="10" />
+        </TabItem>
+        </TabControl>
+    </DockPanel>
+</Window>

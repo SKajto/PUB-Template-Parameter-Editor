@@ -12,6 +12,7 @@
         <KeyBinding Modifiers="Control" Key="O" Command="{Binding OpenFolderCommand}"/>
         <KeyBinding Key="F5" Command="{Binding ReadParametersCommand}"/>
         <KeyBinding Modifiers="Control" Key="F" Command="{Binding FocusFilterCommand}"/>
+        <KeyBinding Modifiers="Control" Key="L" Command="{Binding OpenLicensesCommand}"/>
     </Window.InputBindings>
 
     <DockPanel>
@@ -32,6 +33,9 @@
                          ToolTip="Filter explorer by file name"/>
                 <Separator/>
                 <Button Command="{Binding ToggleThemeCommand}" Content="Toggle light/dark"/>
+                <Separator/>
+                <Button Command="{Binding OpenLicensesCommand}" Content="Licences…"
+                        ToolTip="Offline GPL and bundled-component notices (Ctrl+L)"/>
             </ToolBar>
         </ToolBarTray>
 

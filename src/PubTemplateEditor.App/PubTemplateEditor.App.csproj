@@ -18,6 +18,7 @@
   <ItemGroup>
     <Resource Include="..\..\LICENSE" Link="Assets\LICENSE.txt" />
     <Resource Include="..\..\NOTICE" Link="Assets\NOTICE.txt" />
+    <Resource Include="..\..\THIRD-PARTY-NOTICES.txt" Link="Assets\THIRD-PARTY-NOTICES.txt" />
   </ItemGroup>
 
 </Project>

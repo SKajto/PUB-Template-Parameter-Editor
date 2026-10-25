@@ -1,0 +1,41 @@
+Third-party notices for PUB Template Parameter Editor
+=====================================================
+
+PUB Template Parameter Editor (the application source, UI resources, build and
+packaging scripts) is licensed under the GNU General Public License version 3
+only (GPL-3.0-only). See LICENSE and NOTICE in this repository.
+
+The distributed binaries are self-contained and therefore also carry the
+following components. They are NOT relicensed as GPL; they stay under their own
+terms and their own copyright holders.
+
+1. .NET 10 runtime and .NET SDK components
+   Copyright (c) .NET Foundation and contributors
+   License: MIT
+   Full license text shipped with the runtime: LICENSE.txt in the .NET
+   distribution, and the third-party notices list at
+   https://dotnet.microsoft.com/en-us/developer/distributions
+   Parts of the runtime contain third-party code listed at
+   https://github.com/dotnet/runtime/blob/main/LICENSE.TXT
+
+2. Windows Presentation Foundation (WPF) and Windows Forms, delivered as part
+   of the .NET (Microsoft.WindowsDesktop.App) runtime
+   Copyright (c) .NET Foundation and contributors
+   License: MIT (same notice set as above)
+
+3. System.Runtime / CoreCLR native components (coreclr, clrcompression,
+   wpfgfx_cor3.dll, etc.) bundled in the self-contained payload
+   Copyright (c) Microsoft Corporation
+   License: MIT / .NET runtime license terms as published above
+
+4. Microsoft Windows SDK packaging tools (MakeAppx.exe) are used only at build
+   time on the maintainer machine or CI runner. They are not part of the
+   distributed payload.
+
+5. Test-only tooling (xUnit.net and friends) is used at build time and is not
+   shipped in the application binaries.
+
+No template data, PUB template content or user files are part of the
+application distribution. Native .dta reference samples used for format
+evidence are user/owner-provided content; see docs/SAMPLE_FINDINGS.md for the
+redistribution gate before they may be published with the source.

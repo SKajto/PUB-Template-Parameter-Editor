@@ -1,0 +1,121 @@
+# PR validation for PUB Template Parameter Editor.
+# Runs untrusted contribution code, so: read-only token, no Store secrets, no deploy keys.
+#
+# Action references are pinned to immutable commit SHAs. They were resolved from the
+# official repository tag listings on 2026-10-25 (github.com REST API tags endpoint):
+#   actions/checkout          v7.0.1  3d3c42e5aac5ba805825da76410c181273ba90b1
+#   actions/setup-dotnet      v6.0.0  a98b56852c35b8e3190ac28c8c2271da59106c68
+#   actions/upload-artifact   v7.0.2  cf430e030ddbb5b0abf93d22962f4752f3646cd9
+# Re-verify before changing a pin (see docs/GITHUB_STORE_RELEASE.md).
+
+name: CI validation
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+
+jobs:
+  build-test-package:
+    name: Build, test and draft-package (windows-latest)
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Toolchain versions (recorded for the release map)
+        run: |
+          dotnet --version
+          dotnet --list-sdks
+          Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' -Directory |
+            ForEach-Object { $_.Name }
+        shell: pwsh
+
+      - name: Install .NET from global.json
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+
+      - name: Restore
+        run: dotnet restore PubTemplateEditor.slnx
+        shell: pwsh
+
+      - name: Build
+        run: dotnet build PubTemplateEditor.slnx -c Release --no-restore
+        shell: pwsh
+
+      - name: Unit tests (Core, no filesystem writes)
+        run: dotnet test tests/PubTemplateEditor.Core.Tests -c Release --no-build --logger trx --results-directory TestResults
+        shell: pwsh
+
+      - name: Integration tests (temp copies, packaging config)
+        run: dotnet test tests/PubTemplateEditor.Integration.Tests -c Release --no-build --logger trx --results-directory TestResults
+        shell: pwsh
+
+      - name: WPF shell/theme tests (STA host)
+        run: dotnet test tests/PubTemplateEditor.App.Tests -c Release --no-build --logger trx --results-directory TestResults
+        shell: pwsh
+
+      - name: Licensing/repo hygiene checks
+        run: |
+          $license = Get-Content LICENSE -Raw
+          if ($license -notmatch 'GNU GENERAL PUBLIC LICENSE') { throw 'LICENSE is missing the GPLv3 text' }
+          if ($license -notmatch 'Version 3') { throw 'LICENSE is not GPLv3' }
+          if (-not (Test-Path NOTICE)) { throw 'NOTICE is missing' }
+          if (-not (Select-String -Path Directory.Build.props -Pattern 'GPL-3.0-only' -Quiet)) {
+            throw 'Directory.Build.props must carry the recorded SPDX id'
+          }
+          $tracked = git ls-files | Where-Object { $_ -match '^(bin|obj|artifacts)/|\.pdb$|\.dll$' }
+          if ($tracked) { throw "build outputs are tracked in git: $($tracked -join ', ')" }
+        shell: pwsh
+
+      - name: Publish portable single-file EXE (development/optional channel)
+        run: >
+          dotnet publish src/PubTemplateEditor.App/PubTemplateEditor.App.csproj
+          -c Release -p:PublishProfile=PortableWin_x64
+          -o artifacts/publish/portable-win-x64
+        shell: pwsh
+
+      - name: Portable payload must contain no loose symbols
+        run: |
+          $loose = Get-ChildItem artifacts/publish/portable-win-x64 -Recurse -Include *.pdb,*.xml
+          if ($loose) { throw "unexpected files: $($loose.Name -join ', ')" }
+          if (-not (Test-Path artifacts/publish/portable-win-x64/PubTemplateEditor.exe)) {
+            throw 'PubTemplateEditor.exe missing from the portable payload'
+          }
+        shell: pwsh
+
+      - name: Draft MSIX (placeholder identity, unsigned)
+        run: >
+          powershell -NoProfile -ExecutionPolicy Bypass -File packaging/build-msix.ps1
+          -Version 0.0.0 -Mode Draft
+        shell: pwsh
+
+      - name: Record artifact hashes
+        run: |
+          Get-ChildItem artifacts/publish/portable-win-x64/PubTemplateEditor.exe,
+                       artifacts/packaging/out/*.msix |
+            ForEach-Object { '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash, $_.Name } |
+            Tee-Object artifacts/sha256.txt
+        shell: pwsh
+
+      - name: Upload CI artifacts (not Store-signed)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: ci-outputs-${{ github.run_id }}
+          path: |
+            artifacts/packaging/out
+            artifacts/publish/portable-win-x64
+            artifacts/sha256.txt
+          retention-days: 7
+          if-no-files-found: error

@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Draft MSIX manifest template for PUB Template Parameter Editor.
-  {{TOKENS}} are replaced by packaging/build-msix.ps1 from packaging/StoreRelease.settings.json.
+  Token placeholders are replaced by packaging/build-msix.ps1 from packaging/StoreRelease.settings.json.
   A -Strict (submission) build rejects any unresolved REPLACE_* token; see docs/GITHUB_STORE_RELEASE.md.
   runFullTrust is required because the payload is a self-contained Win32/WPF executable.
   Store signing happens after Partner Center certification; this manifest needs no publisher CA certificate.
 -->
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
          xmlns:mp="http://schemas.microsoft.com/appx/2014/manifest"
-         xmlns:uap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/universal"
+         xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
          xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities">
 
   <Identity Name="{{PACKAGE_IDENTITY_NAME}}"
@@ -23,9 +23,9 @@
   </Properties>
 
   <Dependencies>
-    <!-- Windows 11 x64 is the initial target (REQUIREMENTS GEN-02). MaxVersionTested is
-         updated by CI when a newer SDK is actually verified on runners. -->
-    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.22000.0" MaxVersionTested="10.0.26100.0" />
+    <!-- Windows 11 x64 is the initial target (REQUIREMENTS GEN-02). MaxVersionTested must
+         never exceed the Windows SDK whose schema the packaging tool validates against. -->
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="{{MIN_VERSION}}" MaxVersionTested="{{MAX_VERSION_TESTED}}" />
   </Dependencies>
 
   <Resources>

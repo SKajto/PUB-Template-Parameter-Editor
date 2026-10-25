@@ -1,0 +1,135 @@
+# Trusted release packaging. Never holds Store credentials.
+# Runs only for maintainer-triggered work or tags on the protected default branch;
+# PR code is not executed here. Requires the 'release-packaging' environment so a
+# maintainer must approve the run (Settings -> Environments -> protection rules).
+#
+# Pinned action SHAs are the same verified refs as .github/workflows/ci.yml.
+
+name: Release packaging
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Tag, branch or commit to package (must be the released commit)
+        required: true
+        default: main
+      appVersion:
+        description: App version MAJOR.MINOR.PATCH (MSIX version becomes MAJOR.MINOR.PATCH.0)
+        required: true
+        default: 0.1.0
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-packaging-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    name: Validate, build and package the release
+    runs-on: windows-latest
+    environment: release-packaging
+
+    outputs:
+      appVersion: ${{ steps.version.outputs.appVersion }}
+      packageVersion: ${{ steps.version.outputs.packageVersion }}
+
+    steps:
+      - name: Resolve and validate the version inputs
+        id: version
+        run: |
+          $raw = if ('${{ github.event_name }}' -eq 'workflow_dispatch') { '${{ inputs.appVersion }}' }
+                 else { '${{ github.ref_name }}'.Substring(1) }
+          if ($raw -notmatch '^\d+\.\d+\.\d+$') { throw "appVersion '$raw' must be MAJOR.MINOR.PATCH" }
+          "appVersion=$raw" >> $env:GITHUB_OUTPUT
+          "packageVersion=$raw.0" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          # A tag push checks out the tag itself; a manual run uses the given ref.
+
+      - name: Install .NET from global.json
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+
+      - name: Build
+        run: |
+          dotnet restore PubTemplateEditor.slnx
+          dotnet build PubTemplateEditor.slnx -c Release --no-restore
+        shell: pwsh
+
+      - name: Test
+        run: |
+          dotnet test tests/PubTemplateEditor.Core.Tests -c Release --no-build
+          dotnet test tests/PubTemplateEditor.Integration.Tests -c Release --no-build
+          dotnet test tests/PubTemplateEditor.App.Tests -c Release --no-build
+        shell: pwsh
+
+      - name: Reject unresolved identity in a submission build (REL-04)
+        run: |
+          $settings = Get-Content packaging/StoreRelease.settings.json -Raw | ConvertFrom-Json
+          $bad = @($settings.PSObject.Properties | Where-Object {
+              $_.Value -is [string] -and ($_.Value -like 'REPLACE_*' -or -not $_.Value)
+          })
+          if ($bad) {
+            throw "unresolved release configuration: $($bad.Name -join ', ') - fill in the real Partner Center values first"
+          }
+        shell: pwsh
+
+      - name: Package MSIX for Store submission (unsigned at build time)
+        run: >
+          powershell -NoProfile -ExecutionPolicy Bypass -File packaging/build-msix.ps1
+          -Version ${{ steps.version.outputs.appVersion }} -Mode Strict
+        shell: pwsh
+
+      - name: Publish portable single-file EXE (separate, never Store-signed)
+        run: >
+          dotnet publish src/PubTemplateEditor.App/PubTemplateEditor.App.csproj
+          -c Release -p:PublishProfile=PortableWin_x64
+          -o artifacts/publish/portable-win-x64
+        shell: pwsh
+
+      - name: Corresponding source archive (GPL obligation)
+        run: |
+          New-Item -ItemType Directory -Force artifacts/source | Out-Null
+          git archive --format=tar.gz -o artifacts/source/PubTemplateEditor-${{ steps.version.outputs.appVersion }}-source.tar.gz HEAD
+          git rev-parse HEAD | Tee-Object artifacts/source/commit.txt
+        shell: pwsh
+
+      - name: Notices shipped with the binaries
+        run: |
+          New-Item -ItemType Directory -Force artifacts/notices | Out-Null
+          Copy-Item LICENSE,NOTICE artifacts/notices/
+          dotnet publish src/PubTemplateEditor.App/PubTemplateEditor.App.csproj -c Release `
+            -p:PublishProfile=StoreMsixWin_x64 -o artifacts/tmp-notice --no-build | Out-Null
+          Get-ChildItem artifacts/tmp-notice -Filter *.txt | Copy-Item -Destination artifacts/notices/ -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force artifacts/tmp-notice -ErrorAction SilentlyContinue
+        shell: pwsh
+
+      - name: Hashes and provenance
+        run: |
+          Get-ChildItem artifacts -Recurse -Include *.msix,*.exe,*.tar.gz |
+            ForEach-Object { '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash, $_.FullName.Replace("$PWD\", '') } |
+            Tee-Object artifacts/SHA256SUMS.txt
+          'commit: ' + (git rev-parse HEAD) | Tee-Object -Append artifacts/SHA256SUMS.txt
+          'dotnet: ' + (dotnet --version) | Tee-Object -Append artifacts/SHA256SUMS.txt
+        shell: pwsh
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-${{ steps.version.outputs.appVersion }}
+          path: |
+            artifacts/packaging/out
+            artifacts/publish/portable-win-x64
+            artifacts/source
+            artifacts/notices
+            artifacts/SHA256SUMS.txt
+          retention-days: 90
+          if-no-files-found: error
