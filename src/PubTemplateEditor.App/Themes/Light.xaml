@@ -1,28 +1,54 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
-    <!-- Light theme. Keys must stay identical to Dark.xaml. -->
-    <Color x:Key="WindowBackgroundColor">#F7F7F9</Color>
+    <!--
+      Light theme. Keys must stay identical to Dark.xaml (ThemeTests enforces the parity).
+      Values follow the reviewed reference UI palette (blue accent, cool grey borders/text).
+    -->
+    <Color x:Key="WindowBackgroundColor">#F3F5F8</Color>
     <Color x:Key="PanelBackgroundColor">#FFFFFF</Color>
-    <Color x:Key="ForegroundColor">#1B1B1F</Color>
-    <Color x:Key="MutedForegroundColor">#5D5D66</Color>
-    <Color x:Key="BorderColor">#D4D4DA</Color>
-    <Color x:Key="AccentColor">#0F6CBD</Color>
-    <Color x:Key="SelectionColor">#CCE4F7</Color>
+    <Color x:Key="Panel2BackgroundColor">#EEF1F5</Color>
+    <Color x:Key="ForegroundColor">#364150</Color>
+    <Color x:Key="MutedForegroundColor">#8792A2</Color>
+    <Color x:Key="EyebrowForegroundColor">#8792A2</Color>
+    <Color x:Key="BorderColor">#D8E0EB</Color>
+    <Color x:Key="StrongBorderColor">#C3CEDB</Color>
+    <Color x:Key="AccentColor">#315FCA</Color>
+    <Color x:Key="AccentSoftColor">#E8EEFB</Color>
+    <Color x:Key="SelectionColor">#DCE7FA</Color>
+    <Color x:Key="RowHoverColor">#F7F9FC</Color>
     <Color x:Key="DirtyColor">#B45309</Color>
-    <Color x:Key="ErrorColor">#C13832</Color>
-    <Color x:Key="OkColor">#107C10</Color>
+    <Color x:Key="DirtyForegroundColor">#8F4A0B</Color>
+    <Color x:Key="DirtyNoticeBackgroundColor">#FFF1DB</Color>
+    <Color x:Key="ErrorColor">#C0392F</Color>
+    <Color x:Key="ErrorForegroundColor">#A4232E</Color>
+    <Color x:Key="ErrorNoticeBackgroundColor">#FFEEF1</Color>
+    <Color x:Key="OkColor">#16704A</Color>
+    <Color x:Key="OkForegroundColor">#146349</Color>
+    <Color x:Key="OkNoticeBackgroundColor">#EAFAF0</Color>
 
     <SolidColorBrush x:Key="WindowBackgroundBrush" Color="{DynamicResource WindowBackgroundColor}"/>
     <SolidColorBrush x:Key="PanelBackgroundBrush" Color="{DynamicResource PanelBackgroundColor}"/>
+    <SolidColorBrush x:Key="Panel2BackgroundBrush" Color="{DynamicResource Panel2BackgroundColor}"/>
     <SolidColorBrush x:Key="ForegroundBrush" Color="{DynamicResource ForegroundColor}"/>
     <SolidColorBrush x:Key="MutedForegroundBrush" Color="{DynamicResource MutedForegroundColor}"/>
+    <SolidColorBrush x:Key="EyebrowForegroundBrush" Color="{DynamicResource EyebrowForegroundColor}"/>
     <SolidColorBrush x:Key="BorderBrush" Color="{DynamicResource BorderColor}"/>
+    <SolidColorBrush x:Key="StrongBorderBrush" Color="{DynamicResource StrongBorderColor}"/>
     <SolidColorBrush x:Key="AccentBrush" Color="{DynamicResource AccentColor}"/>
+    <SolidColorBrush x:Key="AccentSoftBrush" Color="{DynamicResource AccentSoftColor}"/>
     <SolidColorBrush x:Key="SelectionBrush" Color="{DynamicResource SelectionColor}"/>
+    <SolidColorBrush x:Key="RowHoverBackgroundBrush" Color="{DynamicResource RowHoverColor}"/>
+    <SolidColorBrush x:Key="SelectedRowBackgroundBrush" Color="{DynamicResource SelectionColor}"/>
     <SolidColorBrush x:Key="DirtyBrush" Color="{DynamicResource DirtyColor}"/>
+    <SolidColorBrush x:Key="DirtyForegroundBrush" Color="{DynamicResource DirtyForegroundColor}"/>
+    <SolidColorBrush x:Key="DirtyNoticeBackgroundBrush" Color="{DynamicResource DirtyNoticeBackgroundColor}"/>
     <SolidColorBrush x:Key="ErrorBrush" Color="{DynamicResource ErrorColor}"/>
+    <SolidColorBrush x:Key="ErrorForegroundBrush" Color="{DynamicResource ErrorForegroundColor}"/>
+    <SolidColorBrush x:Key="ErrorNoticeBackgroundBrush" Color="{DynamicResource ErrorNoticeBackgroundColor}"/>
     <SolidColorBrush x:Key="OkBrush" Color="{DynamicResource OkColor}"/>
+    <SolidColorBrush x:Key="OkForegroundBrush" Color="{DynamicResource OkForegroundColor}"/>
+    <SolidColorBrush x:Key="OkNoticeBackgroundBrush" Color="{DynamicResource OkNoticeBackgroundColor}"/>
 
     <FontFamily x:Key="UiFontFamily">Segoe UI Variable Text, Segoe UI</FontFamily>
     <FontFamily x:Key="MonoFontFamily">Cascadia Mono, Consolas</FontFamily>

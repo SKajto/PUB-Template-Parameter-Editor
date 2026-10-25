@@ -3,7 +3,7 @@ Copyright (C) PUB Template Parameter Editor contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License
+the Free Software Foundation; version 3 of the License
 (GPL-3.0-only; the provisional SPDX choice recorded in REQUIREMENTS.md).
 
 This program is distributed in the hope that it will be useful,
@@ -23,3 +23,11 @@ Bundled runtime components (not relicensed as GPL):
 
 Third-party template data: native PUB .dta samples are user content.
 Only explicitly redistributable or synthetic fixtures may be committed.
+
+Design reference: the functionality and screen layout of this editor were
+reviewed against SKajto's "PUB Template Parameter Editor" (an offline
+Electron/TypeScript implementation, GPL-3.0-only),
+https://github.com/SKajto/PUB-Template-Parameter-Editor. This repository is
+an independent C#/WPF implementation; no source files from that project are
+copied, translated or vendored here. See docs/REFERENCE_UI_FINDINGS.md for
+the reviewed surface, mirrored behaviour and recorded differences.

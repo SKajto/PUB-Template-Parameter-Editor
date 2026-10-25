@@ -28,6 +28,17 @@ Done when supported samples yield verified names/defaults/access/descriptions, e
 - Add name/description search, All/Internal/External filtering and clear counts/states. Keep active focus separate from multi-selection.
 - Use resizable panels, keyboard focus and accessible light/dark styles through built-in WPF controls.
 
+Status 2026-10-25: implemented — folder selection with remembered folder and theme,
+non-recursive `.dta` listing with per-entry stat errors, filename filter with
+Select/Clear visible, read checkboxes separate from the focused template, explicit
+async Read parameters with progress and per-template errors, name/description search
+with All/Internal/External filter and live counts, read-only parameter table and
+detail cards, resizable panels (`GridSplitter`), Ctrl+E search focus, accessible
+light/dark/system styles matching the reference palette. Read hashes of the sample
+templates are re-verified unchanged after listing/reading (see the file-fingerprint
+assertions in the integration tests). Still open: human review of the rendered UI in
+an interactive Windows desktop session (see the Progress record).
+
 Done when reading/filter combinations and persistence work in the actual Windows GUI, counts match verified samples and original file hashes remain unchanged.
 
 ## S3 Add edits comparison and bulk staging
@@ -89,6 +100,132 @@ Done when application, format, packaging, lifecycle, licensing and actual distri
 ## Progress record
 
 Initial status: all milestones not started. For each completed increment record what works, executed checks and commands, artifact locations, decisions, next work and remaining external gates. Update the status as actual development proceeds; do not infer completion from this document.
+
+### 2026-10-25 — S0 complete, S1 complete, S2 in progress
+
+Toolchain actually used: `dotnet --version` = **10.0.402** (`global.json` pins
+`10.0.0` feature band `latestPatch`), Windows 11 x64, MSBuild from the .NET SDK,
+MakeAppx from Windows SDKs 10.0.19041.0 / 10.0.22621.0 / 10.0.26100.0.
+
+Executed commands and results:
+
+- `dotnet build -c Debug` → 0 warnings, 0 errors.
+- `dotnet test` → **64 passing, 0 failing** (Core 35, Integration 9, App/WPF 20).
+- `dotnet publish src/PubTemplateEditor.App -c Release -p:PublishProfile=PortableWin_x64`
+  → single-file `PubTemplateEditor.exe` (~125 MB), no loose `.pdb` (embedded debug
+  info), self-contained win-x64.
+- `powershell -File packaging/build-msix.ps1 -Version 0.1.0 -Mode Draft`
+  → `artifacts/msix/PubTemplateEditor_0.1.0_win-x64.msix` (60.8 MB) plus unpacked
+  verification layout and provenance JSON with the SHA-256. `-Mode Strict`
+  fails on the `REPLACE_*` Partner Center identity placeholders (REL-04 gate).
+- GUI launch check: started `PubTemplateEditor.exe`, process alive after 6 s.
+  This machine has no interactive desktop session, so no screen capture and no
+  click-through verification is possible here (recorded gate, not a failure).
+
+S2 work now in the tree (read-only explorer, matching the reference layout in
+`docs/REFERENCE_UI_FINDINGS.md`):
+
+- `Infrastructure/TemplateFolderScanner.cs` — non-recursive `.dta` listing with
+  sizes and per-entry stat errors (FILE-02/FILE-04).
+- `Core/Search/ParameterSearchMatcher.cs` — anchored case-sensitive name search
+  with `*`, case-insensitive description search, name-region suppression; 8 Core
+  tests including literal metacharacters and multi-line values.
+- `ViewModels/WorkspaceViewModel.cs`, `TemplateItem`, `ParameterRowItem` —
+  folder restore, filename filter, read scope vs active focus (FILE-05),
+  explicit async Read parameters with progress and per-file errors, parameter
+  search/access filter with live counts, read-only detail cards with the
+  XML-type note and unsupported-shape explanations, Light/Dark/System theme
+  persistence, footer text and version→licences entry point.
+- `MainWindow.xaml` rebuilt to the reference screen map; `Themes/Controls.xaml`
+  gained eyebrow/card/notice/badge/segment/ListView-GridView styles; empty states
+  are mutually exclusive.
+- `tests/PubTemplateEditor.App.Tests/ExplorerTests.cs` and `ShellSnapshotTests.cs`
+  (the latter renders the shell in the STA host, asserts panel geometry and writes
+  `artifacts/screenshots/shell-light.png` / `shell-dark.png` for human review).
+
+Decisions recorded: GPL-3.0-only wording fixed in `NOTICE`; upstream design
+lineage added to `NOTICE` and `docs/REFERENCE_UI_FINDINGS.md` (independent
+implementation, no code copied); `SystemThemePreference` reads the Windows
+registry value with a Light fallback; folder listing is `.dta` only and
+non-recursive.
+
+Remaining gates before S2 can be called done:
+
+1. Human visual review of `artifacts/screenshots/*.png` and of the running window
+   on a real desktop session (keyboard/mouse, DPI scaling, screen reader names).
+2. Persistence round-trip already covered for folder and theme; detail-panel width
+   and column widths are not yet remembered (open product question, not required
+   by REQUIREMENTS.md).
+3. Compare / "Apply value to templates" controls intentionally absent until S3.
+
+Next: S3 — enable default value, access and supported description editing with
+explicit Apply edits, dirty indicators, no-op normalisation, unsaved-work
+navigation, compare panel and bulk value staging.
+
+### 2026-10-25 — S2 code complete (GUI review gate still open)
+
+Added after the first S2 pass:
+
+- Reference review documentation `docs/REFERENCE_UI_FINDINGS.md`: upstream project,
+  reviewed revision (`SKajto/PUB-Template-Parameter-Editor` @
+  `7aa497d61f37fd4f7430eba266c5f6b18bf2ef42`, GPL-3.0), the screen map, the mirrored
+  behaviour rules and the recorded differences. Provenance is also stated in
+  `NOTICE`; no upstream source is copied or vendored (`.reference/` is gitignored).
+- `NOTICE` wording corrected to the **GPL-3.0-only** grant (it previously carried the
+  "either version" -or-later sentence while the SPDX choice is `GPL-3.0-only`).
+- Theme palette aligned with the reviewed reference values (`Themes/Light.xaml`,
+  `Themes/Dark.xaml`): accent `#315FCA`, border `#D8E0EB`, text `#364150`,
+  muted `#8792A2`, window `#F3F5F8`, panel `#FFFFFF`, plus accent-soft, selection,
+  row-hover and error/success/warning background+foreground pairs. Dark values are
+  derived (upstream ships light only). No colour literals remain outside the theme
+  dictionaries.
+- `Infrastructure/ProductInfo.cs` is the single source for product name, version,
+  licence id, copyright, runtime/OS description and the corresponding-source note;
+  `WorkspaceViewModel` and the new **About tab** in `LicensesWindow` read it, so the
+  footer button, About view and licence text cannot disagree. The About view is
+  reachable offline (footer button, Ctrl+L).
+- `TemplateFolderScanner` takes an optional stat seam so a failing entry can be
+  tested; `tests/PubTemplateEditor.Integration.Tests/FolderScannerTests.cs` covers
+  `.dta`-only, non-recursive, deterministic order, per-entry listing errors and a
+  missing folder.
+- New App tests: select/clear-visible changes only the read scope, focus never
+  re-checks a checkbox, an empty scope is refused and a successful read clears the
+  error state, and the rendered detail controls show the exact declaration values.
+- `ShellSnapshotTests` now also renders the About window and asserts that the
+  rendered shell text carries the view-model values (product name, folder name,
+  file count badge, scope line, focused template, summary, footer counts,
+  version button), which catches mistyped binding paths. `ThemeTests` gained
+  "every StaticResource key is defined" and "no hard-coded colours in shell XAML".
+
+Executed commands and results:
+
+- `dotnet build -c Debug` → 0 warnings, 0 errors.
+- `dotnet test` → **72 passing, 0 failing** (Core 35, Integration 12, App/WPF 25).
+- `dotnet publish src/PubTemplateEditor.App -c Release -p:PublishProfile=PortableWin_x64`
+  → `src/PubTemplateEditor.App/bin/Release/net10.0-windows/win-x64/publish/PubTemplateEditor.exe`
+  (131,020,339 bytes, single file, self-contained).
+- Started that executable: process alive after 8 s, then stopped
+  (`artifacts` launch probe, no interactive desktop session on this machine).
+- `powershell -File packaging/build-msix.ps1 -Version 0.2.0 -Mode Draft`
+  → `artifacts/packaging/out/PubTemplateEditor_0.2.0_win-x64.msix`, SHA-256
+  `A8BD3D9A…CFBB71`, unpacked layout contains `notices/`; `-Mode Strict` still
+  rejects the unresolved identity values (REL-04).
+
+Regression found and fixed while doing this: the `LinkButtonStyle` block had been
+dropped from `Themes/Controls.xaml` by an edit, which crashed shell construction
+(and aborted the WPF test host). The new "every StaticResource key is defined"
+test plus the rendered-text assertions are the guards for that class of mistake.
+
+Still open for S2:
+
+1. Human visual review of `artifacts/screenshots/shell-light.png`,
+   `shell-dark.png` and `about-light.png`, plus keyboard/mouse/DPI/screen-reader
+   checks in an interactive Windows session. Software-rendered snapshots and the
+   process-alive check do not prove interactive GUI behaviour.
+2. Panel widths and column widths are not persisted (not required by
+   REQUIREMENTS.md; recorded as an open product question).
+3. Compare and "Apply value to templates" controls intentionally arrive with S3.
+
 
 ## Deferred scope
 

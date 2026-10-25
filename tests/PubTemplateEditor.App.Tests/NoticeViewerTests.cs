@@ -45,7 +45,16 @@ public class NoticeViewerTests
         Assert.Contains("Third-party notices", window.ThirdPartyContent);
         Assert.Contains(".NET", window.ThirdPartyContent);
         Assert.Contains("Version ", window.SourceContent);
-        Assert.Equal(3, window.NoticeTabCount);
+        Assert.Equal(4, window.NoticeTabCount);
+
+        // About view: identity, licence, runtime and bundled components, offline.
+        Assert.Equal("PUB Template Parameter Editor", window.AboutName);
+        Assert.False(string.IsNullOrWhiteSpace(window.AboutVersion));
+        Assert.Contains("GPL-3.0-only", window.AboutLicense);
+        Assert.Contains("Copyright (C)", window.AboutCopyright);
+        Assert.Contains(".NET", window.AboutRuntime);
+        Assert.Contains(".NET runtime and WPF", window.AboutBundled);
+        Assert.DoesNotContain("REPLACE_", window.AboutBundled);
         window.Close();
     });
 

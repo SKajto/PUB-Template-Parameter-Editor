@@ -11,3 +11,6 @@ publish/
 *.nupkg
 MSIX/
 .reference/
+
+# Scratch tooling kept outside the source distribution
+.tools/

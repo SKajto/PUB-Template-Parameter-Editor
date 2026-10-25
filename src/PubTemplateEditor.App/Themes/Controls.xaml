@@ -172,6 +172,203 @@
         <Setter Property="Background" Value="{DynamicResource WindowBackgroundBrush}"/>
     </Style>
 
+    <!-- ===== workspace typography and layout primitives (S2 explorer) ===== -->
+
+    <Style x:Key="EyebrowStyle" TargetType="{x:Type TextBlock}">
+        <Setter Property="Foreground" Value="{DynamicResource MutedForegroundBrush}"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Margin" Value="0,0,0,2"/>
+    </Style>
+
+    <Style x:Key="SectionTitleStyle" TargetType="{x:Type TextBlock}">
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+    </Style>
+
+    <Style x:Key="FieldNoteStyle" TargetType="{x:Type TextBlock}">
+        <Setter Property="Foreground" Value="{DynamicResource MutedForegroundBrush}"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="Margin" Value="0,3,0,0"/>
+    </Style>
+
+    <Style x:Key="BadgeBorderStyle" TargetType="{x:Type Border}">
+        <Setter Property="Background" Value="{DynamicResource WindowBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="3"/>
+        <Setter Property="Padding" Value="4,1"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Margin" Value="6,0,0,0"/>
+    </Style>
+
+    <Style x:Key="DirtyBadgeStyle" TargetType="{x:Type TextBlock}">
+        <Setter Property="Foreground" Value="{DynamicResource DirtyBrush}"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+
+    <Style x:Key="CardStyle" TargetType="{x:Type Border}">
+        <Setter Property="Background" Value="{DynamicResource PanelBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Padding" Value="10"/>
+        <Setter Property="Margin" Value="0,0,0,8"/>
+    </Style>
+
+    <Style x:Key="NoticeBaseStyle" TargetType="Border">
+        <Setter Property="Padding" Value="10,8"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Margin" Value="0,0,0,6"/>
+    </Style>
+    <Style x:Key="InfoNoticeStyle" TargetType="Border" BasedOn="{StaticResource NoticeBaseStyle}">
+        <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource StrongBorderBrush}"/>
+    </Style>
+    <Style x:Key="ErrorNoticeStyle" TargetType="Border" BasedOn="{StaticResource NoticeBaseStyle}">
+        <Setter Property="Background" Value="{DynamicResource ErrorNoticeBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
+    </Style>
+    <Style x:Key="SuccessNoticeStyle" TargetType="Border" BasedOn="{StaticResource NoticeBaseStyle}">
+        <Setter Property="Background" Value="{DynamicResource OkNoticeBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource OkBrush}"/>
+    </Style>
+    <Style x:Key="WarningNoticeStyle" TargetType="Border" BasedOn="{StaticResource NoticeBaseStyle}">
+        <Setter Property="Background" Value="{DynamicResource DirtyNoticeBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource DirtyBrush}"/>
+    </Style>
+
+    <!-- Borderless text button used for inline commands (Select visible, Clear, dismiss). -->
+    <Style x:Key="LinkButtonStyle" TargetType="{x:Type Button}" BasedOn="{StaticResource {x:Type Button}}">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+        <Setter Property="Padding" Value="4,1"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Button}">
+                    <Border x:Name="LinkBorder" Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="3" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="LinkBorder" Property="Background" Value="{DynamicResource AccentSoftBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{DynamicResource MutedForegroundBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="PanelBorderStyle" TargetType="{x:Type Border}">
+        <Setter Property="Background" Value="{DynamicResource PanelBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+    </Style>
+
+    <!-- Theme selector: radio buttons styled as one segmented control. -->
+    <Style x:Key="SegmentRadioStyle" TargetType="{x:Type RadioButton}">
+        <Setter Property="Foreground" Value="{DynamicResource ForegroundBrush}"/>
+        <Setter Property="FontFamily" Value="{DynamicResource UiFontFamily}"/>
+        <Setter Property="Padding" Value="10,5"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type RadioButton}">
+                    <Border x:Name="Chrome" Background="{DynamicResource PanelBackgroundBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AccentBrush}"/>
+                            <Setter Property="Foreground" Value="White"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Parameter table: ListView + GridView keeps built-in keyboard/mouse behaviour. -->
+    <Style TargetType="{x:Type ListView}">
+        <Setter Property="Background" Value="{DynamicResource PanelBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ForegroundBrush}"/>
+    </Style>
+
+    <Style TargetType="{x:Type ListViewItem}">
+        <Setter Property="Foreground" Value="{DynamicResource ForegroundBrush}"/>
+        <Setter Property="Padding" Value="4,3"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ListViewItem}">
+                    <Border x:Name="Chrome" Background="{TemplateBinding Background}" BorderThickness="0,0,0,1"
+                            BorderBrush="{DynamicResource BorderBrush}" Padding="{TemplateBinding Padding}"
+                            SnapsToDevicePixels="True">
+                        <GridViewRowPresenter Content="{TemplateBinding Content}"
+                                              Columns="{TemplateBinding GridView.ColumnCollection}"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource SelectionBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource SelectionBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="{x:Type GridViewColumnHeader}">
+        <Setter Property="Foreground" Value="{DynamicResource MutedForegroundBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource WindowBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+        <Setter Property="FontFamily" Value="{DynamicResource UiFontFamily}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <Setter Property="Padding" Value="6,4"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type GridViewColumnHeader}">
+                    <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="0,0,1,1" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="PlaceholderStyle" TargetType="{x:Type TextBlock}">
+        <Setter Property="Foreground" Value="{DynamicResource MutedForegroundBrush}"/>
+        <Setter Property="IsHitTestVisible" Value="False"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Margin" Value="6,0"/>
+        <Setter Property="FontStyle" Value="Italic"/>
+    </Style>
+
+    <Style x:Key="SplitterStyle" TargetType="{x:Type GridSplitter}">
+        <Setter Property="Background" Value="{DynamicResource BorderBrush}"/>
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+    </Style>
+
     <Style TargetType="{x:Type Separator}">
         <Setter Property="Background" Value="{DynamicResource BorderBrush}"/>
     </Style>

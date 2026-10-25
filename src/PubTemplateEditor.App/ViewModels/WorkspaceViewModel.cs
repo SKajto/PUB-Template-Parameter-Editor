@@ -1,43 +1,68 @@
 using System.Collections.ObjectModel;
-using System.ComponentModel;
 using System.IO;
 using System.Windows;
+using System.Windows.Input;
 using PubTemplateEditor.App.Infrastructure;
 using PubTemplateEditor.Core.Model;
+using PubTemplateEditor.Core.Search;
 using PubTemplateEditor.Infrastructure;
 
 namespace PubTemplateEditor.App.ViewModels;
 
+/// <summary>Access column filter of the parameter table.</summary>
+public enum AccessFilterChoice
+{
+    All,
+    Internal,
+    External,
+}
+
 /// <summary>
-/// Main workspace state for S0/S1: remembered folder and theme, template explorer,
-/// explicit Read parameters with per-file status. Editing/compare/save arrive in S2+.
+/// Workspace state for the S2 read-only explorer: remembered folder/theme, template
+/// explorer with an explicit read scope, Read parameters with per-file status, and the
+/// active template's parameter table with search, access filter and detail panel.
+/// Editing, compare and save arrive in later milestones and are absent here by design.
 /// </summary>
 public sealed class WorkspaceViewModel : ViewModelBase
 {
     private readonly SettingsService _settings;
     private readonly TemplateReaderService _reader = new();
+    private readonly TemplateFolderScanner _scanner = new();
     private EditorSettings _loadedSettings;
+
     private string? _filterText;
+    private string? _parameterQuery;
     private string? _statusMessage;
+    private string? _actionError;
+    private string? _actionNotice;
     private string? _folderPath;
     private bool _isBusy;
     private double _progress;
-    private TemplateItem? _selectedItem;
+    private AccessFilterChoice _accessFilter = AccessFilterChoice.All;
+    private TemplateItem? _activeFile;
+    private ParameterRowItem? _selectedParameter;
+    private ThemeChoice _theme;
 
     public WorkspaceViewModel(SettingsService settings, EditorSettings loadedSettings)
     {
         _settings = settings;
         _loadedSettings = loadedSettings;
+        _theme = SettingsService.ParseTheme(loadedSettings.Theme) ?? ThemeChoice.System;
 
         OpenFolderCommand = new RelayCommand(OpenFolder, () => !IsBusy);
         FocusFilterCommand = new RelayCommand(() => FilterFocusRequested?.Invoke());
+        FocusParameterSearchCommand = new RelayCommand(() => ParameterSearchFocusRequested?.Invoke());
         ReadParametersCommand = new AsyncRelayCommand(ReadParametersAsync, () => !IsBusy && FolderPath is not null);
-        SelectAllForReadCommand = new RelayCommand(() => SetAllChecked(true), () => VisibleFiles.Count > 0);
-        ClearReadSelectionCommand = new RelayCommand(() => SetAllChecked(false), () => VisibleFiles.Count > 0);
-        ToggleThemeCommand = new RelayCommand(ToggleTheme);
+        SelectVisibleCommand = new RelayCommand(() => SetAllChecked(true), () => VisibleFiles.Count > 0);
+        ClearVisibleCommand = new RelayCommand(() => SetAllChecked(false), () => VisibleFiles.Count > 0);
+        SelectActiveFileCommand = new RelayCommand(item => SelectActiveFile(item as TemplateItem));
+        SetThemeCommand = new RelayCommand(value => ApplyTheme(ParseThemeChoice(value)));
+        DismissNoticeCommand = new RelayCommand(() => ActionNotice = null);
         // Licences must stay reachable offline from inside the app (GPL distribution rule).
         // The view decides how to present them; the view model stays free of window types.
         OpenLicensesCommand = new RelayCommand(() => LicensesRequested?.Invoke());
+
+        RefreshThemeSelection();
 
         // FILE-01: restore remembered folder; a missing folder produces a clear message.
         if (!string.IsNullOrWhiteSpace(loadedSettings.LastFolder))
@@ -52,21 +77,45 @@ public sealed class WorkspaceViewModel : ViewModelBase
 
     public ObservableCollection<TemplateItem> AllFiles { get; } = [];
     public ObservableCollection<TemplateItem> VisibleFiles { get; } = [];
+    public ObservableCollection<ParameterRowItem> AllParameters { get; } = [];
+    public ObservableCollection<ParameterRowItem> VisibleParameters { get; } = [];
 
     public RelayCommand OpenFolderCommand { get; }
     public RelayCommand FocusFilterCommand { get; }
+    public RelayCommand FocusParameterSearchCommand { get; }
     public AsyncRelayCommand ReadParametersCommand { get; }
-    public RelayCommand SelectAllForReadCommand { get; }
-    public RelayCommand ClearReadSelectionCommand { get; }
-    public RelayCommand ToggleThemeCommand { get; }
+    public RelayCommand SelectVisibleCommand { get; }
+    public RelayCommand ClearVisibleCommand { get; }
+    public RelayCommand SelectActiveFileCommand { get; }
+    public RelayCommand SetThemeCommand { get; }
+    public RelayCommand DismissNoticeCommand { get; }
     public RelayCommand OpenLicensesCommand { get; }
+
+    public string ProductName => ProductInfo.Name;
+
+    public string VersionLabel => $"Version {VersionText}";
+
+    public string VersionText => ProductInfo.Version;
 
     public string? FolderPath
     {
         get => _folderPath;
-        private set => Set(ref _folderPath, value);
+        private set
+        {
+            if (Set(ref _folderPath, value))
+            {
+                Raise(nameof(FolderName));
+                Raise(nameof(HasFolder));
+                Raise(nameof(FolderSummaryText));
+            }
+        }
     }
 
+    public string FolderName => _folderPath is null ? "No folder selected" : Path.GetFileName(_folderPath.TrimEnd('\\', '/'));
+
+    public bool HasFolder => _folderPath is not null;
+
+    /// <summary>Filename filter of the explorer; filtering never changes the read selection.</summary>
     public string? FilterText
     {
         get => _filterText;
@@ -74,7 +123,7 @@ public sealed class WorkspaceViewModel : ViewModelBase
         {
             if (Set(ref _filterText, value))
             {
-                ApplyFilter();
+                ApplyFileFilter();
             }
         }
     }
@@ -93,6 +142,36 @@ public sealed class WorkspaceViewModel : ViewModelBase
 
     public bool IsStatusEmpty => string.IsNullOrEmpty(_statusMessage);
 
+    /// <summary>Recoverable failure of a workspace action, shown as a dismissible notice.</summary>
+    public string? ActionError
+    {
+        get => _actionError;
+        private set
+        {
+            if (Set(ref _actionError, value))
+            {
+                Raise(nameof(HasActionError));
+            }
+        }
+    }
+
+    public bool HasActionError => !string.IsNullOrEmpty(_actionError);
+
+    /// <summary>Success confirmation with an explicit dismiss control.</summary>
+    public string? ActionNotice
+    {
+        get => _actionNotice;
+        private set
+        {
+            if (Set(ref _actionNotice, value))
+            {
+                Raise(nameof(HasActionNotice));
+            }
+        }
+    }
+
+    public bool HasActionNotice => !string.IsNullOrEmpty(_actionNotice);
+
     public bool IsBusy
     {
         get => _isBusy;
@@ -101,43 +180,220 @@ public sealed class WorkspaceViewModel : ViewModelBase
             if (Set(ref _isBusy, value))
             {
                 Raise(nameof(IsNotBusy));
+                Raise(nameof(IsIdle));
+                Raise(nameof(ProgressText));
             }
         }
     }
 
     public bool IsNotBusy => !_isBusy;
 
+    /// <summary>True while nothing is running and no folder is loaded: the welcome state.</summary>
+    public bool IsIdle => !IsBusy && _folderPath is null;
+
     public double Progress
     {
         get => _progress;
-        private set => Set(ref _progress, value);
-    }
-
-    public TemplateItem? SelectedItem
-    {
-        get => _selectedItem;
-        set
+        private set
         {
-            // FILE-05: focusing a template never silently changes read/bulk selection.
-            if (Set(ref _selectedItem, value))
+            if (Set(ref _progress, value))
             {
-                Raise(nameof(ActiveTemplateInfo));
+                Raise(nameof(ProgressText));
             }
         }
     }
 
-    public string ActiveTemplateInfo =>
-        SelectedItem is null ? "No template focused." : $"{SelectedItem.FileName} — {SelectedItem.Status}";
+    public string ProgressText => _isBusy ? $"Reading… {Progress:P0}" : string.Empty;
+
+    public string FolderSummaryText => _folderPath is null
+        ? "No folder selected"
+        : $"{AllFiles.Count} template(s) in folder";
+
+    public string OperationText => _isBusy
+        ? ProgressText
+        : "Offline · Review Save writes selected changes";
+
+    public ThemeChoice Theme
+    {
+        get => _theme;
+        private set
+        {
+            if (Set(ref _theme, value))
+            {
+                RefreshThemeSelection();
+            }
+        }
+    }
+
+    public bool IsLightSelected => _theme == ThemeChoice.Light;
+    public bool IsDarkSelected => _theme == ThemeChoice.Dark;
+    public bool IsSystemSelected => _theme == ThemeChoice.System;
+
+    // ---------------------------------------------------------------- file scope
 
     public int SelectedReadCount => AllFiles.Count(f => f.IsSelectedForRead);
 
     public int TotalFileCount => AllFiles.Count;
 
+    public bool HasFiles => AllFiles.Count > 0;
+
+    public bool HasVisibleFiles => VisibleFiles.Count > 0;
+
+    /// <summary>Folder has entries but the filename filter hides them all.</summary>
+    public bool ShowNoFileMatches => AllFiles.Count > 0 && VisibleFiles.Count == 0;
+
+    public string ScopeDescription => SelectedReadCount > 0
+        ? $"Reading {SelectedReadCount} explicitly selected template{(SelectedReadCount == 1 ? "" : "s")}."
+        : $"No read selection is active; reading all {VisibleFiles.Count} currently visible template{(VisibleFiles.Count == 1 ? "" : "s")}.";
+
+    /// <summary>FILE-05: the focused template, independent from read/bulk selection.</summary>
+    public TemplateItem? ActiveFile
+    {
+        get => _activeFile;
+        private set
+        {
+            if (Set(ref _activeFile, value))
+            {
+                if (value is not null)
+                {
+                    foreach (var item in AllFiles)
+                    {
+                        item.IsActive = ReferenceEquals(item, value);
+                    }
+                }
+
+                Raise(nameof(ActiveTemplateName));
+                Raise(nameof(HasActiveFile));
+                Raise(nameof(ActiveParameterSummary));
+                Raise(nameof(ShowEmptyNoActiveFile));
+                LoadParameters();
+            }
+        }
+    }
+
+    public string ActiveTemplateName => _activeFile?.FileName ?? "Parameter browser";
+
+    public bool HasActiveFile => _activeFile is not null;
+
+    public void SelectActiveFile(TemplateItem? item)
+    {
+        if (item is not null)
+        {
+            ActiveFile = item;
+            ParameterQuery = null;
+            SelectedAccessFilter = AccessFilterChoice.All;
+        }
+    }
+
+    // ------------------------------------------------------------ parameter view
+
+    /// <summary>Name/description search over the active template's declarations.</summary>
+    public string? ParameterQuery
+    {
+        get => _parameterQuery;
+        set
+        {
+            if (Set(ref _parameterQuery, value))
+            {
+                ApplyParameterFilter();
+            }
+        }
+    }
+
+    public AccessFilterChoice SelectedAccessFilter
+    {
+        get => _accessFilter;
+        set
+        {
+            if (Set(ref _accessFilter, value))
+            {
+                ApplyParameterFilter();
+            }
+        }
+    }
+
+    /// <summary>ComboBox items in AccessFilterChoice order, with UI labels.</summary>
+    public string[] AccessFilterLabels { get; } = ["All access", "Internal", "External"];
+
+    public int AccessFilterIndex
+    {
+        get => (int)SelectedAccessFilter;
+        set
+        {
+            if (Enum.IsDefined(typeof(AccessFilterChoice), value))
+            {
+                SelectedAccessFilter = (AccessFilterChoice)value;
+            }
+        }
+    }
+
+    public int TotalParameterCount => AllParameters.Count;
+
+    public int MatchedParameterCount => VisibleParameters.Count;
+
+    public bool HasParameters => AllParameters.Count > 0;
+
+    public bool HasVisibleParameters => VisibleParameters.Count > 0;
+
+    /// <summary>The three mutually exclusive empty states of the parameter area.</summary>
+    public bool ShowEmptyNoActiveFile => ActiveFile is null && !IsBusy;
+
+    public bool ShowEmptyNotRead => ActiveFile is not null && AllParameters.Count == 0;
+
+    public bool ShowEmptyNoMatches => AllParameters.Count > 0 && VisibleParameters.Count == 0;
+
+    public string ActiveParameterSummary => _activeFile is null
+        ? "No active template"
+        : _activeFile.Record?.ReadState == TemplateReadState.Loaded
+            ? $"{MatchedParameterCount} matched of {TotalParameterCount} parameters"
+            : "Parameters not read yet";
+
+    public ParameterRowItem? SelectedParameter
+    {
+        get => _selectedParameter;
+        set
+        {
+            if (Set(ref _selectedParameter, value))
+            {
+                Raise(nameof(HasSelectedParameter));
+                Raise(nameof(DetailName));
+                Raise(nameof(DetailXmlType));
+                Raise(nameof(DetailAccess));
+                Raise(nameof(DetailDefaultValue));
+                Raise(nameof(DetailDescription));
+                Raise(nameof(DetailReadOnlyReason));
+                Raise(nameof(HasDetailReadOnlyReason));
+            }
+        }
+    }
+
+    public bool HasSelectedParameter => _selectedParameter is not null;
+
+    public string DetailName => _selectedParameter?.Name ?? string.Empty;
+
+    public string DetailXmlType => _selectedParameter?.XmlTypeLabel ?? string.Empty;
+
+    public string DetailAccess => _selectedParameter?.AccessLabel ?? string.Empty;
+
+    public string DetailDefaultValue => _selectedParameter?.DefaultFullValue ?? string.Empty;
+
+    public string DetailDescription => _selectedParameter?.DescriptionFullValue ?? string.Empty;
+
+    /// <summary>Why unsupported declaration shapes stay read-only, shown in the detail panel.</summary>
+    public string DetailReadOnlyReason => _selectedParameter is { HasReadOnlyShape: true } p ? p.ReadOnlyShapeReasons : string.Empty;
+
+    public bool HasDetailReadOnlyReason => DetailReadOnlyReason.Length > 0;
+
     /// <summary>Set by the view so Ctrl+F can move keyboard focus to the filter box.</summary>
     public event Action? FilterFocusRequested;
 
+    /// <summary>Set by the view so Ctrl+E can move keyboard focus to the parameter search box.</summary>
+    public event Action? ParameterSearchFocusRequested;
+
     /// <summary>Raised when the user asks for the offline licence/notices view.</summary>
     public event Action? LicensesRequested;
+
+    // ------------------------------------------------------------------- actions
 
     private void OpenFolder()
     {
@@ -162,27 +418,25 @@ public sealed class WorkspaceViewModel : ViewModelBase
     {
         try
         {
-            var items = Directory.EnumerateFiles(path)
-                .Where(TemplateReaderService.IsTemplateFile)
-                .OrderBy(f => Path.GetFileName(f), StringComparer.CurrentCultureIgnoreCase)
-                .Select(f => new TemplateItem(f, true))
-                .ToList();
+            var listed = _scanner.Scan(path);
 
             AllFiles.Clear();
-            foreach (var item in items)
+            foreach (var entry in listed)
             {
-                AllFiles.Add(item);
+                AllFiles.Add(new TemplateItem(entry.FilePath, true, entry.SizeBytes, entry.ListingError));
             }
 
             FolderPath = path;
-            ApplyFilter();
-            Raise(nameof(SelectedReadCount));
-            Raise(nameof(TotalFileCount));
+            ActiveFile = AllFiles.FirstOrDefault();
+            ApplyFileFilter();
+            RefreshCounters();
 
             // FILE-04: reading is explicit; listing does not parse.
-            StatusMessage = items.Count == 0
-                ? "No .dta or template .xml files in this folder."
-                : $"{items.Count} template file(s) listed. Press Read parameters to load declarations.";
+            StatusMessage = AllFiles.Count == 0
+                ? "No .dta template files in this folder."
+                : $"{AllFiles.Count} template file(s) listed. Press Read parameters to load declarations.";
+            ActionNotice = null;
+            ActionError = null;
 
             // Persist the working folder immediately (GEN/FILE-01).
             _loadedSettings.LastFolder = path;
@@ -194,7 +448,7 @@ public sealed class WorkspaceViewModel : ViewModelBase
         }
     }
 
-    private void ApplyFilter()
+    private void ApplyFileFilter()
     {
         VisibleFiles.Clear();
         foreach (var item in AllFiles)
@@ -205,6 +459,11 @@ public sealed class WorkspaceViewModel : ViewModelBase
                 VisibleFiles.Add(item);
             }
         }
+
+        Raise(nameof(HasVisibleFiles));
+        Raise(nameof(ShowNoFileMatches));
+        Raise(nameof(ScopeDescription));
+        CommandManager.InvalidateRequerySuggested();
     }
 
     private void SetAllChecked(bool value)
@@ -214,19 +473,22 @@ public sealed class WorkspaceViewModel : ViewModelBase
             item.IsSelectedForRead = value;
         }
 
-        Raise(nameof(SelectedReadCount));
+        RefreshCounters();
     }
 
     private async Task ReadParametersAsync(CancellationToken token)
     {
-        var targets = AllFiles.Where(f => f.IsSelectedForRead).ToList();
+        // FILE-05: an empty checkbox set falls back to the visible scope, never to "nothing".
+        var targets = AllFiles.Where(f => f.IsSelectedForRead && f.IsListable).ToList();
         if (targets.Count == 0)
         {
-            StatusMessage = "No templates selected for reading.";
+            ActionError = "No readable templates are selected or visible for reading.";
             return;
         }
 
         IsBusy = true;
+        ActionError = null;
+        ActionNotice = null;
         Progress = 0;
         int done = 0;
         int errors = 0;
@@ -251,6 +513,12 @@ public sealed class WorkspaceViewModel : ViewModelBase
 
                 done++;
                 Progress = (double)done / targets.Count;
+                if (ReferenceEquals(item, ActiveFile))
+                {
+                    LoadParameters();
+                }
+
+                RefreshCounters();
             }
 
             StatusMessage = errors == 0
@@ -265,21 +533,111 @@ public sealed class WorkspaceViewModel : ViewModelBase
         {
             IsBusy = false;
             Progress = 0;
-            Raise(nameof(SelectedReadCount));
+            RefreshCounters();
+            Raise(nameof(ShowEmptyNotRead));
         }
     }
 
-    private void ToggleTheme()
+    /// <summary>Rebuilds the parameter table of the focused template from its record.</summary>
+    private void LoadParameters()
     {
-        var current = SettingsService.ParseTheme(_loadedSettings.Theme)
-            ?? (((Application.Current.FindResource("WindowBackgroundBrush") as System.Windows.Media.SolidColorBrush)?.Color.R ?? 0) > 128
-                ? ThemeChoice.Light
-                : ThemeChoice.Dark);
-        var next = current == ThemeChoice.Light ? ThemeChoice.Dark : ThemeChoice.Light;
+        var previous = _selectedParameter;
+        AllParameters.Clear();
+        VisibleParameters.Clear();
+        _selectedParameter = null;
+        Raise(nameof(SelectedParameter));
 
-        ThemeManager.Apply(Application.Current, next);
-        _loadedSettings.Theme = next.ToString();
-        _settings.Save(_loadedSettings);
-        StatusMessage = $"{next} theme applied and remembered.";
+        var record = _activeFile?.Record;
+        if (record is { ReadState: TemplateReadState.Loaded })
+        {
+            foreach (var declaration in record.Declarations)
+            {
+                AllParameters.Add(new ParameterRowItem(declaration));
+            }
+        }
+
+        // A re-read of the same declaration keeps the user's row selection.
+        if (previous is not null)
+        {
+            var same = AllParameters.FirstOrDefault(r => r.DeclarationId == previous.DeclarationId);
+            if (same is not null)
+            {
+                _selectedParameter = same;
+                Raise(nameof(SelectedParameter));
+            }
+        }
+
+        ApplyParameterFilter();
+        Raise(nameof(HasSelectedParameter));
+        Raise(nameof(HasParameters));
+        Raise(nameof(TotalParameterCount));
     }
+
+    private void ApplyParameterFilter()
+    {
+        VisibleParameters.Clear();
+        foreach (var row in AllParameters)
+        {
+            bool matchesAccess = SelectedAccessFilter switch
+            {
+                AccessFilterChoice.Internal => string.Equals(row.AccessLabel, "internal", StringComparison.OrdinalIgnoreCase),
+                AccessFilterChoice.External => string.Equals(row.AccessLabel, "external", StringComparison.OrdinalIgnoreCase),
+                _ => true,
+            };
+
+            if (!matchesAccess)
+            {
+                continue;
+            }
+
+            if (ParameterSearchMatcher.Matches(row.Declaration.ExactName, row.Declaration.Description.LogicalValue, _parameterQuery ?? string.Empty))
+            {
+                VisibleParameters.Add(row);
+            }
+        }
+
+        Raise(nameof(MatchedParameterCount));
+        Raise(nameof(ActiveParameterSummary));
+        Raise(nameof(HasVisibleParameters));
+        Raise(nameof(ShowEmptyNoActiveFile));
+        Raise(nameof(ShowEmptyNotRead));
+        Raise(nameof(ShowEmptyNoMatches));
+    }
+
+    private void RefreshCounters()
+    {
+        Raise(nameof(SelectedReadCount));
+        Raise(nameof(TotalFileCount));
+        Raise(nameof(HasFiles));
+        Raise(nameof(ScopeDescription));
+        Raise(nameof(FolderSummaryText));
+        Raise(nameof(ActiveParameterSummary));
+    }
+
+    private void ApplyTheme(ThemeChoice choice)
+    {
+        if (choice == Theme)
+        {
+            return;
+        }
+
+        ThemeManager.Apply(Application.Current, choice);
+        Theme = choice;
+        _loadedSettings.Theme = choice.ToString();
+        _settings.Save(_loadedSettings);
+    }
+
+    private void RefreshThemeSelection()
+    {
+        Raise(nameof(IsLightSelected));
+        Raise(nameof(IsDarkSelected));
+        Raise(nameof(IsSystemSelected));
+    }
+
+    private static ThemeChoice ParseThemeChoice(object? value) => value switch
+    {
+        ThemeChoice choice => choice,
+        string text when SettingsService.ParseTheme(text) is ThemeChoice parsed => parsed,
+        _ => ThemeChoice.System,
+    };
 }

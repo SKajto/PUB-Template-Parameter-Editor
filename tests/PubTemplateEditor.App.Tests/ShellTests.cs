@@ -155,9 +155,9 @@ public class ShellTests : IDisposable
             vm.FilterText = "";
             Assert.Equal(total, vm.VisibleFiles.Count);
 
-            vm.ClearReadSelectionCommand.Execute(null);
+            vm.ClearVisibleCommand.Execute(null);
             Assert.Equal(0, vm.SelectedReadCount);
-            vm.SelectAllForReadCommand.Execute(null);
+            vm.SelectVisibleCommand.Execute(null);
             Assert.Equal(total, vm.SelectedReadCount);
         });
     }

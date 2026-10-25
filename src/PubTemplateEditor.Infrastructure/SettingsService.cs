@@ -6,6 +6,9 @@ public enum ThemeChoice
 {
     Light,
     Dark,
+
+    /// <summary>Follow the Windows app-colour setting; resolved at apply time.</summary>
+    System,
 }
 
 /// <summary>Persisted user preferences. Saved immediately when changed; drafts are never persisted automatically.</summary>

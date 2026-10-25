@@ -18,6 +18,14 @@ public partial class LicensesWindow : Window
     public string SourceContent => SourceLine.Text;
     public int NoticeTabCount => NoticeTabs.Items.Count;
 
+    /// <summary>About view fields, exposed for UI tests.</summary>
+    public string AboutName => AboutNameText.Text;
+    public string AboutVersion => AboutVersionText.Text;
+    public string AboutLicense => AboutLicenseText.Text;
+    public string AboutCopyright => AboutCopyrightText.Text;
+    public string AboutRuntime => AboutRuntimeText.Text;
+    public string AboutBundled => AboutBundledText.Text;
+
     public LicensesWindow()
     {
         InitializeComponent();
@@ -26,10 +34,26 @@ public partial class LicensesWindow : Window
         NoticeText.Text = EmbeddedNotices.Read(EmbeddedNotices.CopyrightNotice);
         ThirdPartyText.Text = EmbeddedNotices.Read(EmbeddedNotices.ThirdParty);
 
-        string version = typeof(LicensesWindow).Assembly
-            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "unknown";
+        // About view: identity, licence and the bundled runtime, all offline.
+        AboutNameText.Text = ProductInfo.Name;
+        AboutTaglineText.Text = ProductInfo.Tagline;
+        AboutDescriptionText.Text = ProductInfo.Description;
+        AboutVersionText.Text = ProductInfo.Version;
+        AboutLicenseText.Text = $"{ProductInfo.LicenseId} (see the GNU GPL v3 tab for the full text)";
+        AboutCopyrightText.Text = ProductInfo.CopyrightLine;
+        AboutRuntimeText.Text = $"{ProductInfo.RuntimeDescription}, {ProductInfo.ProcessArchitecture} process on {ProductInfo.OperatingSystemDescription}";
+        AboutSourceText.Text = ProductInfo.SourceNote;
+        AboutBundledText.Text =
+            $".NET runtime and WPF ({ProductInfo.RuntimeDescription}) are bundled in the self-contained " +
+            "payload under the MIT/.NET Runtime licence; they are not relicensed. Build tooling such as " +
+            "xUnit is test-only and not shipped. Full texts are in the Third-party tab.";
+        AboutWarrantyText.Text =
+            "This program is free software and comes with ABSOLUTELY NO WARRANTY; to the extent permitted " +
+            "by law, no warranty is given. You can redistribute it and/or modify it under the GNU General " +
+            "Public License version 3.";
+
+        string version = ProductInfo.Version;
         SourceLine.Text =
-            $"Version {version}. The corresponding source for this exact build is published with the " +
-            "release of the same version under GPL-3.0-only (see the NOTICE tab).";
+            $"Version {version}. " + ProductInfo.SourceNote;
     }
 }

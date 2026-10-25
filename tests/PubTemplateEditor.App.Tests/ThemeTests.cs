@@ -95,6 +95,60 @@ public class ThemeTests
     }
 
     [Fact]
+    public void EveryStaticResourceKeyUsedByTheShellIsDefined()
+    {
+        // A missing style otherwise only surfaces as a crash when the shell is constructed.
+        var used = new SortedSet<string>(StringComparer.Ordinal);
+        var defined = new SortedSet<string>(StringComparer.Ordinal);
+        string dir = Path.Combine(RepoRoot(), "src", "PubTemplateEditor.App");
+        var staticPattern = new Regex(@"\{StaticResource\s+([^}]+)\}", RegexOptions.Compiled);
+        var keyPattern = new Regex(@"x:Key=""([A-Za-z0-9_.]+)""", RegexOptions.Compiled);
+
+        foreach (string file in Directory.GetFiles(dir, "*.xaml", SearchOption.AllDirectories))
+        {
+            string text = File.ReadAllText(file);
+            foreach (Match m in staticPattern.Matches(text))
+            {
+                string key = m.Groups[1].Value.Trim();
+                if (key.Contains("x:Type"))
+                {
+                    continue; // implicit theme keys such as {x:Type Button}
+                }
+                used.Add(key);
+            }
+
+            if (Path.GetFileName(file) is "Light.xaml" or "Dark.xaml" or "Controls.xaml" or "App.xaml")
+            {
+                foreach (Match m in keyPattern.Matches(text))
+                {
+                    defined.Add(m.Groups[1].Value);
+                }
+            }
+        }
+
+        var missing = used.Except(defined).ToArray();
+        Assert.True(missing.Length == 0, "undefined resources: " + string.Join(", ", missing));
+    }
+
+    [Fact]
+    public void ShellXamlCarriesNoHardCodedColours()
+    {
+        // Colours must come from the theme dictionaries, otherwise Dark mode stays unreadable.
+        var hex = new Regex("#[0-9A-Fa-f]{3,8}\\b", RegexOptions.Compiled);
+        string dir = Path.Combine(RepoRoot(), "src", "PubTemplateEditor.App");
+
+        foreach (string file in Directory.GetFiles(dir, "*.xaml", SearchOption.AllDirectories))
+        {
+            if (Path.GetFileName(file) is "Light.xaml" or "Dark.xaml")
+            {
+                continue;
+            }
+
+            Assert.False(hex.IsMatch(File.ReadAllText(file)), $"hard-coded colour in {Path.GetFileName(file)}");
+        }
+    }
+
+    [Fact]
     public void SwitchingThemeChangesResolvableBrushes()
     {
         _host.Do(() =>
@@ -113,7 +167,7 @@ public class ThemeTests
     }
 
     [Fact]
-    public void ThemeTogglePersistsTheChoice()
+    public void ThemeSelectionAppliesAndPersists()
     {
         string settingsDir = Path.Combine(Path.GetTempPath(), "dtaparam-theme-" + Guid.NewGuid().ToString("N"));
         string templateDir = Path.Combine(Path.GetTempPath(), "dtaparam-tpl-" + Guid.NewGuid().ToString("N"));
@@ -127,17 +181,24 @@ public class ThemeTests
                 var vm = new PubTemplateEditor.App.ViewModels.WorkspaceViewModel(settings, new EditorSettings { Theme = "Light", LastFolder = templateDir });
 
                 ThemeManager.Apply(_host.App, ThemeChoice.Light);
-                var before = (SolidColorBrush)_host.App.FindResource("WindowBackgroundBrush");
-                Assert.True(before.Color.R > 128);
+                Assert.True(((SolidColorBrush)_host.App.FindResource("WindowBackgroundBrush")).Color.R > 128);
 
-                vm.ToggleThemeCommand.Execute(null);
+                vm.SetThemeCommand.Execute("Dark");
 
-                var after = (SolidColorBrush)_host.App.FindResource("WindowBackgroundBrush");
-                Assert.True(after.Color.R < 128, "dark palette should be active after toggle");
-                Assert.Contains("theme applied and remembered", vm.StatusMessage, StringComparison.OrdinalIgnoreCase);
+                Assert.True(((SolidColorBrush)_host.App.FindResource("WindowBackgroundBrush")).Color.R < 128,
+                    "dark palette should be active after selecting Dark");
+                Assert.True(vm.IsDarkSelected);
+                Assert.False(vm.IsLightSelected);
+                Assert.Equal("Dark", settings.Load().Theme);
 
-                var reloaded = settings.Load();
-                Assert.Equal("Dark", reloaded.Theme);
+                // System follows the Windows app preference and is stored as such.
+                vm.SetThemeCommand.Execute("System");
+                Assert.True(vm.IsSystemSelected);
+                Assert.Equal("System", settings.Load().Theme);
+                ThemeChoice resolved = ThemeManager.Resolve(_host.App, ThemeChoice.System);
+                Assert.True(resolved is ThemeChoice.Light or ThemeChoice.Dark);
+
+                ThemeManager.Apply(_host.App, ThemeChoice.Light);
             });
         }
         finally

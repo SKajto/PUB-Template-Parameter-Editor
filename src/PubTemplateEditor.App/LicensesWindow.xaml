@@ -1,7 +1,7 @@
 <Window x:Class="PubTemplateEditor.App.LicensesWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Licence and bundled components"
+        Title="About, licence and bundled components"
         Width="820" Height="620"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
@@ -12,6 +12,50 @@
                    TextWrapping="Wrap"
                    Foreground="{DynamicResource MutedForegroundBrush}"/>
         <TabControl x:Name="NoticeTabs" BorderThickness="0" Background="{DynamicResource WindowBackgroundBrush}">
+        <TabItem Header="About">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12">
+                <StackPanel>
+                    <TextBlock x:Name="AboutNameText" FontWeight="SemiBold" FontSize="18"/>
+                    <TextBlock x:Name="AboutTaglineText" Foreground="{DynamicResource MutedForegroundBrush}" Margin="0,2,0,0"/>
+                    <TextBlock x:Name="AboutDescriptionText" TextWrapping="Wrap" Margin="0,10,0,0" MaxWidth="620" HorizontalAlignment="Left"/>
+
+                    <Grid Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="170"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Version" Foreground="{DynamicResource MutedForegroundBrush}" Margin="0,2"/>
+                        <TextBlock Grid.Row="0" Grid.Column="1" x:Name="AboutVersionText" Margin="0,2"/>
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Licence" Foreground="{DynamicResource MutedForegroundBrush}" Margin="0,2"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1" x:Name="AboutLicenseText" Margin="0,2"/>
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Copyright" Foreground="{DynamicResource MutedForegroundBrush}" Margin="0,2"/>
+                        <TextBlock Grid.Row="2" Grid.Column="1" x:Name="AboutCopyrightText" Margin="0,2" TextWrapping="Wrap"/>
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Operation" Foreground="{DynamicResource MutedForegroundBrush}" Margin="0,2"/>
+                        <TextBlock Grid.Row="3" Grid.Column="1" Text="Offline; template files stay on this computer" Margin="0,2" TextWrapping="Wrap"/>
+                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Runtime" Foreground="{DynamicResource MutedForegroundBrush}" Margin="0,2"/>
+                        <TextBlock Grid.Row="4" Grid.Column="1" x:Name="AboutRuntimeText" Margin="0,2" TextWrapping="Wrap"/>
+                        <TextBlock Grid.Row="5" Grid.Column="0" Text="Corresponding source" Foreground="{DynamicResource MutedForegroundBrush}" Margin="0,2"/>
+                        <TextBlock Grid.Row="5" Grid.Column="1" x:Name="AboutSourceText" Margin="0,2" TextWrapping="Wrap"/>
+                    </Grid>
+
+                    <TextBlock Text="Bundled components" FontWeight="SemiBold" Margin="0,16,0,0"/>
+                    <TextBlock x:Name="AboutBundledText" TextWrapping="Wrap" Margin="0,4,0,0" MaxWidth="680" HorizontalAlignment="Left"
+                               Foreground="{DynamicResource MutedForegroundBrush}"/>
+
+                    <TextBlock x:Name="AboutWarrantyText" TextWrapping="Wrap" Margin="0,16,0,0" MaxWidth="680" HorizontalAlignment="Left"
+                               Foreground="{DynamicResource MutedForegroundBrush}"/>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
         <TabItem Header="GNU GPL v3">
             <TextBox x:Name="LicenseText" IsReadOnly="True" IsReadOnlyCaretVisible="False"
                      AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"

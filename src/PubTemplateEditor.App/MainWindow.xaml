@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="PUB Template Parameter Editor"
-        Width="1180" Height="740"
+        Width="1240" Height="780" MinWidth="900" MinHeight="520"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource WindowBackgroundBrush}"
         TextOptions.TextFormattingMode="Ideal"
@@ -12,120 +12,393 @@
         <KeyBinding Modifiers="Control" Key="O" Command="{Binding OpenFolderCommand}"/>
         <KeyBinding Key="F5" Command="{Binding ReadParametersCommand}"/>
         <KeyBinding Modifiers="Control" Key="F" Command="{Binding FocusFilterCommand}"/>
+        <KeyBinding Modifiers="Control" Key="E" Command="{Binding FocusParameterSearchCommand}"/>
         <KeyBinding Modifiers="Control" Key="L" Command="{Binding OpenLicensesCommand}"/>
     </Window.InputBindings>
 
-    <DockPanel>
-        <!-- Toolbar -->
-        <ToolBarTray DockPanel.Dock="Top">
-            <ToolBar>
-                <Button Command="{Binding OpenFolderCommand}" Content="Open folder…"
-                        ToolTip="Choose the template folder (Ctrl+O)"/>
-                <Separator/>
-                <Button Command="{Binding ReadParametersCommand}" Content="Read parameters"
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ================= top bar: identity, theme, folder ================= -->
+        <Border Grid.Row="0" Background="{DynamicResource PanelBackgroundBrush}"
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="12,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Width="34" Height="34" CornerRadius="6"
+                        Background="{DynamicResource AccentBrush}" VerticalAlignment="Center">
+                    <TextBlock Text="PUB" Foreground="White" FontWeight="Bold" FontSize="12"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+
+                <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                    <TextBlock x:Name="BrandTitleText" Text="{Binding ProductName}" FontWeight="SemiBold"/>
+                    <TextBlock Text="Local template workspace" Style="{StaticResource FieldNoteStyle}" Margin="0"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="0,0,10,0" VerticalAlignment="Center">
+                    <RadioButton GroupName="theme" Content="Light" Style="{StaticResource SegmentRadioStyle}"
+                                 IsChecked="{Binding IsLightSelected, Mode=OneWay}"
+                                 Command="{Binding SetThemeCommand}" CommandParameter="Light"
+                                 AutomationProperties.Name="Light theme"/>
+                    <RadioButton GroupName="theme" Content="Dark" Style="{StaticResource SegmentRadioStyle}"
+                                 IsChecked="{Binding IsDarkSelected, Mode=OneWay}"
+                                 Command="{Binding SetThemeCommand}" CommandParameter="Dark"
+                                 AutomationProperties.Name="Dark theme"/>
+                    <RadioButton GroupName="theme" Content="System" Style="{StaticResource SegmentRadioStyle}"
+                                 IsChecked="{Binding IsSystemSelected, Mode=OneWay}"
+                                 Command="{Binding SetThemeCommand}" CommandParameter="System"
+                                 AutomationProperties.Name="Follow Windows theme"/>
+                </StackPanel>
+
+                <Button Grid.Column="4" Content="Choose folder" Command="{Binding OpenFolderCommand}"
                         Style="{StaticResource AccentButtonStyle}"
-                        ToolTip="Parse declarations of the checked templates (F5)"/>
-                <Separator/>
-                <Button Command="{Binding SelectAllForReadCommand}" Content="Select all"/>
-                <Button Command="{Binding ClearReadSelectionCommand}" Content="Clear selection"/>
-                <Separator/>
-                <TextBox x:Name="FilterBox" Width="220" Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
-                         ToolTip="Filter explorer by file name"/>
-                <Separator/>
-                <Button Command="{Binding ToggleThemeCommand}" Content="Toggle light/dark"/>
-                <Separator/>
-                <Button Command="{Binding OpenLicensesCommand}" Content="Licences…"
-                        ToolTip="Offline GPL and bundled-component notices (Ctrl+L)"/>
-            </ToolBar>
-        </ToolBarTray>
+                        ToolTip="Choose the folder containing .dta templates (Ctrl+O)"/>
+            </Grid>
+        </Border>
 
-        <!-- Status bar -->
-        <StatusBar DockPanel.Dock="Bottom">
-            <StatusBar.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <DockPanel HorizontalAlignment="Stretch"/>
-                </ItemsPanelTemplate>
-            </StatusBar.ItemsPanel>
-            <StatusBarItem>
-                <ProgressBar Width="160" Value="{Binding Progress, Mode=OneWay}" Minimum="0" Maximum="1"
-                             Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}"/>
-            </StatusBarItem>
-            <StatusBarItem DockPanel.Dock="Right">
-                <TextBlock Text="{Binding TotalFileCount}" Margin="0,0,8,0"/>
-            </StatusBarItem>
-            <Separator DockPanel.Dock="Right"/>
-            <StatusBarItem DockPanel.Dock="Right">
-                <TextBlock Text="{Binding SelectedReadCount}" Margin="0,0,8,0"/>
-            </StatusBarItem>
-            <Separator DockPanel.Dock="Right"/>
-            <StatusBarItem DockPanel.Dock="Right">
-                <TextBlock Text="selected:" Foreground="{DynamicResource MutedForegroundBrush}" Margin="0,0,4,0"/>
-            </StatusBarItem>
-            <Separator DockPanel.Dock="Right"/>
-            <StatusBarItem>
-                <TextBlock Text="{Binding StatusMessage}" TextTrimming="CharacterEllipsis"
-                           Foreground="{DynamicResource MutedForegroundBrush}"/>
-            </StatusBarItem>
-        </StatusBar>
-
-        <!-- Main split -->
-        <Grid>
+        <!-- ================= workspace: explorer | parameters | details ================= -->
+        <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="300" MinWidth="180"/>
-                <ColumnDefinition Width="6"/>
+                <ColumnDefinition Width="310" MinWidth="200"/>
+                <ColumnDefinition Width="5"/>
                 <ColumnDefinition Width="*" MinWidth="380"/>
+                <ColumnDefinition Width="5"/>
+                <ColumnDefinition Width="380" MinWidth="340" MaxWidth="520"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Explorer -->
-            <Border Grid.Column="0" Background="{DynamicResource PanelBackgroundBrush}"
-                    BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,1,1">
+            <!-- template explorer -->
+            <Border Grid.Column="0" Style="{StaticResource PanelBorderStyle}" BorderThickness="0,1,1,1">
                 <DockPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="TEMPLATES" Margin="10,8"
-                               Foreground="{DynamicResource MutedForegroundBrush}"
-                               FontWeight="SemiBold"/>
-                    <ListBox ItemsSource="{Binding VisibleFiles}"
-                             SelectedItem="{Binding SelectedItem}"
-                             BorderThickness="0"
-                             HorizontalContentAlignment="Stretch">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <CheckBox Grid.Column="0" IsChecked="{Binding IsSelectedForRead}"
-                                              VerticalAlignment="Center"
-                                              ToolTip="Include in Read parameters"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding FileName}" Margin="6,0"
-                                               TextTrimming="CharacterEllipsis"
-                                               ToolTip="{Binding FilePath}"/>
-                                    <TextBlock Grid.Column="2" Text="{Binding StatusDisplay}"
-                                               Foreground="{DynamicResource MutedForegroundBrush}"
-                                               FontSize="11" Margin="6,0,0,0"/>
-                                </Grid>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
+                    <StackPanel DockPanel.Dock="Top" Margin="10,10,10,0">
+                        <TextBlock Text="TEMPLATES" Style="{StaticResource EyebrowStyle}"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="FolderNameText" Grid.Column="0" Text="{Binding FolderName}"
+                                       ToolTip="{Binding FolderPath}"
+                                       Style="{StaticResource SectionTitleStyle}"/>
+                            <Border Grid.Column="1" Style="{StaticResource BadgeBorderStyle}">
+                                <TextBlock x:Name="FileCountText" Text="{Binding TotalFileCount}"/>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+
+                    <StackPanel DockPanel.Dock="Bottom" Margin="10,8,10,10">
+                        <ProgressBar Value="{Binding Progress, Mode=OneWay}" Minimum="0" Maximum="1"
+                                     Margin="0,0,0,6"
+                                     Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                        <TextBlock x:Name="ScopeText" Text="{Binding ScopeDescription}" Style="{StaticResource FieldNoteStyle}"
+                                   Margin="0,0,0,6"/>
+                        <Button Content="Read parameters" Command="{Binding ReadParametersCommand}"
+                                Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch"
+                                ToolTip="Parse declarations of the selected templates (F5)"/>
+                    </StackPanel>
+
+                    <StackPanel DockPanel.Dock="Top" Margin="10,8,10,0">
+                        <TextBlock Text="Filter files" Style="{StaticResource EyebrowStyle}"/>
+                        <Grid>
+                            <TextBox x:Name="FilterBox"
+                                     Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged, Delay=150}"
+                                     AutomationProperties.Name="Filter files by name"/>
+                            <TextBlock Text="Filename…" Style="{StaticResource PlaceholderStyle}"
+                                       Visibility="{Binding FilterText, Converter={StaticResource EmptyStringToVisibilityConverter}}"/>
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                            <Button Content="Select visible" Style="{StaticResource LinkButtonStyle}"
+                                    Command="{Binding SelectVisibleCommand}"/>
+                            <Button Content="Clear visible" Style="{StaticResource LinkButtonStyle}" Margin="10,0,0,0"
+                                    Command="{Binding ClearVisibleCommand}"/>
+                        </StackPanel>
+                        <TextBlock x:Name="SelectedCountText" Style="{StaticResource FieldNoteStyle}"
+                                   Text="{Binding SelectedReadCount, StringFormat={}{0} selected for reading}"/>
+                    </StackPanel>
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="4,8,4,4">
+                        <ItemsControl ItemsSource="{Binding VisibleFiles}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderThickness="0,0,0,1" BorderBrush="{DynamicResource BorderBrush}"
+                                            Background="{DynamicResource PanelBackgroundBrush}">
+                                        <Grid Margin="4,5">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <CheckBox Grid.Column="0" IsChecked="{Binding IsSelectedForRead}"
+                                                      IsEnabled="{Binding IsListable}"
+                                                      VerticalAlignment="Center"
+                                                      AutomationProperties.Name="{Binding FileName, StringFormat={}Select {0} for reading}"/>
+                                            <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                                <RadioButton GroupName="active-file" IsChecked="{Binding IsActive, Mode=OneWay}"
+                                                             Command="{Binding DataContext.SelectActiveFileCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                             CommandParameter="{Binding}"
+                                                             BorderThickness="0"
+                                                             AutomationProperties.Name="{Binding FileName, StringFormat={}Focus {0}}"
+                                                             Content="{Binding FileName}"
+                                                             ToolTip="{Binding FilePath}"/>
+                                                <TextBlock Style="{StaticResource FieldNoteStyle}" Margin="0,1,0,0"
+                                                           ToolTip="{Binding Status}">
+                                                    <Run Text="{Binding SizeText, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding StatusDisplay, Mode=OneWay}"/>
+                                                </TextBlock>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
                 </DockPanel>
             </Border>
 
-            <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Stretch"
-                          Background="{DynamicResource BorderBrush}"/>
+            <GridSplitter Grid.Column="1" Width="5" Style="{StaticResource SplitterStyle}"/>
 
-            <!-- Parameter panel (populated in S2; informative placeholder for S1) -->
-            <Border Grid.Column="2" Background="{DynamicResource PanelBackgroundBrush}"
-                    BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
-                <DockPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="{Binding ActiveTemplateInfo}"
-                               Margin="10,8" FontWeight="SemiBold"/>
-                    <TextBlock Margin="24" TextWrapping="Wrap" MaxWidth="520"
+            <!-- parameter table -->
+            <Border Grid.Column="2" Style="{StaticResource PanelBorderStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0" Margin="12,10,12,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="220"/>
+                            <ColumnDefinition Width="130"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="ACTIVE TEMPLATE" Style="{StaticResource EyebrowStyle}"/>
+                            <TextBlock x:Name="ActiveTemplateText" Text="{Binding ActiveTemplateName}" Style="{StaticResource SectionTitleStyle}"
+                                       ToolTip="{Binding ActiveFile.FilePath}"/>
+                        </StackPanel>
+                        <Grid Grid.Column="1" VerticalAlignment="Center" Margin="10,0,0,0">
+                            <TextBox x:Name="ParameterSearchBox"
+                                     Text="{Binding ParameterQuery, UpdateSourceTrigger=PropertyChanged, Delay=150}"
+                                     IsEnabled="{Binding HasActiveFile}"
+                                     AutomationProperties.Name="Search parameters by name or description"/>
+                            <TextBlock Text="Search name or description…" Style="{StaticResource PlaceholderStyle}"
+                                       Visibility="{Binding ParameterQuery, Converter={StaticResource EmptyStringToVisibilityConverter}}"/>
+                        </Grid>
+                        <ComboBox Grid.Column="2" VerticalAlignment="Center" Margin="8,0,0,0"
+                                  ItemsSource="{Binding AccessFilterLabels}"
+                                  SelectedIndex="{Binding AccessFilterIndex}"
+                                  IsEnabled="{Binding HasActiveFile}"
+                                  AutomationProperties.Name="Filter by access"/>
+                    </Grid>
+
+                    <TextBlock x:Name="SummaryText" Grid.Row="1" Margin="12,8,12,0" Style="{StaticResource FieldNoteStyle}"
+                               Text="{Binding ActiveParameterSummary}"/>
+
+                    <StackPanel Grid.Row="2" Margin="12,8,12,0">
+                        <Border Style="{StaticResource ErrorNoticeStyle}"
+                                Visibility="{Binding HasActionError, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <TextBlock x:Name="ActionErrorText" Text="{Binding ActionError}" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource ErrorForegroundBrush}"/>
+                        </Border>
+                        <Border Style="{StaticResource SuccessNoticeStyle}"
+                                Visibility="{Binding HasActionNotice, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{Binding ActionNotice}" TextWrapping="Wrap"
+                                           Foreground="{DynamicResource OkForegroundBrush}"/>
+                                <Button Grid.Column="1" Content="×" Style="{StaticResource LinkButtonStyle}"
+                                        Command="{Binding DismissNoticeCommand}"
+                                        AutomationProperties.Name="Dismiss confirmation"/>
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource WarningNoticeStyle}"
+                                Visibility="{Binding ShowNoFileMatches, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <TextBlock Text="No template files match the folder filter."
+                                       Foreground="{DynamicResource DirtyBrush}"/>
+                        </Border>
+                    </StackPanel>
+
+                    <ListView Grid.Row="3" x:Name="ParameterList" Margin="12,10,12,12"
+                              ItemsSource="{Binding VisibleParameters}"
+                              SelectedItem="{Binding SelectedParameter}"
+                              IsEnabled="{Binding HasActiveFile}"
+                              SelectionMode="Single"
+                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Width="260">
+                                    <GridViewColumnHeader Content="Name"/>
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"
+                                                           ToolTip="{Binding Name}"/>
+                                                <Border Style="{StaticResource BadgeBorderStyle}"
+                                                        Visibility="{Binding HasReadOnlyShape, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                        ToolTip="{Binding ReadOnlyShapeReasons}">
+                                                    <TextBlock Text="Read-only shape" FontSize="11"
+                                                               Foreground="{DynamicResource DirtyBrush}"/>
+                                                </Border>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                                <GridViewColumn Width="90" DisplayMemberBinding="{Binding AccessLabel}">
+                                    <GridViewColumnHeader Content="Access"/>
+                                </GridViewColumn>
+                                <GridViewColumn Width="290" DisplayMemberBinding="{Binding DefaultPreview}">
+                                    <GridViewColumnHeader Content="Default value"/>
+                                </GridViewColumn>
+                                <GridViewColumn Width="290" DisplayMemberBinding="{Binding DescriptionPreview}">
+                                    <GridViewColumnHeader Content="Description"/>
+                                </GridViewColumn>
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+
+                    <!-- empty states over the table area; never intercept mouse input -->
+                    <TextBlock Grid.Row="3" IsHitTestVisible="False" Margin="24" MaxWidth="460" TextWrapping="Wrap"
                                HorizontalAlignment="Center" VerticalAlignment="Center"
-                               Foreground="{DynamicResource MutedForegroundBrush}"
-                               Text="Declarations of the focused template appear here. The parameter table, editing, comparison and save review are added in the next milestones (S2–S4)."/>
-                </DockPanel>
+                               Style="{StaticResource FieldNoteStyle}"
+                               Visibility="{Binding ShowEmptyNoActiveFile, Converter={StaticResource BoolToVisibilityConverter}}"
+                               Text="Choose a template in the explorer. Focusing it does not add it to the read selection."/>
+                    <TextBlock Grid.Row="3" IsHitTestVisible="False" Margin="24" MaxWidth="460" TextWrapping="Wrap"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Style="{StaticResource FieldNoteStyle}"
+                               Visibility="{Binding ShowEmptyNotRead, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Run Text="Parameters not read yet."/><LineBreak/>
+                        <Run Text="Select templates for reading or use the default visible-file scope, then press Read parameters."/>
+                    </TextBlock>
+                    <TextBlock Grid.Row="3" IsHitTestVisible="False" Margin="24" MaxWidth="460" TextWrapping="Wrap"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Style="{StaticResource FieldNoteStyle}"
+                               Visibility="{Binding ShowEmptyNoMatches, Converter={StaticResource BoolToVisibilityConverter}}"
+                               Text="No matching parameters."/>
+                </Grid>
+            </Border>
+
+            <GridSplitter Grid.Column="3" Width="5" Style="{StaticResource SplitterStyle}"/>
+
+            <!-- parameter details -->
+            <Border Grid.Column="4" Style="{StaticResource PanelBorderStyle}" BorderThickness="1,1,0,1">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,10">
+                    <StackPanel>
+                        <TextBlock Text="DETAILS" Style="{StaticResource EyebrowStyle}"/>
+
+                        <TextBlock Style="{StaticResource FieldNoteStyle}" Margin="0,10,0,10"
+                                   Text="Select a row to inspect its read-only declaration fields."
+                                   Visibility="{Binding HasSelectedParameter, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
+
+                        <Border Style="{StaticResource CardStyle}"
+                                Visibility="{Binding HasSelectedParameter, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel>
+                                <TextBlock Text="Parameter name" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="DetailNameText" Text="{Binding DetailName}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                <TextBlock Text="Read-only" Style="{StaticResource FieldNoteStyle}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CardStyle}"
+                                Visibility="{Binding HasSelectedParameter, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel>
+                                <TextBlock Text="Default value" FontWeight="SemiBold"/>
+                                <TextBox x:Name="DetailValueBox" Text="{Binding DetailDefaultValue, Mode=OneWay}" IsReadOnly="True"
+                                         TextWrapping="Wrap" AcceptsReturn="True" MaxHeight="140"
+                                         Margin="0,4,0,0" FontFamily="{DynamicResource MonoFontFamily}"
+                                         AutomationProperties.Name="Default value"/>
+                                <TextBlock Text="Read-only: editing arrives with the editing milestone."
+                                           Style="{StaticResource FieldNoteStyle}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CardStyle}"
+                                Visibility="{Binding HasSelectedParameter, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel>
+                                <TextBlock Text="Access" FontWeight="SemiBold"/>
+                                <TextBox x:Name="DetailAccessBox" Text="{Binding DetailAccess, Mode=OneWay}" IsReadOnly="True" Margin="0,4,0,0"
+                                         AutomationProperties.Name="Access classification"/>
+                                <TextBlock Text="Read-only: editing arrives with the editing milestone."
+                                           Style="{StaticResource FieldNoteStyle}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CardStyle}"
+                                Visibility="{Binding HasSelectedParameter, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel>
+                                <TextBlock Text="Description" FontWeight="SemiBold"/>
+                                <TextBox x:Name="DetailDescriptionBox" Text="{Binding DetailDescription, Mode=OneWay}" IsReadOnly="True"
+                                         TextWrapping="Wrap" AcceptsReturn="True" MaxHeight="140"
+                                         Margin="0,4,0,0" FontFamily="{DynamicResource MonoFontFamily}"
+                                         AutomationProperties.Name="Description"/>
+                                <TextBlock Text="Read-only: editing arrives with the editing milestone."
+                                           Style="{StaticResource FieldNoteStyle}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CardStyle}"
+                                Visibility="{Binding HasSelectedParameter, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel>
+                                <TextBlock Text="XML type property" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="DetailXmlTypeText" Text="{Binding DetailXmlType}" Margin="0,4,0,0"
+                                           FontFamily="{DynamicResource MonoFontFamily}"/>
+                                <TextBlock Text="Separate from Internal / External access"
+                                           Style="{StaticResource FieldNoteStyle}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource WarningNoticeStyle}"
+                                Visibility="{Binding HasDetailReadOnlyReason, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel>
+                                <TextBlock Text="Unsupported declaration shape" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource DirtyBrush}"/>
+                                <TextBlock Text="{Binding DetailReadOnlyReason}" TextWrapping="Wrap"
+                                           Style="{StaticResource FieldNoteStyle}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <TextBlock Text="Review-gated saving" FontWeight="SemiBold"/>
+                                <TextBlock Style="{StaticResource FieldNoteStyle}" TextWrapping="Wrap"
+                                           Text="Editing stages drafts in memory. Only Review Save writes; each file is fingerprint-checked, backed up, replaced and verified. Multi-file saving is not one global atomic operation."/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
             </Border>
         </Grid>
-    </DockPanel>
+
+        <!-- ================= footer ================= -->
+        <Border Grid.Row="2" Background="{DynamicResource WindowBackgroundBrush}"
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="12,6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="FooterCountText" Grid.Column="0" Text="{Binding FolderSummaryText}"
+                           Foreground="{DynamicResource MutedForegroundBrush}"/>
+                <TextBlock x:Name="FooterOperationText" Grid.Column="1" Text="{Binding OperationText}"
+                           Foreground="{DynamicResource MutedForegroundBrush}"/>
+                <Button x:Name="VersionButton" Grid.Column="2" Content="{Binding VersionLabel}"
+                        Style="{StaticResource LinkButtonStyle}" Command="{Binding OpenLicensesCommand}"
+                        ToolTip="About, licence and bundled-component notices (Ctrl+L)"
+                        AutomationProperties.Name="About and licences"/>
+            </Grid>
+        </Border>
+    </Grid>
 </Window>

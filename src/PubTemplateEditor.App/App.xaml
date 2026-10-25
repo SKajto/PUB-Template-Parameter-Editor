@@ -11,6 +11,10 @@
             </ResourceDictionary.MergedDictionaries>
             <infrastructure:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"
                 xmlns:infrastructure="clr-namespace:PubTemplateEditor.App.Infrastructure"/>
+            <infrastructure:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter"
+                xmlns:infrastructure="clr-namespace:PubTemplateEditor.App.Infrastructure"/>
+            <infrastructure:EmptyStringToVisibilityConverter x:Key="EmptyStringToVisibilityConverter"
+                xmlns:infrastructure="clr-namespace:PubTemplateEditor.App.Infrastructure"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>
