@@ -128,7 +128,7 @@ public class ExplorerTests
     }
 
     [Fact]
-    public async Task DetailPanelShowsTheSelectedDeclarationReadOnly()
+    public async Task DetailPanelShowsTheSelectedDeclarationFields()
     {
         string settingsDir = TempDir("settings");
         string templates = TempDir("templates");
