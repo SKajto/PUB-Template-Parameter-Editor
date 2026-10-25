@@ -9,12 +9,14 @@
     <Color x:Key="PanelBackgroundColor">#FFFFFF</Color>
     <Color x:Key="Panel2BackgroundColor">#EEF1F5</Color>
     <Color x:Key="ForegroundColor">#364150</Color>
-    <Color x:Key="MutedForegroundColor">#8792A2</Color>
-    <Color x:Key="EyebrowForegroundColor">#8792A2</Color>
+    <Color x:Key="MutedForegroundColor">#667182</Color>
+    <Color x:Key="EyebrowForegroundColor">#667182</Color>
     <Color x:Key="BorderColor">#D8E0EB</Color>
     <Color x:Key="StrongBorderColor">#C3CEDB</Color>
     <Color x:Key="AccentColor">#315FCA</Color>
     <Color x:Key="AccentSoftColor">#E8EEFB</Color>
+    <!-- Text drawn on top of the accent fill; the contrast audit enforces readability. -->
+    <Color x:Key="OnAccentColor">#FFFFFF</Color>
     <Color x:Key="SelectionColor">#DCE7FA</Color>
     <Color x:Key="RowHoverColor">#F7F9FC</Color>
     <Color x:Key="DirtyColor">#B45309</Color>
@@ -37,6 +39,7 @@
     <SolidColorBrush x:Key="StrongBorderBrush" Color="{DynamicResource StrongBorderColor}"/>
     <SolidColorBrush x:Key="AccentBrush" Color="{DynamicResource AccentColor}"/>
     <SolidColorBrush x:Key="AccentSoftBrush" Color="{DynamicResource AccentSoftColor}"/>
+    <SolidColorBrush x:Key="OnAccentBrush" Color="{DynamicResource OnAccentColor}"/>
     <SolidColorBrush x:Key="SelectionBrush" Color="{DynamicResource SelectionColor}"/>
     <SolidColorBrush x:Key="RowHoverBackgroundBrush" Color="{DynamicResource RowHoverColor}"/>
     <SolidColorBrush x:Key="SelectedRowBackgroundBrush" Color="{DynamicResource SelectionColor}"/>

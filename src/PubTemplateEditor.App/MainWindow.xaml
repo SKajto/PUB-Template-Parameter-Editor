@@ -14,9 +14,13 @@
         <KeyBinding Modifiers="Control" Key="F" Command="{Binding FocusFilterCommand}"/>
         <KeyBinding Modifiers="Control" Key="E" Command="{Binding FocusParameterSearchCommand}"/>
         <KeyBinding Modifiers="Control" Key="L" Command="{Binding OpenLicensesCommand}"/>
+        <KeyBinding Modifiers="Control" Key="S" Command="{Binding OpenReviewCommand}"/>
     </Window.InputBindings>
 
-    <Grid>
+    <!-- The theme text colour is inherited from here; see the note in Themes/Controls.xaml.
+         A style setter would beat the colour controls pass down, so the implicit TextBlock
+         style deliberately does not set Foreground. -->
+    <Grid TextElement.Foreground="{DynamicResource ForegroundBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -33,11 +37,12 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
                 <Border Grid.Column="0" Width="34" Height="34" CornerRadius="6"
                         Background="{DynamicResource AccentBrush}" VerticalAlignment="Center">
-                    <TextBlock Text="PUB" Foreground="White" FontWeight="Bold" FontSize="12"
+                    <TextBlock Text="PUB" Foreground="{DynamicResource OnAccentBrush}" FontWeight="Bold" FontSize="12"
                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
 
@@ -46,24 +51,59 @@
                     <TextBlock Text="Local template workspace" Style="{StaticResource FieldNoteStyle}" Margin="0"/>
                 </StackPanel>
 
-                <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="0,0,10,0" VerticalAlignment="Center">
-                    <RadioButton GroupName="theme" Content="Light" Style="{StaticResource SegmentRadioStyle}"
-                                 IsChecked="{Binding IsLightSelected, Mode=OneWay}"
-                                 Command="{Binding SetThemeCommand}" CommandParameter="Light"
-                                 AutomationProperties.Name="Light theme"/>
-                    <RadioButton GroupName="theme" Content="Dark" Style="{StaticResource SegmentRadioStyle}"
-                                 IsChecked="{Binding IsDarkSelected, Mode=OneWay}"
-                                 Command="{Binding SetThemeCommand}" CommandParameter="Dark"
-                                 AutomationProperties.Name="Dark theme"/>
-                    <RadioButton GroupName="theme" Content="System" Style="{StaticResource SegmentRadioStyle}"
-                                 IsChecked="{Binding IsSystemSelected, Mode=OneWay}"
-                                 Command="{Binding SetThemeCommand}" CommandParameter="System"
-                                 AutomationProperties.Name="Follow Windows theme"/>
+                <!-- Staged changes are session state, so the counter and the controls that manage it
+                     (review entry, discard) sit in the top bar next to the folder they belong to.
+                     The per-field rows stay in the details column. -->
+                <StackPanel x:Name="StagedTray" Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,14,0">
+                    <Border Style="{StaticResource BadgeBorderStyle}" Padding="8,3" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Style="{StaticResource IconLineStyle}" Data="{StaticResource IconListChecks}"
+                                  Width="13" Height="13" Margin="0,0,5,0"
+                                  Stroke="{DynamicResource MutedForegroundBrush}"/>
+                            <TextBlock x:Name="StagedTrayText" Text="{Binding StagedSummary}" FontSize="12"
+                                       Foreground="{DynamicResource MutedForegroundBrush}"/>
+                        </StackPanel>
+                    </Border>
+                    <Button Content="Review and save" Command="{Binding OpenReviewCommand}"
+                            Style="{StaticResource AccentButtonStyle}" Margin="10,0,0,0"
+                            ToolTip="List every staged change before anything is written (Ctrl+S)"
+                            AutomationProperties.Name="Review staged changes"/>
+                    <Button x:Name="DiscardAllButton" Content="Discard all" Command="{Binding DiscardAllStagedCommand}" Margin="8,0,0,0"
+                            ToolTip="Forget the staged proposals and the unapplied typing of this session; no template file is written"
+                            AutomationProperties.Name="Discard all staged changes"/>
                 </StackPanel>
 
-                <Button Grid.Column="4" Content="Choose folder" Command="{Binding OpenFolderCommand}"
-                        Style="{StaticResource AccentButtonStyle}"
-                        ToolTip="Choose the folder containing .dta templates (Ctrl+O)"/>
+                <!-- Interface mode as icon buttons; each carries a text alternative for assistive
+                     technology and a tooltip naming the mode. -->
+                <StackPanel Grid.Column="4" Orientation="Horizontal" Margin="0,0,14,0" VerticalAlignment="Center">
+                    <RadioButton GroupName="theme" Style="{StaticResource SegmentIconRadioStyle}"
+                                 IsChecked="{Binding IsLightSelected, Mode=OneWay}"
+                                 Command="{Binding SetThemeCommand}" CommandParameter="Light"
+                                 ToolTip="Light interface" AutomationProperties.Name="Light theme">
+                        <Path Style="{StaticResource RadioIconStyle}" Data="{StaticResource IconSun}" Width="17" Height="17"/>
+                    </RadioButton>
+                    <RadioButton GroupName="theme" Style="{StaticResource SegmentIconRadioStyle}" Margin="-1,0,0,0"
+                                 IsChecked="{Binding IsDarkSelected, Mode=OneWay}"
+                                 Command="{Binding SetThemeCommand}" CommandParameter="Dark"
+                                 ToolTip="Dark interface" AutomationProperties.Name="Dark theme">
+                        <Path Style="{StaticResource RadioIconStyle}" Data="{StaticResource IconMoon}" Width="17" Height="17"/>
+                    </RadioButton>
+                    <RadioButton GroupName="theme" Style="{StaticResource SegmentIconRadioStyle}" Margin="-1,0,0,0"
+                                 IsChecked="{Binding IsSystemSelected, Mode=OneWay}"
+                                 Command="{Binding SetThemeCommand}" CommandParameter="System"
+                                 ToolTip="Follow the Windows colour setting" AutomationProperties.Name="Follow Windows theme">
+                        <Path Style="{StaticResource RadioIconStyle}" Data="{StaticResource IconMonitor}" Width="17" Height="17"/>
+                    </RadioButton>
+                </StackPanel>
+
+                <StackPanel Grid.Column="5" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding FolderName}" MaxWidth="200" TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding FolderPath}" VerticalAlignment="Center" Margin="0,0,8,0"
+                               AutomationProperties.Name="Active folder"/>
+                    <Button Content="Choose folder" Command="{Binding OpenFolderCommand}"
+                            Style="{StaticResource AccentButtonStyle}"
+                            ToolTip="Choose the folder containing .dta templates (Ctrl+O)"/>
+                </StackPanel>
             </Grid>
         </Border>
 
@@ -294,10 +334,135 @@
                                Text="No matching parameters."/>
 
                     <!-- ============ compare panel: the same parameter in every read template ============ -->
-                    <Border Grid.Row="0" Grid.RowSpan="4" Margin="10" Panel.ZIndex="10"
-                            Background="{DynamicResource PanelBackgroundBrush}"
-                            BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1"
-                            Visibility="{Binding IsCompareOpen, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <!-- ============ save review: the only place that could write ============
+                             Every staged change of the session, per field, with a tick box each. The
+                             primary action stays disabled until the write step exists, and says so
+                             instead of pretending to save. -->
+                        <Border Grid.Row="0" Grid.RowSpan="4" Margin="10" Panel.ZIndex="11"
+                                Background="{DynamicResource PanelBackgroundBrush}"
+                                BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1"
+                                Visibility="{Binding IsReviewOpen, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <DockPanel LastChildFill="True">
+                                <Grid DockPanel.Dock="Top" Margin="12,10,12,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="SAVE REVIEW" Style="{StaticResource EyebrowStyle}"/>
+                                        <TextBlock x:Name="ReviewSummaryText" Text="{Binding ReviewSummary}"
+                                                   Style="{StaticResource SectionTitleStyle}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Button Content="Select all" Style="{StaticResource LinkButtonStyle}" Margin="0,0,8,0"
+                                                Command="{Binding SelectAllReviewCommand}"
+                                                AutomationProperties.Name="Select every staged change"/>
+                                        <Button Content="Select none" Style="{StaticResource LinkButtonStyle}" Margin="0,0,8,0"
+                                                Command="{Binding SelectNoneReviewCommand}"
+                                                AutomationProperties.Name="Deselect every staged change"/>
+                                        <Button Content="Discard selected" Style="{StaticResource LinkButtonStyle}" Margin="0,0,8,0"
+                                                Command="{Binding DiscardSelectedReviewCommand}"
+                                                ToolTip="Forget the ticked proposals; no template file is written"
+                                                AutomationProperties.Name="Discard the ticked staged changes"/>
+                                        <Button Content="Close" Style="{StaticResource LinkButtonStyle}"
+                                                Command="{Binding CloseReviewCommand}"
+                                                AutomationProperties.Name="Close the save review"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <Border DockPanel.Dock="Bottom" Style="{StaticResource CardStyle}" Margin="12,6,12,10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,10,0">
+                                            <Path Style="{StaticResource IconLineStyle}" Data="{StaticResource IconWarning}"
+                                                  Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"
+                                                  Stroke="{DynamicResource DirtyBrush}"/>
+                                            <TextBlock Text="{Binding SaveUnavailableReason}" TextWrapping="Wrap"
+                                                       MaxWidth="380" VerticalAlignment="Center"
+                                                       Style="{StaticResource FieldNoteStyle}"/>
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Content="Save to templates" VerticalAlignment="Center"
+                                                Style="{StaticResource AccentButtonStyle}"
+                                                Command="{Binding SaveReviewCommand}" IsEnabled="{Binding CanSaveReview}"
+                                                ToolTip="{Binding SaveUnavailableReason}" ToolTipService.ShowOnDisabled="True"
+                                                AutomationProperties.Name="Save the ticked changes to the templates"/>
+                                    </Grid>
+                                </Border>
+
+                                <ListView x:Name="ReviewListView" ItemsSource="{Binding ReviewRows}"
+                                          BorderThickness="0" Margin="12,0,12,0" IsTabStop="False"
+                                          AutomationProperties.Name="Staged changes waiting for review">
+                                    <ListView.View>
+                                        <GridView>
+                                            <GridViewColumn Header="" Width="30">
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <CheckBox IsChecked="{Binding IsSelected}"
+                                                                  HorizontalAlignment="Center"
+                                                                  AutomationProperties.Name="Include this change"/>
+                                                    </DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
+                                            <GridViewColumn Header="Parameter" Width="120">
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding ParameterName}" FontFamily="{DynamicResource MonoFontFamily}"/>
+                                                    </DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
+                                            <GridViewColumn Header="Template" Width="110">
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding FileName}" ToolTip="{Binding FilePath}"/>
+                                                    </DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
+                                            <GridViewColumn Header="Field" Width="80">
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding FieldLabel}"
+                                                                   Foreground="{DynamicResource MutedForegroundBrush}"/>
+                                                    </DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
+                                            <GridViewColumn Header="Now" Width="110">
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding BaselineText}" FontFamily="{DynamicResource MonoFontFamily}"
+                                                                   TextTrimming="CharacterEllipsis" MaxWidth="104"/>
+                                                    </DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
+                                            <GridViewColumn Header="After save" Width="130">
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding ProposedText}" FontFamily="{DynamicResource MonoFontFamily}"
+                                                                   TextTrimming="CharacterEllipsis" MaxWidth="124"
+                                                                   Foreground="{DynamicResource AccentBrush}"/>
+                                                    </DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
+                                            <GridViewColumn Header="Writes" Width="86">
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding WriteStateText}" Foreground="{DynamicResource MutedForegroundBrush}"
+                                                                   ToolTip="{Binding NoOpHint}" ToolTipService.ShowOnDisabled="True"/>
+                                                    </DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
+                                        </GridView>
+                                    </ListView.View>
+                                </ListView>
+                            </DockPanel>
+                        </Border>
+
+                        <Border Grid.Row="0" Grid.RowSpan="4" Margin="10" Panel.ZIndex="10"
+                                Background="{DynamicResource PanelBackgroundBrush}"
+                                BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1"
+                                Visibility="{Binding IsCompareOpen, Converter={StaticResource BoolToVisibilityConverter}}">
                         <DockPanel LastChildFill="True">
                             <Grid DockPanel.Dock="Top" Margin="12,10,12,6">
                                 <Grid.ColumnDefinitions>
@@ -586,9 +751,13 @@
                                             Command="{Binding RevertFormCommand}"
                                             AutomationProperties.Name="Reload the form with the session values"/>
                                     <Button x:Name="DiscardDraftsButton" Content="Discard staged for this parameter"
-                                            Style="{StaticResource LinkButtonStyle}"
+                                            Style="{StaticResource LinkButtonStyle}" Margin="0,0,6,0"
                                             Command="{Binding DiscardDraftsForParameterCommand}"
                                             AutomationProperties.Name="Discard the staged changes of this parameter"/>
+                                    <Button x:Name="OpenReviewButton" Content="Review all staged changes"
+                                            Style="{StaticResource LinkButtonStyle}"
+                                            Command="{Binding OpenReviewCommand}"
+                                            AutomationProperties.Name="Open the save review for every staged change"/>
                                 </WrapPanel>
                                 <WrapPanel>
                                     <Button x:Name="CompareButton" Content="Compare with other templates"
@@ -646,10 +815,9 @@
                         <TextBlock x:Name="StagedSummaryText" Text="{Binding StagedSummary}" FontSize="11"
                                    Style="{StaticResource DirtyBadgeStyle}"/>
                     </Border>
-                    <Button x:Name="DiscardAllButton" Content="Discard all staged"
-                            Style="{StaticResource LinkButtonStyle}" Margin="8,0,0,0"
-                            Command="{Binding DiscardAllStagedCommand}"
-                            AutomationProperties.Name="Discard every staged change of this session"/>
+                    <TextBlock Margin="8,0,0,0" Text="Review and save in the top bar"
+                               Foreground="{DynamicResource MutedForegroundBrush}" VerticalAlignment="Center"
+                               FontSize="11"/>
                 </StackPanel>
                 <Button x:Name="VersionButton" Grid.Column="2" Content="{Binding VersionLabel}"
                         Style="{StaticResource LinkButtonStyle}" Command="{Binding OpenLicensesCommand}"

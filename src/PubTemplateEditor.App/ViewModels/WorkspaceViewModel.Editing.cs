@@ -712,6 +712,11 @@ public sealed partial class WorkspaceViewModel
         RaiseAllEditorProperties();
         RebuildCompareRows();
         RebuildBulkTargets();
+        if (_isReviewOpen)
+        {
+            RebuildReviewRows();
+        }
+
         RefreshReviewAndActionStates();
         CommandManager.InvalidateRequerySuggested();
     }

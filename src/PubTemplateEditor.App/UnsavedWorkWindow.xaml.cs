@@ -21,6 +21,9 @@ public partial class UnsavedWorkWindow : Window
     public Button KeepEditingChoice => KeepEditingButton;
     public TextBlock MessageLabel => MessageText;
     public TextBlock HeadlineLabel => HeadlineText;
+    public TextBlock TypingStateLabel => TypingStateText;
+    public TextBlock StagedStateLabel => StagedStateText;
+    public TextBlock HelpLabel => ApplyHelpText;
 
     public UnsavedWorkWindow(NavigationPrompt prompt)
     {
@@ -32,6 +35,24 @@ public partial class UnsavedWorkWindow : Window
             ? Visibility.Visible
             : Visibility.Collapsed;
         ApplyButton.IsEnabled = prompt.UnappliedFieldCount > 0;
+
+        // State chips: the counts decide which choices exist, so they are shown rather than implied.
+        TypingStateText.Text = prompt.UnappliedFieldCount == 0
+            ? "Form: nothing typed without Apply"
+            : $"Form: {prompt.UnappliedFieldCount} field(s) typed without Apply";
+        StagedStateText.Text = prompt.StagedChangeCount == 0
+            ? "Session: no staged changes"
+            : $"Session: {prompt.StagedChangeCount} staged change(s), not written";
+
+        // A disabled button has to say why, otherwise it reads as a broken control.
+        ApplyHelpText.Text = prompt.UnappliedFieldCount > 0
+            ? "Apply stages what is typed in the form; the staged changes themselves stay in memory until the save review."
+            : "Apply is unavailable because every typed value has already been staged. The staged changes are kept unless you discard them.";
+        ToolTipService.SetToolTip(ApplyButton, ApplyHelpText.Text);
+        // Enter must never trigger a destructive choice: when Apply is unavailable, the safe default
+        // is the same as Escape.
+        KeepEditingButton.IsDefault = prompt.UnappliedFieldCount == 0;
+        ApplyButton.IsDefault = prompt.UnappliedFieldCount > 0;
 
         ApplyButton.Click += (_, _) => Choose(NavigationDecision.ApplyForms);
         DiscardFormButton.Click += (_, _) => Choose(NavigationDecision.DiscardForms);

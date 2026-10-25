@@ -280,6 +280,29 @@ public class DraftStoreTests
         drafts.Clear();
         Assert.False(drafts.HasAny);
     }
+
+    [Fact]
+    public void RemoveDropsExactlyOneStagedChange()
+    {
+        TemplateRecord a = AlphaTemplate();
+        var drafts = new DraftStore();
+
+        drafts.Stage(FileA, EditingFixtures.Decl(a, "alpha"), FieldKind.DefaultValue, "keep");
+        drafts.Stage(FileA, EditingFixtures.Decl(a, "alpha"), FieldKind.Description, "drop");
+        drafts.Stage(FileA, EditingFixtures.Decl(a, "beta"), FieldKind.DefaultValue, "other");
+        Assert.Equal(3, drafts.Count);
+
+        var descriptionKey = new ChangeKey(FileA, EditingFixtures.Decl(a, "alpha").DeclarationId, FieldKind.Description);
+        Assert.True(drafts.Remove(descriptionKey));
+        Assert.Equal(2, drafts.Count);
+        Assert.Null(drafts.Find(FileA, EditingFixtures.Decl(a, "alpha").DeclarationId, FieldKind.Description));
+        Assert.NotNull(drafts.Find(FileA, EditingFixtures.Decl(a, "alpha").DeclarationId, FieldKind.DefaultValue));
+
+        // The save step removes what it has already written. Removing twice must report false, never
+        // throw, so a partially applied batch cannot abort on bookkeeping.
+        Assert.False(drafts.Remove(descriptionKey));
+        Assert.Equal(2, drafts.Count);
+    }
 }
 
 public class ParameterComparisonTests

@@ -181,6 +181,17 @@ public sealed class DraftStore
         return keys.Count;
     }
 
+    /// <summary>
+    /// Drops a single staged change: the review list deselects a field that must not be written,
+    /// and the save step removes rows once they are confirmed on disk. Returns false when the
+    /// change disappeared in the meantime (re-read, discard, bulk revert).
+    /// </summary>
+    public bool Remove(ChangeKey key)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key.FilePath);
+        return _drafts.Remove(key);
+    }
+
     public int DiscardForDeclaration(string filePath, int declarationId)
     {
         var keys = _drafts.Keys.Where(k => k.FilePath == filePath && k.DeclarationId == declarationId).ToList();

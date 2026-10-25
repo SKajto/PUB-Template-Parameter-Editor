@@ -293,6 +293,95 @@ Open gates for S3:
 3. Undo/redo across staged drafts is not implemented; per-parameter and global discard are
    the documented recovery paths, matching REQUIREMENTS.md.
 
+### 2026-10-25 — S4 save review surface (write step intentionally absent)
+
+App (`ViewModels/WorkspaceViewModel.Review.cs` partial, `StagedReviewRow` in `ReviewRows.cs`,
+`MainWindow.xaml` overlay, `DraftStore.Remove` in Core):
+
+- The review lists every staged change of the session — one row per change key, ordered by parameter
+  name — with columns for the per-row tick, Parameter, Template, Field, Now (session baseline),
+  After save (proposal) and Writes. It opens over the workspace with `Ctrl+S`, the top-bar
+  "Review all staged changes..." button, or the details action, and it never writes: opening,
+  selecting and discarding were each asserted against `File.ReadAllBytes` of the source templates.
+- Selection is remembered per change key (`_reviewDeselected`) rather than "select all when nothing
+  is ticked", so staging or discarding while the review is open rebuilds the table without silently
+  re-ticking rows the user had cleared; a new review starts fully ticked.
+- "Discard selected" removes proposals from the session — the only safe meaning of "do not save this
+  field" before a write step exists — is disabled when nothing is ticked, and closes the panel when
+  the last row disappears instead of showing an empty table.
+- Save stays disabled with a visible reason (`CanSaveReview == false` plus `SaveUnavailableReason`,
+  echoed in the panel footer, which also states that the baseline shown is the value as read in this
+  session and is re-checked before anything is written). A disabled button that explains itself beats
+  a silent no-op.
+- Top bar now carries the live staged counter (`N staged in M template(s)`), the review button and
+  "Discard all" (moved out of the footer where it was easy to miss). The unsaved-work prompt was
+  rebuilt around the same distinction: typed-but-not-staged vs staged counts, a "Discard all" choice
+  that only appears when that would really throw work away, and an Apply choice that is disabled —
+  with its own explanation — while a field is blocked or the session cannot write.
+- `DraftStore.Remove(ChangeKey)` drops exactly one staged change and reports false on a second
+  removal, so the later save step can clean up what it has already written without a bookkeeping call
+  aborting a partially applied batch.
+
+Icons and control templates: the icon set is hand-drawn `StreamGeometry` path data on a 24×24 grid
+(folder, reload, list, save, undo, close, compare, brush, sun/moon/display, warning, search) in the
+theme resource dictionaries — no icon font and no third-party icon asset, consistent with the
+zero-dependency rule. Full templates were added for CheckBox, RadioButton, ComboBox, TabItem,
+ScrollBar and ToolTip because the default Aero chrome tints those with its own colours, which was the
+source of most contrast failures.
+
+Contrast as a measurable requirement (`ContrastAuditTests`): walks the visual tree of the shell in
+base, bulk, compare and save-review states, both prompt variants and the licence window in both
+themes, resolves the effective text and background brushes behind every `TextBlock`, and reports
+pairs below the WCAG 3.0 minimum (4.5:1 body, 3:1 large/UI). It writes
+`artifacts/screenshots/contrast-light.txt` / `contrast-dark.txt`; current state is 0 offenders per
+theme (body text 8.06:1 and 12.64:1 light, 10.03:1 and 6.34:1 dark). Two structural causes were found
+and are now pinned by tests: the implicit `TextBlock` style used to set `Foreground`, and a style
+setter wins over an inherited value — so it pinned labels inside accent-filled buttons to the theme
+text colour (now the window root sets `TextElement.Foreground` once, specificity 0, and
+`ImplicitTextBlockStyleDoesNotSetForeground` / `EveryWindowRootInheritsTheThemeTextColour` guard it);
+and `ShellXamlCarriesNoHardCodedColours` now rejects named colours (`White`, `Black`, …) as well as
+hex literals, with the brand mark switched to `OnAccentBrush`.
+
+Executed commands and results:
+
+- `dotnet build -c Release` → 0 warnings, 0 errors.
+- `dotnet test` → **115 passing, 0 failing** (Core 60, Integration 12, App/WPF 43).
+- New tests: `tests/PubTemplateEditor.App.Tests/ReviewTests.cs` (5),
+  `DraftStoreTests.RemoveDropsExactlyOneStagedChange` in `EditingTests.cs` (Core 60),
+  `ContrastAuditTests` (2, now including the review panel), and the review case in
+  `ShellSnapshotTests.EditingPanelsRenderAndWriteSnapshots` which writes
+  `artifacts/screenshots/editing-review-light.png` and asserts the summary text and row count.
+- `dotnet publish src/PubTemplateEditor.App -c Release -p:PublishProfile=PortableWin_x64`
+  and `powershell -File packaging/build-msix.ps1 -Version 0.4.0 -Mode Draft`
+  → `artifacts/packaging/out/PubTemplateEditor_0.4.0_win-x64.msix` (unsigned draft, placeholders).
+
+A binding-path guard tried first watched WPF binding errors with a `TraceListener` across the first
+layout pass; that crashed the WPF test host, and a crashed suite is worse than the bug it hunts. The
+replacement is static: every `{Binding}` path inside the review table's columns must resolve on
+`StagedReviewRow`, and the expected column set must be present. It paid for itself immediately — the
+panel bound `IsNoOp`, a member of `DraftChange` that the row object does not expose, and such a typo
+blanks a cell instead of throwing.
+
+Also fixed while regenerating snapshots: `ShellSnapshotTests.EditingPanelsRenderAndWriteSnapshots`
+closed the shell while three changes were staged. With no prompt seam installed the view model
+correctly refuses to lose work, so the window never closed, the test hit its 4-minute timeout and the
+abandoned window leaked into the next test. It now installs a `NavigationGuard` seam, asserts the
+prompt was actually raised with `NavigationReason.CloseWorkspace`, and closes cleanly; a stale
+`testhost.exe` left behind by the earlier run also had to be killed before the suite could be
+re-run. The editing test file's helper used the wrong `NavigationDecision`/`NavigationReason` enum
+members, which sent the prompt down a path that never dismisses it — another 4-minute timeout.
+
+Open gates:
+
+1. S3's interactive desktop review still stands, and now covers the review panel, the redesigned
+   prompt and the icon theme switcher.
+2. The write step: source-span patcher with exact lexical verification, output preflight, SHA-256
+   fingerprint check against the bytes currently on disk, user-scoped backups and recovery journal,
+   same-volume temporary file with verified per-file replacement, and writing only the ticked rows.
+   Enabling `SaveReviewCommand` happens last, after round-trip, conflict, mid-batch-failure and
+   byte-exactness tests on copies of the native samples pass.
+
+
 ## Deferred scope
 
 Linux UI, additional architectures, parameter creation/deletion/renaming, presets, recursive folders, in-app PUB generation, browser hosting and custom installer/updater services are outside this initial Windows release. Keep the domain core independent without building a second UI.

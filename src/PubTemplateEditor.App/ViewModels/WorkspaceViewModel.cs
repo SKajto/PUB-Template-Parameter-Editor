@@ -67,6 +67,8 @@ public sealed partial class WorkspaceViewModel : ViewModelBase
         SetThemeCommand = new RelayCommand(value => ApplyTheme(ParseThemeChoice(value)));
         DismissNoticeCommand = new RelayCommand(() => ActionNotice = null);
         InitEditingCommands();
+        InitReviewCommands();
+        InitReviewCommands();
         // Licences must stay reachable offline from inside the app (GPL distribution rule).
         // The view decides how to present them; the view model stays free of window types.
         OpenLicensesCommand = new RelayCommand(() => LicensesRequested?.Invoke());

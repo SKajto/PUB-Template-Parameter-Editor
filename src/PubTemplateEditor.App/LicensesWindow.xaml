@@ -7,7 +7,7 @@
         ShowInTaskbar="False"
         Background="{DynamicResource WindowBackgroundBrush}"
         FontSize="{DynamicResource UiFontSize}">
-    <DockPanel>
+    <DockPanel TextElement.Foreground="{DynamicResource ForegroundBrush}">
         <TextBlock x:Name="SourceLine" DockPanel.Dock="Bottom" Margin="10,8"
                    TextWrapping="Wrap"
                    Foreground="{DynamicResource MutedForegroundBrush}"/>

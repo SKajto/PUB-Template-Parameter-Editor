@@ -134,7 +134,12 @@ public class ThemeTests
     public void ShellXamlCarriesNoHardCodedColours()
     {
         // Colours must come from the theme dictionaries, otherwise Dark mode stays unreadable.
+        // Named colours are just as much a trap as hex literals: "White" on the accent fill is
+        // illegible once the dark theme lightens that accent.
         var hex = new Regex("#[0-9A-Fa-f]{3,8}\\b", RegexOptions.Compiled);
+        var named = new Regex(
+            "(Foreground|Background|BorderBrush|Fill|Stroke)=\"(White|Black|Gray|Grey|Red|Green|Blue|Yellow|Orange|Purple)\"",
+            RegexOptions.Compiled);
         string dir = Path.Combine(RepoRoot(), "src", "PubTemplateEditor.App");
 
         foreach (string file in Directory.GetFiles(dir, "*.xaml", SearchOption.AllDirectories))
@@ -144,8 +149,41 @@ public class ThemeTests
                 continue;
             }
 
+            string text = File.ReadAllText(file);
             Assert.False(hex.IsMatch(File.ReadAllText(file)), $"hard-coded colour in {Path.GetFileName(file)}");
+            Assert.False(named.IsMatch(text), $"hard-coded named colour in {Path.GetFileName(file)}");
         }
+    }
+
+    [Fact]
+    public void EveryWindowRootInheritsTheThemeTextColour()
+    {
+        // Without this, text in a new window falls back to the property default (black).
+        string dir = Path.Combine(RepoRoot(), "src", "PubTemplateEditor.App");
+        var windows = Directory.GetFiles(dir, "*.xaml", SearchOption.AllDirectories)
+            .Where(f => File.ReadAllText(f).Contains("<Window "))
+            .ToList();
+        Assert.NotEmpty(windows);
+        foreach (string file in windows)
+        {
+            string text = File.ReadAllText(file);
+            Assert.True(text.Contains("TextElement.Foreground=\"{DynamicResource ForegroundBrush}\""),
+                $"{Path.GetFileName(file)} does not inherit the theme text colour");
+        }
+    }
+
+    [Fact]
+    public void ImplicitTextBlockStyleDoesNotSetForeground()
+    {
+        // Precedence trap: a style setter beats an inherited value, so an implicit TextBlock
+        // Foreground would override the colour that accent buttons, selected rows and combo boxes
+        // pass down, and the theme text colour would win over everything. The theme colour is set
+        // once on each window root instead. ContrastAuditTests is the behavioural guard.
+        string controls = File.ReadAllText(Path.Combine(RepoRoot(), "src", "PubTemplateEditor.App", "Themes", "Controls.xaml"));
+        int start = controls.IndexOf("<Style TargetType=\"{x:Type TextBlock}\">", StringComparison.Ordinal);
+        Assert.True(start >= 0, "implicit TextBlock style is missing");
+        int end = controls.IndexOf("</Style>", start, StringComparison.Ordinal);
+        Assert.DoesNotContain("Foreground", controls[start..end], StringComparison.Ordinal);
     }
 
     [Fact]

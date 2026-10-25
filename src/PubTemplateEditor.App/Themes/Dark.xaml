@@ -16,6 +16,8 @@
     <Color x:Key="StrongBorderColor">#3A434F</Color>
     <Color x:Key="AccentColor">#6E93E8</Color>
     <Color x:Key="AccentSoftColor">#1E2A45</Color>
+    <!-- The dark accent is a light blue, so text on it has to be dark to stay readable. -->
+    <Color x:Key="OnAccentColor">#13171F</Color>
     <Color x:Key="SelectionColor">#24314D</Color>
     <Color x:Key="RowHoverColor">#1E232B</Color>
     <Color x:Key="DirtyColor">#E0A44A</Color>
@@ -38,6 +40,7 @@
     <SolidColorBrush x:Key="StrongBorderBrush" Color="{DynamicResource StrongBorderColor}"/>
     <SolidColorBrush x:Key="AccentBrush" Color="{DynamicResource AccentColor}"/>
     <SolidColorBrush x:Key="AccentSoftBrush" Color="{DynamicResource AccentSoftColor}"/>
+    <SolidColorBrush x:Key="OnAccentBrush" Color="{DynamicResource OnAccentColor}"/>
     <SolidColorBrush x:Key="SelectionBrush" Color="{DynamicResource SelectionColor}"/>
     <SolidColorBrush x:Key="RowHoverBackgroundBrush" Color="{DynamicResource RowHoverColor}"/>
     <SolidColorBrush x:Key="SelectedRowBackgroundBrush" Color="{DynamicResource SelectionColor}"/>

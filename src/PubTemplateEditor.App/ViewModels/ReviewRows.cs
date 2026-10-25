@@ -103,6 +103,71 @@ public sealed class CompareFieldRowItem
 }
 
 /// <summary>
+/// One staged change in the review list. Identity is the change key (file, declaration, field), never
+/// the displayed name: two templates can hold the same parameter, and one template can declare it
+/// twice. The proposed value is shown exactly as staged, including surrounding spaces.
+/// </summary>
+public sealed class StagedReviewRow : ViewModelBase
+{
+    private bool _isSelected = true;
+
+    public StagedReviewRow(DraftChange change)
+    {
+        Change = change;
+    }
+
+    public DraftChange Change { get; }
+
+    public ChangeKey Key => Change.Key;
+
+    public FieldKind Field => Change.Key.Field;
+
+    public string FilePath => Change.Key.FilePath;
+
+    public string FileName => System.IO.Path.GetFileName(Change.Key.FilePath);
+
+    public string ParameterName => Change.DeclarationName;
+
+    public string FieldLabel => TemplateFieldRules.DisplayName(Change.Key.Field);
+
+    public string BaselineText => Show(Change.BaselineValue);
+
+    public string ProposedText => Show(Change.ProposedValue);
+
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (Set(ref _isSelected, value))
+            {
+                Raise(nameof(SelectionMark));
+            }
+        }
+    }
+
+    /// <summary>Visual cue besides the tick box, so the state is not colour-only.</summary>
+    public string SelectionMark => _isSelected ? "\u2713" : "\u2013";
+
+    /// <summary>A staged read-only name change: the save step will refuse it, so say so here.</summary>
+    public bool IsNoOp => Change.IsNoOp;
+
+    public string NoOpHint => IsNoOp
+        ? "Parameter names are read-only. This change was staged from the comparison view and cannot be written."
+        : string.Empty;
+
+    /// <summary>Short writable/read-only marker for the review table.</summary>
+    public string WriteStateText => IsNoOp ? "read-only" : "yes";
+
+    private static string Show(string? value) => value switch
+    {
+        null => "(no such property)",
+        "" => "(empty)",
+        _ => value,
+    };
+}
+
+/// <summary>
 /// One candidate of the bulk panel. Ineligible candidates stay visible with their reason; the
 /// checkbox is disabled so a user cannot stage a change the save review would have to guess about.
 /// </summary>

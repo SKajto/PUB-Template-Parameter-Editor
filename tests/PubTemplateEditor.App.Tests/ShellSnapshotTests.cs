@@ -210,7 +210,28 @@ public class ShellSnapshotTests
             RenderShell(window, "editing-bulk-light.png");
             vm.CloseBulkCommand.Execute(null);
 
+            // Save review: the staged changes of the whole session in one table, each with its own tick.
+            vm.OpenReviewCommand.Execute(null);
+            Assert.True(vm.IsReviewOpen);
+            Assert.Contains("1 of 1 staged change(s) selected", vm.ReviewSummary, StringComparison.Ordinal);
+            Assert.Contains("1 template(s)", vm.ReviewSummary, StringComparison.Ordinal);
+            Assert.Single(vm.ReviewRows);
+            RenderShell(window, "editing-review-light.png");
+            vm.CloseReviewCommand.Execute(null);
+            Assert.False(vm.IsReviewOpen);
+
+            // Closing with staged work must ask first. The real prompt is modal, so the test seam
+            // records the question instead of pumping a dialog on the STA thread (EditingInteractionTests
+            // and InteractiveCloseGuardUsesTheRealPromptWindow cover the dialog itself).
+            var closeQuestions = new List<NavigationPrompt>();
+            vm.NavigationGuard = p =>
+            {
+                closeQuestions.Add(p);
+                return NavigationDecision.DiscardFormsAndStaged;
+            };
             window.Close();
+            Assert.Single(closeQuestions);
+            Assert.Equal(NavigationReason.CloseWorkspace, closeQuestions[0].Reason);
             RenderPrompt(new UnsavedWorkWindow(new NavigationPrompt(NavigationReason.ReReadTemplates, 2, 3)), "prompt-unsaved-light.png");
             DeleteDir(dir);
         });

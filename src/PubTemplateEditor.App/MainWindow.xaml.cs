@@ -50,6 +50,10 @@ public partial class MainWindow : Window
     public Button DiscardAllActionButton => DiscardAllButton;
     public Border DetailActionsPanel => DetailActionsCard;
     public Border ExplorerStagedBadge => StagedBadge;
+    public ListView ReviewList => ReviewListView;
+    public TextBlock ReviewSummaryLabel => ReviewSummaryText;
+    public Button ReviewOpenButton => OpenReviewButton;
+    public TextBlock StagedTrayLabel => StagedTrayText;
 
     private LicensesWindow? _licensesWindow;
 
