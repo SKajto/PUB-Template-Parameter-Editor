@@ -18,11 +18,19 @@ public sealed class TemplateReaderService
 
     public TemplateRecord Load(string path, CancellationToken token)
     {
+        return LoadFromBytes(path, File.ReadAllBytes(path), token);
+    }
+
+    /// <summary>
+    /// Parses bytes that the caller already holds. Used by the save path, which must verify the file
+    /// it just wrote without letting a second read overwrite the record it is working from.
+    /// </summary>
+    public TemplateRecord LoadFromBytes(string path, byte[] bytes, CancellationToken token = default)
+    {
         var record = new TemplateRecord { FilePath = path };
 
         try
         {
-            byte[] bytes = File.ReadAllBytes(path);
             record.BaselineFingerprint = HashService.Sha256Hex(bytes);
             record.Format = TemplateFormatDetector.Detect(bytes.AsSpan(0, Math.Min(bytes.Length, 64)));
 
@@ -61,6 +69,8 @@ public sealed class TemplateReaderService
                     record.ReadError = "Unrecognized file bytes; the file is not a supported template and stays read-only.";
                     return record;
             }
+
+            token.ThrowIfCancellationRequested();
 
             token.ThrowIfCancellationRequested();
 
