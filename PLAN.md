@@ -55,6 +55,9 @@ review still open. See the 2026-10-25 S3 progress record below.
 
 ## S4 Implement review and recoverable saving
 
+Status: in progress. The review surface, the source-preserving patcher and the per-file write path are
+implemented and tested; the interactive desktop gate and native PUB round-trip evidence stay open.
+
 - Add grouped per-file/parameter/field review with selection controls and delivery/revert counts. Back preserves all drafts. Changed proposals require renewed review.
 - Implement output preflight/validation, SHA-256 external-change detection, backups, same-volume temporary replacement, verification and recovery journal.
 - Handle cancel, locked/read-only files, conflicts and injected mid-batch failures. Keep accurate per-file outcomes and reconcile unresolved drafts before retry.
@@ -381,6 +384,85 @@ Open gates:
    Enabling `SaveReviewCommand` happens last, after round-trip, conflict, mid-batch-failure and
    byte-exactness tests on copies of the native samples pass.
 
+
+### 2026-10-25 — S4 write-back: patcher, save service and the review save action
+
+Executed commands and results
+- `dotnet test` -> Core 74, Integration 32, App/WPF 49 = 155 tests, 0 failed, 0 build warnings (SDK 10.0.402).
+- `dotnet publish src/PubTemplateEditor.App -c Release -p:PublishProfile=PortableWin_x64` ->
+  `src/PubTemplateEditor.App/bin/Release/net10.0-windows/win-x64/publish/PubTemplateEditor.exe`, 131,174,963 bytes,
+  no loose .pdb (DebugType=embedded).
+- Launch check of that exe: process alive after 6 s, `MainWindowHandle` non-zero,
+  title `[PUB Template Parameter Editor]`, then stopped.
+- `powershell -File packaging/build-msix.ps1 -Version 0.5.0 -Mode Draft` ->
+  `artifacts/packaging/out/PubTemplateEditor_0.5.0_win-x64.msix`,
+  SHA-256 `C9A0E74EE4419334D894BFD8A1F00408F0BF23DC0F7C1D5CC82A0CCEA1E1D0B7` (unsigned draft, REPLACE_* identity).
+
+What was built
+- `Core/Format/TemplateXmlPatcher.cs` (no I/O): rewrites only the character span that the parse recorded
+  for an edited value, applying edits from the end backwards. Escaping is per context (attribute vs text
+  node); CR/LF/tab in a value are refused because XML attribute normalization would destroy them.
+  Refusals: stale baseline under the span, change staged for another file, parameter names, missing or
+  read-only fields, overlapping spans. The patcher re-parses its own output and compares every field
+  against the plan; a patch that fails verification is never offered for writing.
+- `Infrastructure/TemplateSaveService.cs`: preflight without writing, SHA-256 fingerprint of the current
+  file compared with the fingerprint taken at read time, in-memory assembly of the whole replacement
+  file (container rebuild for .dta so the other entries keep name/order/timestamp/comment/bytes),
+  verification of that in-memory file, same-folder temporary file written with WriteThrough and hashed,
+  user-scoped backup under `%LOCALAPPDATA%\PubTemplateEditorackups` hashed against the original,
+  JSON-lines recovery journal (`prepared` / `backup-ready` / `confirmed`, or `aborted` /
+  `mismatch-after-replace`) with both hashes, then `File.Replace`, then a read-back of the target
+  checking every written field. Per-file outcomes; a batch is not atomic and is never described that way.
+- `TemplateReaderService.LoadFromBytes` so the save path can verify what it wrote without replacing the
+  record it worked from.
+- Review save action (`WorkspaceViewModel.Review.cs` + review footer in MainWindow.xaml): only ticked,
+  non no-op rows are sent; the command is an async command guarded by `IsSaving` so a second save cannot
+  start while one runs; each file reports its own outcome under the table (`SaveOutcomeSummary`,
+  `LastSaveOutcome`); a staged change leaves the session only when its own file was confirmed, everything
+  else stays staged with the review open; written templates are re-read so the next save is not mistaken
+  for an outside edit. Footer states plainly what saving does, or why it is not offered.
+
+Two real read-path bugs found by the patcher's own verification, both fixed
+- A `template.xml` whose decoded text begins with a byte order mark did not parse at all
+  ("Data at the root level is invalid"). `SourceText` now exposes `ParseText`/`LeadCharCount`: the mark
+  stays in `Text` so character offsets keep covering the whole document, the reader gets the mark-free
+  text and every line/position it reports is shifted back.
+- A paired empty constant description (`<expression type="constant"></expression>`, 1857 occurrences in
+  the native samples) had its span anchored on the end tag's line info, which points just past `</`;
+  writing there put the new text inside the tag and produced a broken document. The span now anchors on
+  the zero-length gap directly before the end tag. Before this fix the patcher refused the write, so no
+  corrupt file could be produced, but the field was effectively unwritable.
+
+Deliberately not supported, with the reason shown in the UI instead of a guess
+- `<expression type="constant"/>` (self-closing empty description) stays read-only: writing into it needs
+  a tag-shape change, not a value replacement, and no native sample shows that shape.
+
+Tests added
+- Core: 13 patcher tests + `Remove` idempotence + the empty-constant span test. Byte-exact splice
+  equality is the main assertion: the patched text must equal the original text with the new value
+  spliced into the recorded span, character for character. Encoding round trips are asserted byte-exact
+  for UTF-8, UTF-8+BOM, UTF-16 LE and BE.
+- Integration: 3 native evidence tests that patch all five shipped .dta samples in memory (including all
+  234 writable default values of one template and their empty constant descriptions), read the patched
+  bytes back, compare every field of every declaration, and assert the sample file still hashes to what
+  it hashed to before. 9 save tests on temporary copies only: entry-level byte preservation for the
+  other container entries, plain-XML in-place write, conflict refusal before any write, foreign-file
+  change, name never written, journal and backup contents, per-file batch reporting, preflight writes
+  nothing, and a read-only file producing a reported failure with the original intact.
+- App/WPF: 6 save-flow tests through the shell (write + reload, outside edit refused with the draft kept
+  and the review open, only ticked rows written while the rest stay staged, disabled/Explains-itself
+  states, disabled while a save runs, two templates reported separately). One obsolete test that asserted
+  "writing is not part of this build" was replaced by the real enabled/refused behaviour.
+
+Open gates for S4
+- Interactive desktop review of the whole edit-to-save flow by a human (typing, tabbing, keyboard-only
+  flow, magnification, screen reader) on a real Windows session. Automated tests construct windows and
+  commands, they do not prove the feel or accessibility of the flow.
+- Native PUB round-trip evidence: a template saved by this app opened in PUB. Requires PUB on this
+  machine; not available, so native compatibility remains unproven and the container framing difference
+  (rewritten by System.IO.Compression, documented in `DtaContainer`) is the known risk to check there.
+- Cancellation in the middle of a batch and an injected mid-batch failure are implemented in code but not
+  yet covered by a test; they are recorded as unverified rather than assumed.
 
 ## Deferred scope
 

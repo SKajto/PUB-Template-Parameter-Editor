@@ -376,14 +376,25 @@
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,10,0">
-                                            <Path Style="{StaticResource IconLineStyle}" Data="{StaticResource IconWarning}"
-                                                  Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"
-                                                  Stroke="{DynamicResource DirtyBrush}"/>
+                                        <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Path Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"
+                                                  Data="{StaticResource IconWarning}" Stroke="{DynamicResource DirtyBrush}"
+                                                  Stretch="Uniform" StrokeThickness="1.7"
+                                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                                  StrokeLineJoin="Round"
+                                                  Visibility="{Binding CanSaveReview, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
+                                            <ProgressBar Width="96" Height="10" Margin="0,0,8,0" VerticalAlignment="Center"
+                                                         IsIndeterminate="True" Value="0"
+                                                         Visibility="{Binding IsSaving, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                             <TextBlock Text="{Binding SaveUnavailableReason}" TextWrapping="Wrap"
-                                                       MaxWidth="380" VerticalAlignment="Center"
+                                                       MaxWidth="420" VerticalAlignment="Center"
                                                        Style="{StaticResource FieldNoteStyle}"/>
                                         </StackPanel>
+                                        <TextBlock Text="{Binding SaveOutcomeSummary}" TextWrapping="Wrap"
+                                                   Margin="24,4,0,0" Style="{StaticResource FieldNoteStyle}"
+                                                   Visibility="{Binding HasSaveOutcome, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                    </StackPanel>
                                         <Button Grid.Column="1" Content="Save to templates" VerticalAlignment="Center"
                                                 Style="{StaticResource AccentButtonStyle}"
                                                 Command="{Binding SaveReviewCommand}" IsEnabled="{Binding CanSaveReview}"

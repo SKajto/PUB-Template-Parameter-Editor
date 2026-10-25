@@ -186,7 +186,7 @@ public class ReviewTests
     }
 
     [Fact]
-    public async Task SavingStaysDisabledAndSaysWhyWhileNoWritePathExists()
+    public async Task SavingIsOfferedForATickedChangeAndRefusedWhileNothingIsTicked()
     {
         string settings = TempDir("settings");
         string templates = TempDir("templates");
@@ -199,9 +199,18 @@ public class ReviewTests
         _host.Do(() =>
         {
             vm.OpenReviewCommand.Execute(null);
+
+            // A real, ticked change can be saved: the command is live and explains what saving does.
+            Assert.True(vm.CanSaveReview);
+            Assert.True(vm.SaveReviewCommand.CanExecute(null));
+            Assert.Contains("Only the ticked changes are written", vm.SaveUnavailableReason, StringComparison.Ordinal);
+
+            // Untick everything and the offer goes away with a reason, without writing anything.
+            vm.SelectNoneReviewCommand.Execute(null);
             Assert.False(vm.CanSaveReview);
             Assert.False(vm.SaveReviewCommand.CanExecute(null));
-            Assert.Contains("not part of this build", vm.SaveUnavailableReason, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Tick at least one change", vm.SaveUnavailableReason, StringComparison.Ordinal);
+            Assert.Equal(before, File.ReadAllBytes(one));
 
             var window = new ShellWindow(vm) { ShowInTaskbar = false };
             Assert.Equal(Visibility.Visible, window.ReviewList.Visibility);

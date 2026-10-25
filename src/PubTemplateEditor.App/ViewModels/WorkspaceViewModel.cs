@@ -51,9 +51,15 @@ public sealed partial class WorkspaceViewModel : ViewModelBase
     private ParameterRowItem? _selectedParameter;
     private ThemeChoice _theme;
 
-    public WorkspaceViewModel(SettingsService settings, EditorSettings loadedSettings)
+    /// <param name="saveStateDirectory">
+    /// Where backups and the recovery journal of the save step live. Null means the user-scoped
+    /// application data folder, which is what the shipped app uses; tests pass a temporary folder so a
+    /// save test cannot touch real user state.
+    /// </param>
+    public WorkspaceViewModel(SettingsService settings, EditorSettings loadedSettings, string? saveStateDirectory = null)
     {
         _settings = settings;
+        _saver = new TemplateSaveService(saveStateDirectory);
         _loadedSettings = loadedSettings;
         _theme = SettingsService.ParseTheme(loadedSettings.Theme) ?? ThemeChoice.System;
 

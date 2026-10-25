@@ -26,6 +26,12 @@ public sealed class TemplateSaveServiceTests : IDisposable
     {
         try
         {
+            // A backup taken from a read-only template is read-only too, so clear the attributes first.
+            foreach (string file in Directory.EnumerateFiles(_root, "*", SearchOption.AllDirectories))
+            {
+                File.SetAttributes(file, FileAttributes.Normal);
+            }
+
             Directory.Delete(_root, recursive: true);
         }
         catch (IOException)
@@ -275,6 +281,39 @@ public sealed class TemplateSaveServiceTests : IDisposable
         Assert.Equal(SaveOutcome.Rejected, results[1].Outcome);
         Assert.Equal(staleHashAfterEdit, HashService.Sha256Hex(File.ReadAllBytes(stale)));
         Assert.Contains("changed after it was read", results[1].Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AWriteThatCannotReplaceTheFileReportsTheFailureAndKeepsTheOriginal()
+    {
+        string path = CopySample();
+        string originalHash = HashService.Sha256Hex(File.ReadAllBytes(path));
+
+        TemplateRecord record = new TemplateReaderService().Load(path, CancellationToken.None);
+        VariableDeclaration target = record.Declarations.First(d => d.DefaultValue.Capability == FieldCapability.Editable);
+
+        File.SetAttributes(path, FileAttributes.ReadOnly);
+        try
+        {
+            SaveFileResult result = Service().SaveOne(new SaveRequest(record, [Change(record, target, FieldKind.DefaultValue, "LOCKED")]));
+
+            // The file is writable-blocked, so the write is reported as a failure of that file alone.
+            Assert.Equal(SaveOutcome.Failed, result.Outcome);
+            Assert.True(result.Message.Contains("did not complete", StringComparison.Ordinal), result.Message);
+            Assert.True(result.Message.Contains("target file is unchanged", StringComparison.Ordinal)
+                        || result.Message.Contains("backup", StringComparison.Ordinal), result.Message);
+
+            File.SetAttributes(path, FileAttributes.Normal);
+            Assert.Equal(originalHash, HashService.Sha256Hex(File.ReadAllBytes(path)));
+            // A failed write is journaled, and it is never marked as confirmed.
+            string journal = File.ReadAllText(Service().JournalPath);
+            Assert.Contains("aborted", journal, StringComparison.Ordinal);
+            Assert.DoesNotContain("confirmed", journal, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.SetAttributes(path, FileAttributes.Normal);
+        }
     }
 
     [Fact]
