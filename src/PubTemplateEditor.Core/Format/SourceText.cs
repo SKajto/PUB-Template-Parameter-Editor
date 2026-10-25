@@ -21,11 +21,24 @@ public sealed class SourceText
     public string Text { get; }
     private readonly int[] _lineStarts;
 
+    /// <summary>
+    /// One when the decoded text starts with a ZERO WIDTH NO-BREAK SPACE that came from a UTF-8 byte
+    /// order mark. The mark stays in <see cref="Text"/> so character offsets keep covering the whole
+    /// document, but an XML reader refuses to parse a document whose first character is not '&lt;' or
+    /// '&amp;', so the reader gets the text without it and every line/position it reports is shifted
+    /// back by this amount.
+    /// </summary>
+    public int LeadCharCount { get; }
+
+    /// <summary>The text handed to the XML reader: <see cref="Text"} minus a leading byte order mark.</summary>
+    public string ParseText => LeadCharCount == 0 ? Text : Text[LeadCharCount..];
+
     public SourceText(byte[] bytes, TextEncodingKind encoding, string text)
     {
         OriginalBytes = bytes;
         EncodingName = encoding;
         Text = text;
+        LeadCharCount = text.Length > 0 && text[0] == '﻿' ? 1 : 0;
         _lineStarts = ComputeLineStarts(text);
     }
 
@@ -79,7 +92,7 @@ public sealed class SourceText
             throw new ArgumentOutOfRangeException(nameof(line));
         }
 
-        return _lineStarts[line - 1] + linePosition - 1;
+        return _lineStarts[line - 1] + linePosition - 1 + LeadCharCount;
     }
 
     private static int[] ComputeLineStarts(string text)

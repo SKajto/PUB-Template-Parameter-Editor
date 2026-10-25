@@ -36,7 +36,7 @@ public static class XmlDeclarationParser
 
         try
         {
-            using var stringReader = new StringReader(source.Text);
+            using var stringReader = new StringReader(source.ParseText);
             using var reader = XmlReader.Create(stringReader, settings);
             Walk(source, reader, result);
         }
@@ -394,6 +394,7 @@ public static class XmlDeclarationParser
 
             // Content begins on the node after the expression start element.
             reader.Read();
+            bool emptyTextContent = reader.NodeType == XmlNodeType.EndElement;
             int textStartLine = ((IXmlLineInfo)reader).LineNumber;
             int textStartLinePos = ((IXmlLineInfo)reader).LinePosition;
             string text = string.Empty;
@@ -419,10 +420,20 @@ public static class XmlDeclarationParser
             int start = source.GetOffset(textStartLine, textStartLinePos);
             // EndElement line info also points at the element name; the text span ends at '<'.
             int end = source.GetOffset(endLine, endLinePos);
-            while (end > start && source.Text[end] != '<')
+            while (end > 0 && source.Text[end] != '<')
             {
                 end--;
             }
+
+            if (emptyTextContent)
+            {
+                // A paired empty constant has no text node at all, so the line info above belongs to
+                // the end tag rather than to the content. The value is the zero-length region directly
+                // in front of that end tag, and writing there is what makes
+                // <expression type="constant"></expression> gain its text.
+                start = end;
+            }
+
             int length = end - start;
 
             // Verify span identity: the raw slice must decode to the logical value.
