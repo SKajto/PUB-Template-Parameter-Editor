@@ -12,5 +12,18 @@ public sealed record DraftChange(
     string? ProposedValue,
     bool ProposedFromDraft)
 {
+    /// <summary>
+    /// Declaration name at staging time, for review/list display. Identity is always the key
+    /// (file + declaration + field), never the name, so an ambiguous or unnamed declaration is
+    /// still addressable.
+    /// </summary>
+    public required string DeclarationName { get; init; }
+
+    public string FilePath => Key.FilePath;
+
+    public int DeclarationId => Key.DeclarationId;
+
+    public FieldKind Field => Key.Field;
+
     public bool IsNoOp => string.Equals(BaselineValue, ProposedValue, StringComparison.Ordinal);
 }

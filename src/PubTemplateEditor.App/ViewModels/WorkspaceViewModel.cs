@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using PubTemplateEditor.App.Infrastructure;
+using PubTemplateEditor.Core.Editing;
 using PubTemplateEditor.Core.Model;
 using PubTemplateEditor.Core.Search;
 using PubTemplateEditor.Infrastructure;
@@ -23,11 +24,18 @@ public enum AccessFilterChoice
 /// active template's parameter table with search, access filter and detail panel.
 /// Editing, compare and save arrive in later milestones and are absent here by design.
 /// </summary>
-public sealed class WorkspaceViewModel : ViewModelBase
+public sealed partial class WorkspaceViewModel : ViewModelBase
 {
     private readonly SettingsService _settings;
     private readonly TemplateReaderService _reader = new();
     private readonly TemplateFolderScanner _scanner = new();
+
+    /// <summary>
+    /// Staged field changes of this session. Nothing in loading, comparing, bulk staging or
+    /// editing touches a file; only the save review (S4) writes, and only for selected fields.
+    /// </summary>
+    private readonly DraftStore Drafts = new();
+
     private EditorSettings _loadedSettings;
 
     private string? _filterText;
@@ -58,6 +66,7 @@ public sealed class WorkspaceViewModel : ViewModelBase
         SelectActiveFileCommand = new RelayCommand(item => SelectActiveFile(item as TemplateItem));
         SetThemeCommand = new RelayCommand(value => ApplyTheme(ParseThemeChoice(value)));
         DismissNoticeCommand = new RelayCommand(() => ActionNotice = null);
+        InitEditingCommands();
         // Licences must stay reachable offline from inside the app (GPL distribution rule).
         // The view decides how to present them; the view model stays free of window types.
         OpenLicensesCommand = new RelayCommand(() => LicensesRequested?.Invoke());
@@ -277,12 +286,19 @@ public sealed class WorkspaceViewModel : ViewModelBase
 
     public void SelectActiveFile(TemplateItem? item)
     {
-        if (item is not null)
+        if (item is null || ReferenceEquals(item, _activeFile))
         {
-            ActiveFile = item;
-            ParameterQuery = null;
-            SelectedAccessFilter = AccessFilterChoice.All;
+            return;
         }
+
+        if (!ConfirmNavigation(NavigationReason.ChangeTemplate))
+        {
+            return;
+        }
+
+        ActiveFile = item;
+        ParameterQuery = null;
+        SelectedAccessFilter = AccessFilterChoice.All;
     }
 
     // ------------------------------------------------------------ parameter view
@@ -353,31 +369,29 @@ public sealed class WorkspaceViewModel : ViewModelBase
         get => _selectedParameter;
         set
         {
+            if (ReferenceEquals(value, _selectedParameter))
+            {
+                return;
+            }
+
+            // SWITCH-01: switching away from a form with unapplied changes needs an explicit decision.
+            // When the user stays, the setter raises the old value so a bound list rewinds its selection.
+            if (!ConfirmNavigation(NavigationReason.ChangeParameter))
+            {
+                Raise(nameof(SelectedParameter));
+                return;
+            }
+
             if (Set(ref _selectedParameter, value))
             {
                 Raise(nameof(HasSelectedParameter));
-                Raise(nameof(DetailName));
-                Raise(nameof(DetailXmlType));
-                Raise(nameof(DetailAccess));
-                Raise(nameof(DetailDefaultValue));
-                Raise(nameof(DetailDescription));
-                Raise(nameof(DetailReadOnlyReason));
-                Raise(nameof(HasDetailReadOnlyReason));
+                LoadEditorForm();
+                RefreshReviewAndActionStates();
             }
         }
     }
 
     public bool HasSelectedParameter => _selectedParameter is not null;
-
-    public string DetailName => _selectedParameter?.Name ?? string.Empty;
-
-    public string DetailXmlType => _selectedParameter?.XmlTypeLabel ?? string.Empty;
-
-    public string DetailAccess => _selectedParameter?.AccessLabel ?? string.Empty;
-
-    public string DetailDefaultValue => _selectedParameter?.DefaultFullValue ?? string.Empty;
-
-    public string DetailDescription => _selectedParameter?.DescriptionFullValue ?? string.Empty;
 
     /// <summary>Why unsupported declaration shapes stay read-only, shown in the detail panel.</summary>
     public string DetailReadOnlyReason => _selectedParameter is { HasReadOnlyShape: true } p ? p.ReadOnlyShapeReasons : string.Empty;
@@ -397,6 +411,11 @@ public sealed class WorkspaceViewModel : ViewModelBase
 
     private void OpenFolder()
     {
+        if (!ConfirmNavigation(NavigationReason.ChangeTemplate))
+        {
+            return;
+        }
+
         var dialog = new Microsoft.Win32.OpenFolderDialog
         {
             Title = "Choose the folder containing .dta templates",
@@ -423,7 +442,7 @@ public sealed class WorkspaceViewModel : ViewModelBase
             AllFiles.Clear();
             foreach (var entry in listed)
             {
-                AllFiles.Add(new TemplateItem(entry.FilePath, true, entry.SizeBytes, entry.ListingError));
+                AllFiles.Add(new TemplateItem(entry.FilePath, true, entry.SizeBytes, entry.ListingError, Drafts));
             }
 
             FolderPath = path;
@@ -478,6 +497,12 @@ public sealed class WorkspaceViewModel : ViewModelBase
 
     private async Task ReadParametersAsync(CancellationToken token)
     {
+        // Re-reading replaces the in-session records, so staged work would silently disappear.
+        if (!ConfirmNavigation(NavigationReason.ReReadTemplates))
+        {
+            return;
+        }
+
         // FILE-05: an empty checkbox set falls back to the visible scope, never to "nothing".
         var targets = AllFiles.Where(f => f.IsSelectedForRead && f.IsListable).ToList();
         if (targets.Count == 0)
@@ -552,7 +577,7 @@ public sealed class WorkspaceViewModel : ViewModelBase
         {
             foreach (var declaration in record.Declarations)
             {
-                AllParameters.Add(new ParameterRowItem(declaration));
+                AllParameters.Add(new ParameterRowItem(declaration, _activeFile!, Drafts));
             }
         }
 
@@ -571,6 +596,8 @@ public sealed class WorkspaceViewModel : ViewModelBase
         Raise(nameof(HasSelectedParameter));
         Raise(nameof(HasParameters));
         Raise(nameof(TotalParameterCount));
+        LoadEditorForm();
+        RefreshReviewAndActionStates();
     }
 
     private void ApplyParameterFilter()

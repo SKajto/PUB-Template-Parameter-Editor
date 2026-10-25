@@ -50,6 +50,9 @@ Done when reading/filter combinations and persistence work in the actual Windows
 
 Done when only selected field/target proposals change in memory, filtering/navigation retains drafts and all original template files remain untouched.
 
+Status 2026-10-25: implemented (Core + WPF), automated gates green; interactive desktop
+review still open. See the 2026-10-25 S3 progress record below.
+
 ## S4 Implement review and recoverable saving
 
 - Add grouped per-file/parameter/field review with selection controls and delivery/revert counts. Back preserves all drafts. Changed proposals require renewed review.
@@ -226,6 +229,69 @@ Still open for S2:
    REQUIREMENTS.md; recorded as an open product question).
 3. Compare and "Apply value to templates" controls intentionally arrive with S3.
 
+
+### 2026-10-25 — S3 editing, compare and bulk staging
+
+Core (`src/PubTemplateEditor.Core/Editing/`):
+
+- `TemplateFieldRules` — names and unsupported declarations are never staged; only
+  `DefaultValue`, `Access` and a constant-`Description` are; access must be exactly one of
+  the native `internal` / `external` values, default strings are never trimmed or coerced.
+- `DraftStore` — keys by file + declaration id + field (`ChangeKey`), keeps the parsed
+  baseline for conflict detection and reverts only on a completely successful save, and
+  normalizes a proposal back to the stored value into removal (`ClearedAsNoOp`), so counts,
+  review and saving see real deltas only. Nothing here touches disk.
+- `ParameterComparator` — exact name matching, active row always present, distinct
+  `Self` / `Identical` / `Different` / `Missing` / `NotLoaded` / `Ineligible` states, plus
+  per-field `FieldDiff`s and `LineDiff` line pairs; reads draft-aware so the comparison
+  shows what would actually be saved.
+- `BulkPlan` — classifies every template in scope as `Eligible`, `NotLoaded`, `Missing`,
+  `Ambiguous`, `ReadOnlyShape` or `Conflict` with an explanation; `Plan()` throws for any
+  field other than default value; `StageValues()` refuses non-eligible targets even if a UI
+  hands them over, and skips stale targets whose declaration no longer exists.
+
+App (`WorkspaceViewModel.Editing.cs` partial, `ReviewRows.cs`, `UnsavedWorkWindow`,
+`ParameterRowItem` draft-aware values, `TemplateItem` staged badges):
+
+- Details form edits the observed fields only (name/type/internal-name locked), stages on
+  "Apply edits", marks each changed field with a `draft` badge, shows staged values in the
+  table, and keeps `stored:` text under the current draft. Compare and bulk open as panels
+  over the parameter list; both have a Cancel and state why nothing can be done.
+- `ConfirmNavigation` guards folder change, template open, re-read, filter scope change,
+  parameter switch and close. The modal prompt offers apply / discard form / discard staged
+  only when those choices describe real pending work, and "stay where I am" is always
+  available and is the default when no prompt is installed.
+
+Executed commands and results:
+
+- `dotnet build -c Debug` → 0 warnings, 0 errors.
+- `dotnet test` → **105 passing, 0 failing** (Core 59, Integration 12, App/WPF 34).
+- New evidence tests: `tests/PubTemplateEditor.Core.Tests/EditingTests.cs` (24 S3 tests) and
+  `tests/PubTemplateEditor.App.Tests/EditingInteractionTests.cs` (8 tests). The Core fixtures
+  parse XML held in memory only, so a staging bug cannot reach a template file; the UI tests
+  write synthetic `.dta` copies under `%TEMP%` and assert the file bytes are byte-identical
+  after applying, bulk-staging and discarding.
+- `dotnet test tests/PubTemplateEditor.App.Tests` regenerated
+  `artifacts/screenshots/editing-staged-light.png`, `editing-compare-light.png`,
+  `editing-bulk-light.png` and `prompt-unsaved-light.png`.
+
+Test naming is deliberately independent. The upstream reference suite
+(`param-editor-ui/src/lib/__tests__/{draft-store,parameter-comparison,bulk-plan}.test.ts`,
+1538 lines, read at the reviewed revision) was used to enumerate *behaviours to cover* —
+no-op clearing, active-row anchoring, case/whitespace sensitivity of name matching, access
+and description preserved by bulk, eligible-only staging — and its behaviour tests are
+Apache-free GPLv3 TypeScript that cannot compile here, so the assertions are rewritten from
+the specification in xunit/C# style with different names and fixtures.
+
+Open gates for S3:
+
+1. Human visual/interactive review of the editing UI in a real Windows session (typing,
+   tabbing through the Access combo, screen magnification, keyboard-only flow). The
+   software-rendered snapshots and process-alive checks do not cover that.
+2. The reference app also offers a "Select all / clear" control for bulk targets and a
+   virtualised comparison list; both are deferred until template counts make them necessary.
+3. Undo/redo across staged drafts is not implemented; per-parameter and global discard are
+   the documented recovery paths, matching REQUIREMENTS.md.
 
 ## Deferred scope
 

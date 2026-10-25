@@ -263,7 +263,7 @@ public static class XmlDeclarationParser
                     break;
                 case "access":
                     access = ReadAttributeProperty(source, reader, depthAtFeature + 1, Model.FieldKind.Access, propName, result);
-                    if (access.Present && access.LogicalValue is not ("internal" or "external"))
+                    if (access.Present && !Editing.TemplateFieldRules.IsSupportedAccess(access.LogicalValue))
                     {
                         access = access with
                         {

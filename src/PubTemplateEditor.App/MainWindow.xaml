@@ -239,13 +239,18 @@
                               ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                         <ListView.View>
                             <GridView>
-                                <GridViewColumn Width="260">
+                <GridViewColumn Width="260">
                                     <GridViewColumnHeader Content="Name"/>
                                     <GridViewColumn.CellTemplate>
                                         <DataTemplate>
                                             <StackPanel Orientation="Horizontal">
                                                 <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"
                                                            ToolTip="{Binding Name}"/>
+                                                <Border Style="{StaticResource BadgeBorderStyle}"
+                                                        Visibility="{Binding HasDrafts, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                        ToolTip="{Binding DraftedFieldsSummary}">
+                                                    <TextBlock Text="staged" FontSize="11" Style="{StaticResource DirtyBadgeStyle}"/>
+                                                </Border>
                                                 <Border Style="{StaticResource BadgeBorderStyle}"
                                                         Visibility="{Binding HasReadOnlyShape, Converter={StaticResource BoolToVisibilityConverter}}"
                                                         ToolTip="{Binding ReadOnlyShapeReasons}">
@@ -287,6 +292,169 @@
                                Style="{StaticResource FieldNoteStyle}"
                                Visibility="{Binding ShowEmptyNoMatches, Converter={StaticResource BoolToVisibilityConverter}}"
                                Text="No matching parameters."/>
+
+                    <!-- ============ compare panel: the same parameter in every read template ============ -->
+                    <Border Grid.Row="0" Grid.RowSpan="4" Margin="10" Panel.ZIndex="10"
+                            Background="{DynamicResource PanelBackgroundBrush}"
+                            BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1"
+                            Visibility="{Binding IsCompareOpen, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <DockPanel LastChildFill="True">
+                            <Grid DockPanel.Dock="Top" Margin="12,10,12,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="COMPARE PARAMETER" Style="{StaticResource EyebrowStyle}"/>
+                                    <TextBlock Text="{Binding DetailName}" Style="{StaticResource SectionTitleStyle}"/>
+                                </StackPanel>
+                                <CheckBox Grid.Column="1" Content="Only selected templates"
+                                          IsChecked="{Binding CompareSelectedOnly}"
+                                          VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <Button Grid.Column="2" Content="Close" Style="{StaticResource LinkButtonStyle}"
+                                        Command="{Binding CloseCompareCommand}"
+                                        AutomationProperties.Name="Close compare panel"/>
+                            </Grid>
+                            <TextBlock x:Name="CompareSummaryText" DockPanel.Dock="Top" Margin="12,0,12,6"
+                                       Style="{StaticResource FieldNoteStyle}" Text="{Binding CompareSummary}"/>
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="12,0,12,10">
+                                <ItemsControl ItemsSource="{Binding CompareRows}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Style="{StaticResource CardStyle}">
+                                                <StackPanel>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding FileName}" FontWeight="SemiBold"
+                                                                   ToolTip="{Binding FilePath}"/>
+                                                        <Border Style="{StaticResource BadgeBorderStyle}">
+                                                            <TextBlock Text="{Binding StateLabel}" FontSize="11"
+                                                                       Foreground="{DynamicResource MutedForegroundBrush}"/>
+                                                        </Border>
+                                                        <Border Style="{StaticResource BadgeBorderStyle}"
+                                                                Visibility="{Binding HasUnsavedDrafts, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                            <TextBlock Text="staged values shown" FontSize="11"
+                                                                       Style="{StaticResource DirtyBadgeStyle}"/>
+                                                        </Border>
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding Reason}" TextWrapping="Wrap"
+                                                               Style="{StaticResource FieldNoteStyle}"
+                                                               Visibility="{Binding HasReason, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                    <ItemsControl ItemsSource="{Binding Fields}" Margin="0,4,0,0">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Grid Margin="0,2">
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="110"/>
+                                                                        <ColumnDefinition Width="*"/>
+                                                                        <ColumnDefinition Width="16"/>
+                                                                        <ColumnDefinition Width="*"/>
+                                                                        <ColumnDefinition Width="90"/>
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <TextBlock Grid.Column="0" Text="{Binding FieldLabel}"
+                                                                               Foreground="{DynamicResource MutedForegroundBrush}"/>
+                                                                    <TextBlock Grid.Column="1" Text="{Binding ActiveValue}"
+                                                                               TextWrapping="Wrap" FontFamily="{DynamicResource MonoFontFamily}"/>
+                                                                    <TextBlock Grid.Column="2" Text="→"
+                                                                               Foreground="{DynamicResource MutedForegroundBrush}"/>
+                                                                    <TextBlock Grid.Column="3" Text="{Binding TargetValue}"
+                                                                               TextWrapping="Wrap" FontFamily="{DynamicResource MonoFontFamily}"
+                                                                               Foreground="{DynamicResource DirtyBrush}"
+                                                                               Visibility="{Binding IsDifferent, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                                    <TextBlock Grid.Column="3" Text="{Binding TargetValue}"
+                                                                               TextWrapping="Wrap" FontFamily="{DynamicResource MonoFontFamily}"
+                                                                               Visibility="{Binding IsDifferent, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
+                                                                    <TextBlock Grid.Column="4" Text="{Binding StateLabel}"
+                                                                               Foreground="{DynamicResource MutedForegroundBrush}"/>
+                                                                </Grid>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </Border>
+
+                    <!-- ===== bulk panel: one default value, staged for many templates after review ===== -->
+                    <Border Grid.Row="0" Grid.RowSpan="4" Margin="10" Panel.ZIndex="10"
+                            Background="{DynamicResource PanelBackgroundBrush}"
+                            BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1"
+                            Visibility="{Binding IsBulkOpen, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <DockPanel LastChildFill="True">
+                            <StackPanel DockPanel.Dock="Top" Margin="12,10,12,6">
+                                <TextBlock Text="APPLY ONE VALUE TO TEMPLATES" Style="{StaticResource EyebrowStyle}"/>
+                                <TextBlock Text="{Binding DetailName}" Style="{StaticResource SectionTitleStyle}"/>
+                                <TextBlock Style="{StaticResource FieldNoteStyle}" TextWrapping="Wrap"
+                                           Text="Bulk editing changes the default value only. Target access and description stay untouched."/>
+                            </StackPanel>
+                            <Grid DockPanel.Dock="Top" Margin="12,0,12,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="New default value" VerticalAlignment="Center"
+                                           Margin="0,0,8,0" FontWeight="SemiBold"/>
+                                <TextBox x:Name="BulkValueBox" Grid.Column="1"
+                                         Text="{Binding BulkValueDraft, UpdateSourceTrigger=PropertyChanged}"
+                                         FontFamily="{DynamicResource MonoFontFamily}"
+                                         AutomationProperties.Name="New default value for all selected templates"/>
+                            </Grid>
+                            <Grid DockPanel.Dock="Bottom" Margin="12,6,12,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="BulkSummaryText" Grid.Column="0" Text="{Binding BulkSummary}"
+                                           Style="{StaticResource FieldNoteStyle}" VerticalAlignment="Center"/>
+                                <Button Grid.Column="1" Content="Cancel" Style="{StaticResource LinkButtonStyle}"
+                                        Command="{Binding CloseBulkCommand}" Margin="0,0,8,0"
+                                        AutomationProperties.Name="Cancel bulk value"/>
+                                <Button Grid.Column="2" Content="Apply value to selected templates"
+                                        Command="{Binding ConfirmBulkCommand}"
+                                        AutomationProperties.Name="Stage this value in the selected templates"/>
+                            </Grid>
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="12,0,12,0">
+                                <ItemsControl ItemsSource="{Binding BulkTargets}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Style="{StaticResource CardStyle}">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <CheckBox Grid.Column="0" IsChecked="{Binding IsChecked}"
+                                                              IsEnabled="{Binding IsSelectable}"
+                                                              VerticalAlignment="Center" Margin="0,0,8,0"
+                                                              AutomationProperties.Name="{Binding FileName}"/>
+                                                    <StackPanel Grid.Column="1">
+                                                        <TextBlock Text="{Binding FileName}" FontWeight="SemiBold"
+                                                                   ToolTip="{Binding FilePath}"/>
+                                                        <TextBlock Text="{Binding CurrentValueText}"
+                                                                   Style="{StaticResource FieldNoteStyle}"
+                                                                   FontFamily="{DynamicResource MonoFontFamily}"/>
+                                                        <TextBlock Text="{Binding Reason}" TextWrapping="Wrap"
+                                                                   Style="{StaticResource FieldNoteStyle}"
+                                                                   Visibility="{Binding HasReason, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                    </StackPanel>
+                                                    <Border Grid.Column="2" Style="{StaticResource BadgeBorderStyle}">
+                                                        <TextBlock Text="{Binding StatusLabel}" FontSize="11"
+                                                                   Foreground="{DynamicResource MutedForegroundBrush}"/>
+                                                    </Border>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </Border>
                 </Grid>
             </Border>
 
@@ -299,52 +467,92 @@
                         <TextBlock Text="DETAILS" Style="{StaticResource EyebrowStyle}"/>
 
                         <TextBlock Style="{StaticResource FieldNoteStyle}" Margin="0,10,0,10"
-                                   Text="Select a row to inspect its read-only declaration fields."
+                                   Text="Select a row to inspect or edit its declaration fields."
                                    Visibility="{Binding HasSelectedParameter, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
 
                         <Border Style="{StaticResource CardStyle}"
                                 Visibility="{Binding HasSelectedParameter, Converter={StaticResource BoolToVisibilityConverter}}">
                             <StackPanel>
-                                <TextBlock Text="Parameter name" FontWeight="SemiBold"/>
-                                <TextBlock x:Name="DetailNameText" Text="{Binding DetailName}" TextWrapping="Wrap" Margin="0,4,0,0"/>
-                                <TextBlock Text="Read-only" Style="{StaticResource FieldNoteStyle}"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Parameter name" FontWeight="SemiBold"/>
+                                    <Border Style="{StaticResource BadgeBorderStyle}">
+                                        <TextBlock Text="read-only" FontSize="11"
+                                                   Foreground="{DynamicResource MutedForegroundBrush}"/>
+                                    </Border>
+                                </StackPanel>
+                                <TextBlock x:Name="DetailNameText" Text="{Binding DetailName}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                           FontFamily="{DynamicResource MonoFontFamily}"/>
+                                <TextBlock Text="Renaming would break every reference to this parameter."
+                                           Style="{StaticResource FieldNoteStyle}"/>
                             </StackPanel>
                         </Border>
 
                         <Border Style="{StaticResource CardStyle}"
                                 Visibility="{Binding HasSelectedParameter, Converter={StaticResource BoolToVisibilityConverter}}">
                             <StackPanel>
-                                <TextBlock Text="Default value" FontWeight="SemiBold"/>
-                                <TextBox x:Name="DetailValueBox" Text="{Binding DetailDefaultValue, Mode=OneWay}" IsReadOnly="True"
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Default value" FontWeight="SemiBold"/>
+                                    <Border x:Name="DetailValueDraftBadge" Style="{StaticResource BadgeBorderStyle}"
+                                            Visibility="{Binding DetailHasDefaultValueDraft, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <TextBlock Text="staged" FontSize="11" Style="{StaticResource DirtyBadgeStyle}"/>
+                                    </Border>
+                                    <Border Style="{StaticResource BadgeBorderStyle}"
+                                            Visibility="{Binding HasUnappliedFormEdits, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <TextBlock Text="unapplied" FontSize="11" Style="{StaticResource DirtyBadgeStyle}"/>
+                                    </Border>
+                                </StackPanel>
+                                <TextBox x:Name="DetailValueBox" Text="{Binding DetailDefaultValue, UpdateSourceTrigger=PropertyChanged}"
+                                         IsReadOnly="{Binding CanEditDefaultValue, Converter={StaticResource InverseBooleanConverter}}"
                                          TextWrapping="Wrap" AcceptsReturn="True" MaxHeight="140"
                                          Margin="0,4,0,0" FontFamily="{DynamicResource MonoFontFamily}"
                                          AutomationProperties.Name="Default value"/>
-                                <TextBlock Text="Read-only: editing arrives with the editing milestone."
-                                           Style="{StaticResource FieldNoteStyle}"/>
+                                <TextBlock x:Name="DetailValueNoteText" Text="{Binding DetailDefaultValueNote}"
+                                           TextWrapping="Wrap" Style="{StaticResource FieldNoteStyle}"/>
                             </StackPanel>
                         </Border>
 
                         <Border Style="{StaticResource CardStyle}"
                                 Visibility="{Binding HasSelectedParameter, Converter={StaticResource BoolToVisibilityConverter}}">
                             <StackPanel>
-                                <TextBlock Text="Access" FontWeight="SemiBold"/>
-                                <TextBox x:Name="DetailAccessBox" Text="{Binding DetailAccess, Mode=OneWay}" IsReadOnly="True" Margin="0,4,0,0"
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Access" FontWeight="SemiBold"/>
+                                    <Border x:Name="DetailAccessDraftBadge" Style="{StaticResource BadgeBorderStyle}"
+                                            Visibility="{Binding DetailHasAccessDraft, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <TextBlock Text="staged" FontSize="11" Style="{StaticResource DirtyBadgeStyle}"/>
+                                    </Border>
+                                </StackPanel>
+                                <ComboBox x:Name="DetailAccessCombo" ItemsSource="{Binding AccessChoices}"
+                                          SelectedItem="{Binding DetailAccess}"
+                                          Visibility="{Binding CanEditAccess, Converter={StaticResource BoolToVisibilityConverter}}"
+                                          Margin="0,4,0,0" HorizontalAlignment="Stretch"
+                                          AutomationProperties.Name="Access classification"/>
+                                <TextBox x:Name="DetailAccessBox" Text="{Binding DetailAccess}" IsReadOnly="True"
+                                         Visibility="{Binding CanEditAccess, Converter={StaticResource InverseBoolToVisibilityConverter}}"
+                                         Margin="0,4,0,0" FontFamily="{DynamicResource MonoFontFamily}"
                                          AutomationProperties.Name="Access classification"/>
-                                <TextBlock Text="Read-only: editing arrives with the editing milestone."
-                                           Style="{StaticResource FieldNoteStyle}"/>
+                                <TextBlock x:Name="DetailAccessNoteText" Text="{Binding DetailAccessNote}"
+                                           TextWrapping="Wrap" Style="{StaticResource FieldNoteStyle}"/>
                             </StackPanel>
                         </Border>
 
                         <Border Style="{StaticResource CardStyle}"
                                 Visibility="{Binding HasSelectedParameter, Converter={StaticResource BoolToVisibilityConverter}}">
                             <StackPanel>
-                                <TextBlock Text="Description" FontWeight="SemiBold"/>
-                                <TextBox x:Name="DetailDescriptionBox" Text="{Binding DetailDescription, Mode=OneWay}" IsReadOnly="True"
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Description" FontWeight="SemiBold"/>
+                                    <Border x:Name="DetailDescriptionDraftBadge" Style="{StaticResource BadgeBorderStyle}"
+                                            Visibility="{Binding DetailHasDescriptionDraft, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <TextBlock Text="staged" FontSize="11" Style="{StaticResource DirtyBadgeStyle}"/>
+                                    </Border>
+                                </StackPanel>
+                                <TextBox x:Name="DetailDescriptionBox"
+                                         Text="{Binding DetailDescription, UpdateSourceTrigger=PropertyChanged}"
+                                         IsReadOnly="{Binding CanEditDescription, Converter={StaticResource InverseBooleanConverter}}"
                                          TextWrapping="Wrap" AcceptsReturn="True" MaxHeight="140"
                                          Margin="0,4,0,0" FontFamily="{DynamicResource MonoFontFamily}"
                                          AutomationProperties.Name="Description"/>
-                                <TextBlock Text="Read-only: editing arrives with the editing milestone."
-                                           Style="{StaticResource FieldNoteStyle}"/>
+                                <TextBlock x:Name="DetailDescriptionNoteText" Text="{Binding DetailDescriptionNote}"
+                                           TextWrapping="Wrap" Style="{StaticResource FieldNoteStyle}"/>
                             </StackPanel>
                         </Border>
 
@@ -354,7 +562,45 @@
                                 <TextBlock Text="XML type property" FontWeight="SemiBold"/>
                                 <TextBlock x:Name="DetailXmlTypeText" Text="{Binding DetailXmlType}" Margin="0,4,0,0"
                                            FontFamily="{DynamicResource MonoFontFamily}"/>
-                                <TextBlock Text="Separate from Internal / External access"
+                                <TextBlock Text="Separate from Internal / External access; it is never edited here"
+                                           Style="{StaticResource FieldNoteStyle}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border x:Name="DetailActionsCard" Style="{StaticResource CardStyle}"
+                                Visibility="{Binding HasSelectedParameter, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                    <TextBlock Text="Staged changes of this parameter" FontWeight="SemiBold"/>
+                                    <Border x:Name="DetailAnyDraftBadge" Style="{StaticResource BadgeBorderStyle}"
+                                            Visibility="{Binding DetailHasAnyDraft, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <TextBlock Text="unsaved" FontSize="11" Style="{StaticResource DirtyBadgeStyle}"/>
+                                    </Border>
+                                </StackPanel>
+                                <WrapPanel Margin="0,0,0,4">
+                                    <Button x:Name="ApplyEditsButton" Content="Apply edits" Margin="0,0,6,0"
+                                            Command="{Binding ApplyEditsCommand}"
+                                            AutomationProperties.Name="Stage the form changes for this parameter"/>
+                                    <Button x:Name="RevertFormButton" Content="Undo unapplied typing" Margin="0,0,6,0"
+                                            Style="{StaticResource LinkButtonStyle}"
+                                            Command="{Binding RevertFormCommand}"
+                                            AutomationProperties.Name="Reload the form with the session values"/>
+                                    <Button x:Name="DiscardDraftsButton" Content="Discard staged for this parameter"
+                                            Style="{StaticResource LinkButtonStyle}"
+                                            Command="{Binding DiscardDraftsForParameterCommand}"
+                                            AutomationProperties.Name="Discard the staged changes of this parameter"/>
+                                </WrapPanel>
+                                <WrapPanel>
+                                    <Button x:Name="CompareButton" Content="Compare with other templates"
+                                            Margin="0,0,6,0" Style="{StaticResource LinkButtonStyle}"
+                                            Command="{Binding CompareCommand}"
+                                            AutomationProperties.Name="Compare this parameter with the other templates"/>
+                                    <Button x:Name="BulkButton" Content="Apply value to templates"
+                                            Style="{StaticResource LinkButtonStyle}"
+                                            Command="{Binding OpenBulkCommand}"
+                                            AutomationProperties.Name="Apply one default value to many templates"/>
+                                </WrapPanel>
+                                <TextBlock x:Name="FormSummaryText" Text="{Binding FormSummary}" TextWrapping="Wrap"
                                            Style="{StaticResource FieldNoteStyle}"/>
                             </StackPanel>
                         </Border>
@@ -392,8 +638,19 @@
                 </Grid.ColumnDefinitions>
                 <TextBlock x:Name="FooterCountText" Grid.Column="0" Text="{Binding FolderSummaryText}"
                            Foreground="{DynamicResource MutedForegroundBrush}"/>
-                <TextBlock x:Name="FooterOperationText" Grid.Column="1" Text="{Binding OperationText}"
-                           Foreground="{DynamicResource MutedForegroundBrush}"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <TextBlock x:Name="FooterOperationText" Text="{Binding OperationText}"
+                               Foreground="{DynamicResource MutedForegroundBrush}" VerticalAlignment="Center"/>
+                    <Border x:Name="StagedBadge" Style="{StaticResource BadgeBorderStyle}"
+                            Visibility="{Binding HasStagedChanges, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock x:Name="StagedSummaryText" Text="{Binding StagedSummary}" FontSize="11"
+                                   Style="{StaticResource DirtyBadgeStyle}"/>
+                    </Border>
+                    <Button x:Name="DiscardAllButton" Content="Discard all staged"
+                            Style="{StaticResource LinkButtonStyle}" Margin="8,0,0,0"
+                            Command="{Binding DiscardAllStagedCommand}"
+                            AutomationProperties.Name="Discard every staged change of this session"/>
+                </StackPanel>
                 <Button x:Name="VersionButton" Grid.Column="2" Content="{Binding VersionLabel}"
                         Style="{StaticResource LinkButtonStyle}" Command="{Binding OpenLicensesCommand}"
                         ToolTip="About, licence and bundled-component notices (Ctrl+L)"

@@ -1,0 +1,42 @@
+<Window x:Class="PubTemplateEditor.App.UnsavedWorkWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Unsaved work"
+        Width="480" SizeToContent="Height" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        ShowInTaskbar="False">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" x:Name="HeadlineText" Style="{StaticResource SectionTitleStyle}"
+                   Text="Unapplied editor changes"/>
+
+        <TextBlock Grid.Row="1" x:Name="MessageText" TextWrapping="Wrap" Margin="0,8,0,0"
+                   Style="{StaticResource FieldNoteStyle}"/>
+
+        <StackPanel Grid.Row="2" Margin="0,14,0,0">
+            <Button x:Name="ApplyButton" Content="Apply the form changes and continue"
+                    HorizontalAlignment="Stretch" Margin="0,0,0,6"
+                    AutomationProperties.Name="Apply the editor form changes and continue"/>
+            <Button x:Name="DiscardFormButton" Content="Discard the unapplied form changes and continue"
+                    HorizontalAlignment="Stretch" Margin="0,0,0,6"
+                    Style="{StaticResource LinkButtonStyle}"
+                    AutomationProperties.Name="Discard unapplied form changes and continue"/>
+            <Button x:Name="DiscardAllButton" Content="Discard form changes and every staged change, then continue"
+                    HorizontalAlignment="Stretch" Margin="0,0,0,6"
+                    Style="{StaticResource LinkButtonStyle}"
+                    AutomationProperties.Name="Discard form changes and all staged changes and continue"/>
+        </StackPanel>
+
+        <Button Grid.Row="3" x:Name="KeepEditingButton" Content="Keep editing (nothing changes)"
+                HorizontalAlignment="Stretch" Margin="0,4,0,0"
+                IsCancel="True"
+                AutomationProperties.Name="Cancel the navigation and keep editing"/>
+    </Grid>
+</Window>

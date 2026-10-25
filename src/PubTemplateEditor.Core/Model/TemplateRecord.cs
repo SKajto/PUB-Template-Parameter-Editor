@@ -30,4 +30,11 @@ public sealed class TemplateRecord
     public IReadOnlyList<string> Warnings { get; set; } = [];
 
     public string FileName => Path.GetFileName(FilePath);
+
+    /// <summary>
+    /// Declaration identity within this record. Drafts and bulk targets are addressed by id, so the
+    /// UI never has to re-match by name (which is ambiguous when a name is declared twice).
+    /// </summary>
+    public VariableDeclaration? FindDeclaration(int declarationId) =>
+        Declarations.FirstOrDefault(d => d.DeclarationId == declarationId);
 }

@@ -165,13 +165,30 @@ public class ExplorerTests
             Assert.Equal(row.AccessLabel, window.DetailAccessEditor.Text);
             Assert.Equal(row.DescriptionFullValue, window.DetailDescriptionEditor.Text);
             Assert.Equal(row.XmlTypeLabel, window.DetailXmlTypeLabel.Text);
-            Assert.True(window.DetailValueEditor.IsReadOnly);
-            Assert.True(window.DetailAccessEditor.IsReadOnly);
-            Assert.True(window.DetailDescriptionEditor.IsReadOnly);
+            // S2 kept every field read-only; S3 opens the observed fields and locks the rest.
 
             var declaration = row.Declaration;
             Assert.Equal(declaration.DefaultValue.LogicalValue, vm.DetailDefaultValue);
             Assert.Equal(declaration.Description.LogicalValue, vm.DetailDescription);
+
+            // S3: the form edits exactly the fields whose stored shape was observed, and locks the rest.
+            Assert.False(vm.CanEditName);
+            Assert.Equal(declaration.DefaultValue.Capability == FieldCapability.Editable, !window.DetailValueEditor.IsReadOnly);
+            Assert.Equal(declaration.Description.Capability == FieldCapability.Editable, !window.DetailDescriptionEditor.IsReadOnly);
+            if (declaration.Access.Capability == FieldCapability.Editable)
+            {
+                Assert.True(vm.CanEditAccess);
+                Assert.Contains(vm.DetailAccess, vm.AccessChoices);
+            }
+            else
+            {
+                Assert.False(vm.CanEditAccess);
+                Assert.True(window.DetailAccessEditor.IsReadOnly);
+            }
+
+            Assert.Equal(0, vm.UnappliedFieldCount);
+            Assert.False(vm.HasUnappliedFormEdits);
+            Assert.False(vm.HasStagedChanges);
 
             // A read-only shape is explained instead of silently hidden.
             if (row.HasReadOnlyShape)

@@ -1,4 +1,5 @@
 using PubTemplateEditor.App.Infrastructure;
+using PubTemplateEditor.Core.Editing;
 using PubTemplateEditor.Core.Model;
 using PubTemplateEditor.Infrastructure;
 
@@ -14,18 +15,19 @@ public sealed class TemplateItem : ViewModelBase
 
     private bool _isSelectedForRead;
     private bool _isActive;
-    private int _stagedEditCount;
     private string _status = "Not read";
     private TemplateRecord? _record;
     private long _sizeBytes;
     private string? _listingError;
+    private readonly DraftStore? _drafts;
 
-    public TemplateItem(string filePath, bool selectedForRead, long sizeBytes = 0, string? listingError = null)
+    public TemplateItem(string filePath, bool selectedForRead, long sizeBytes = 0, string? listingError = null, DraftStore? drafts = null)
     {
         FilePath = filePath;
         _isSelectedForRead = selectedForRead;
         _sizeBytes = sizeBytes;
         _listingError = listingError;
+        _drafts = drafts;
         _status = listingError is null ? "Not read" : "Not readable";
     }
 
@@ -79,16 +81,21 @@ public sealed class TemplateItem : ViewModelBase
     /// <summary>A file the folder listing could not stat is disabled for read selection.</summary>
     public bool IsListable => _listingError is null;
 
-    public int StagedEditCount
+    /// <summary>
+    /// Staged (not yet saved) field changes belonging to this file. Read from the session draft
+    /// store, so a template keeps its dirty marker while another template is displayed.
+    /// </summary>
+    public int StagedEditCount => _drafts?.CountForFile(FilePath) ?? 0;
+
+    /// <summary>True when this template holds staged edits that no save has written yet.</summary>
+    public bool IsDraft => StagedEditCount > 0;
+
+    /// <summary>Re-raises the dirty marker after staging or discarding drafts.</summary>
+    public void RefreshDraftState()
     {
-        get => _stagedEditCount;
-        set
-        {
-            if (Set(ref _stagedEditCount, value))
-            {
-                Raise(nameof(StatusDisplay));
-            }
-        }
+        Raise(nameof(StagedEditCount));
+        Raise(nameof(IsDraft));
+        Raise(nameof(StatusDisplay));
     }
 
     public string Status
@@ -106,9 +113,9 @@ public sealed class TemplateItem : ViewModelBase
 
     public bool HasError => _status.StartsWith("Error", StringComparison.Ordinal) || _listingError is not null;
 
-    public string StatusDisplay => _stagedEditCount > 0
-        ? $"{_status} · {_stagedEditCount} staged"
-        : _status;
+    public string StatusDisplay => StagedEditCount > 0
+        ? $"{Status} · {StagedEditCount} staged"
+        : Status;
 
     public TemplateRecord? Record
     {

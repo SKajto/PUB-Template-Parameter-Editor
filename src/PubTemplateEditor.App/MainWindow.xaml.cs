@@ -33,6 +33,23 @@ public partial class MainWindow : Window
     public TextBox DetailAccessEditor => DetailAccessBox;
     public TextBox DetailDescriptionEditor => DetailDescriptionBox;
     public TextBlock ActionErrorLabel => ActionErrorText;
+    public TextBlock DetailValueNoteLabel => DetailValueNoteText;
+    public TextBlock DetailAccessNoteLabel => DetailAccessNoteText;
+    public TextBlock DetailDescriptionNoteLabel => DetailDescriptionNoteText;
+    public TextBlock FormSummaryLabel => FormSummaryText;
+    public TextBlock StagedSummaryLabel => StagedSummaryText;
+    public TextBlock CompareSummaryLabel => CompareSummaryText;
+    public TextBlock BulkSummaryLabel => BulkSummaryText;
+    public TextBox BulkValueEditor => BulkValueBox;
+    public ComboBox DetailAccessChoiceEditor => DetailAccessCombo;
+    public Button ApplyEditsActionButton => ApplyEditsButton;
+    public Button RevertFormActionButton => RevertFormButton;
+    public Button DiscardDraftsActionButton => DiscardDraftsButton;
+    public Button CompareActionButton => CompareButton;
+    public Button BulkActionButton => BulkButton;
+    public Button DiscardAllActionButton => DiscardAllButton;
+    public Border DetailActionsPanel => DetailActionsCard;
+    public Border ExplorerStagedBadge => StagedBadge;
 
     private LicensesWindow? _licensesWindow;
 
@@ -52,6 +69,17 @@ public partial class MainWindow : Window
             ParameterSearchBox.SelectAll();
         };
         workspace.LicensesRequested += ShowLicenses;
+
+        // The view model owns the decision logic; this window only renders the choices.
+        workspace.NavigationGuard = ShowUnsavedWorkPrompt;
+    }
+
+    /// <summary>Modal unsaved-work prompt; called on the UI thread from workspace commands.</summary>
+    private NavigationDecision ShowUnsavedWorkPrompt(NavigationPrompt prompt)
+    {
+        UnsavedWorkWindow dialog = Owned(new UnsavedWorkWindow(prompt));
+        dialog.ShowDialog();
+        return dialog.Decision;
     }
 
     /// <summary>Shows the offline licence/notices view; re-uses one open window.</summary>
@@ -59,7 +87,7 @@ public partial class MainWindow : Window
     {
         if (_licensesWindow is null)
         {
-            _licensesWindow = new LicensesWindow { Owner = this };
+            _licensesWindow = Owned(new LicensesWindow());
             _licensesWindow.Closed += (_, _) => _licensesWindow = null;
             _licensesWindow.Show();
         }
@@ -69,9 +97,30 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// WPF rejects an Owner pointing at a window that has never been shown (tests, or a dialog
+    /// requested during construction), so ownership is attached only once the shell is visible.
+    /// </summary>
+    private T Owned<T>(T dialog)
+        where T : Window
+    {
+        if (IsLoaded)
+        {
+            dialog.Owner = this;
+        }
+
+        return dialog;
+    }
+
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
-        // S3+ will offer Save/Discard/Cancel when drafts or unapplied edits exist.
+        // Closing must not silently drop staged work: the prompt decides, Cancel keeps the window open.
+        if (!Workspace.ConfirmClose())
+        {
+            e.Cancel = true;
+            return;
+        }
+
         base.OnClosing(e);
     }
 }

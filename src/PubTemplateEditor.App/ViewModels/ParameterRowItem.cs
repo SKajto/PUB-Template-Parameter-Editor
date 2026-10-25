@@ -1,64 +1,134 @@
-using System.Collections.ObjectModel;
 using PubTemplateEditor.App.Infrastructure;
+using PubTemplateEditor.Core.Editing;
 using PubTemplateEditor.Core.Model;
-using PubTemplateEditor.Core.Search;
 
 namespace PubTemplateEditor.App.ViewModels;
 
 /// <summary>
-/// One declaration row of the active template's parameter table. Values are shown as
-/// text previews; the full value is carried separately for tooltips and editing.
+/// One row of the parameter table. The row belongs to the active template, so it shows the
+/// session state: staged values are displayed instead of stored values, and a dirty marker says
+/// which fields carry an unsaved change. Nothing here writes; the values live only in memory.
 /// </summary>
 public sealed class ParameterRowItem : ViewModelBase
 {
-    public ParameterRowItem(VariableDeclaration declaration)
+    private readonly DraftStore _drafts;
+
+    public ParameterRowItem(VariableDeclaration declaration, TemplateItem file, DraftStore drafts)
     {
         Declaration = declaration;
+        File = file;
+        _drafts = drafts;
     }
 
     public VariableDeclaration Declaration { get; }
 
+    public TemplateItem File { get; }
+
     public int DeclarationId => Declaration.DeclarationId;
 
-    public string Name => Declaration.DisplayName;
+    /// <summary>Parameter names are read-only and never used as a bulk key from this row.</summary>
+    public string Name => Declaration.ExactName ?? string.Empty;
 
-    public string AccessLabel => Declaration.Access.LogicalValue ?? "Unknown";
+    public string XmlTypeLabel => Declaration.XmlTypeProperty ?? "(no type property)";
 
-    public string XmlTypeLabel => Declaration.XmlTypeProperty ?? "(missing)";
+    public string? RawAccess => Declaration.Access.LogicalValue;
 
-    /// <summary>True when any field exists but cannot be edited losslessly (read-only shape).</summary>
-    public bool HasReadOnlyShape =>
-        Declaration.Name.Capability == FieldCapability.ReadOnlyUnsupported
-        || Declaration.Description.Capability == FieldCapability.ReadOnlyUnsupported
-        || Declaration.DefaultValue.Capability == FieldCapability.ReadOnlyUnsupported
-        || Declaration.Access.Capability == FieldCapability.ReadOnlyUnsupported;
+    // ------------------------------------------------------- effective (draft-aware) view
 
-    public string ReadOnlyShapeReasons => string.Join(
-        "; ",
-        new[] { Declaration.Name, Declaration.Description, Declaration.DefaultValue, Declaration.Access }
-            .Where(f => f.Capability == FieldCapability.ReadOnlyUnsupported)
-            .Select(f => $"{f.Kind}: {f.CapabilityReason}"));
+    public string? EffectiveDefaultValue =>
+        _drafts.EffectiveValue(File.FilePath, Declaration, FieldKind.DefaultValue);
 
-    public string DefaultPreview => Preview(DeclarationFieldText(Declaration.DefaultValue));
+    public string? EffectiveAccess =>
+        _drafts.EffectiveValue(File.FilePath, Declaration, FieldKind.Access);
 
-    public string DescriptionPreview => Preview(DeclarationFieldText(Declaration.Description));
+    public string? EffectiveDescription =>
+        _drafts.EffectiveValue(File.FilePath, Declaration, FieldKind.Description);
 
-    public string DefaultFullValue => DeclarationFieldText(Declaration.DefaultValue);
+    public string AccessLabel => EffectiveAccess ?? "(missing)";
 
-    public string DescriptionFullValue => DeclarationFieldText(Declaration.Description);
+    public string DefaultPreview => Preview(EffectiveDefaultValue);
 
-    /// <summary>Empty values stay visibly distinct from missing ones (REQ: no coercion).</summary>
-    private static string DeclarationFieldText(DeclarationField field) =>
-        !field.Present ? "(missing)" : field.LogicalValue ?? string.Empty;
+    public string DescriptionPreview => Preview(EffectiveDescription);
 
-    private static string Preview(string value)
+    public string DefaultFullValue => EffectiveDefaultValue ?? "(no default property)";
+
+    public string DescriptionFullValue => EffectiveDescription ?? "(no description property)";
+
+    /// <summary>Fields with a staged, not-yet-saved change; drives the row's dirty badge.</summary>
+    public IReadOnlyList<FieldKind> DraftedFields
     {
-        if (value.Length == 0)
+        get
         {
-            return "(empty)";
+            List<FieldKind> fields = [];
+            foreach (FieldKind field in TemplateFieldRules.StagesFields)
+            {
+                if (_drafts.HasChange(File.FilePath, DeclarationId, field))
+                {
+                    fields.Add(field);
+                }
+            }
+
+            return fields;
+        }
+    }
+
+    public bool HasDrafts => DraftedFields.Count > 0;
+
+    public int StagedEditCount => DraftedFields.Count;
+
+    /// <summary>"default, access" style summary shown next to the dirty badge.</summary>
+    public string DraftedFieldsSummary =>
+        string.Join(", ", DraftedFields.Select(TemplateFieldRules.DisplayName));
+
+    public bool HasReadOnlyShape =>
+        Declaration.Name.Capability != FieldCapability.Editable ||
+        Declaration.Description.Capability != FieldCapability.Editable ||
+        Declaration.DefaultValue.Capability != FieldCapability.Editable ||
+        Declaration.Access.Capability != FieldCapability.Editable;
+
+    public string ReadOnlyShapeReasons => string.Join(" ",
+        new[]
+        {
+            Declaration.Name.CapabilityReason,
+            Declaration.Description.CapabilityReason,
+            Declaration.DefaultValue.CapabilityReason,
+            Declaration.Access.CapabilityReason,
+        }.Where(notEmpty => !string.IsNullOrWhiteSpace(notEmpty)));
+
+    /// <summary>Re-raises the draft-derived bindings after staging, discarding or re-reading.</summary>
+    public void RefreshDraftState()
+    {
+        foreach (string property in new[]
+                 {
+                     nameof(EffectiveDefaultValue),
+                     nameof(EffectiveAccess),
+                     nameof(EffectiveDescription),
+                     nameof(AccessLabel),
+                     nameof(DefaultPreview),
+                     nameof(DescriptionPreview),
+                     nameof(DefaultFullValue),
+                     nameof(DescriptionFullValue),
+                     nameof(HasDrafts),
+                     nameof(StagedEditCount),
+                     nameof(DraftedFieldsSummary),
+                 })
+        {
+            Raise(property);
+        }
+    }
+
+    private static string Preview(string? value)
+    {
+        if (value is null)
+        {
+            return "(missing)";
         }
 
-        string single = value.Replace("\r", " ").Replace("\n", " ");
-        return single.Length <= 160 ? single : single[..160] + "…";
+        if (value.Length <= 48)
+        {
+            return value;
+        }
+
+        return value[..45] + "…";
     }
 }

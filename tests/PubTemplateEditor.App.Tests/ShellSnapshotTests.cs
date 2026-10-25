@@ -4,6 +4,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using PubTemplateEditor.App;
 using PubTemplateEditor.App.ViewModels;
+using PubTemplateEditor.Core.Model;
 using PubTemplateEditor.Infrastructure;
 using Xunit;
 using ShellWindow = PubTemplateEditor.App.MainWindow;
@@ -144,6 +145,138 @@ public class ShellSnapshotTests
         Assert.True(pixels.Distinct().Count() > 32, "about snapshot looks blank");
         window.Close();
     });
+
+    /// <summary>
+    /// S3 panels: compare, bulk and the unsaved-work prompt are rendered and written as PNGs so a
+    /// human can review them, and their layout is asserted so an empty overlay never passes silently.
+    /// </summary>
+    [Fact]
+    public async Task EditingPanelsRenderAndWriteSnapshots()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "pubte-snap-edit-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, "t1.dta"), EditableTemplate(("alpha", "OLD_A", "external", "A description"), ("beta", "B", "internal", "shared description")));
+        File.WriteAllText(Path.Combine(dir, "t2.dta"), EditableTemplate(("alpha", "OTHER", "external", "shared description")));
+        File.WriteAllText(Path.Combine(dir, "t3.dta"), EditableTemplate(("alpha", "OLD_A", "internal", "shared description"), ("gamma", "G", "internal", "shared description")));
+        File.WriteAllText(Path.Combine(dir, "t4.dta"), EditableTemplate(("alpha", "X", "internal", "first"), ("alpha", "Y", "internal", "second")));
+
+        WorkspaceViewModel[] holder = new WorkspaceViewModel[1];
+        Task read = Task.CompletedTask;
+        _host.Do(() =>
+        {
+            string settings = Path.Combine(Path.GetTempPath(), "pubte-snap-set-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(settings);
+            holder[0] = new WorkspaceViewModel(new SettingsService(settings), new EditorSettings { LastFolder = dir });
+            read = holder[0].ReadParametersCommand.ExecuteAsync(null);
+        });
+        await read;
+
+        WorkspaceViewModel vm = holder[0];
+        Assert.Equal(4, vm.TotalFileCount);
+
+        _host.Do(() =>
+        {
+            ThemeManager.Apply(_host.App, ThemeChoice.Light);
+
+            ParameterRowItem alpha = vm.VisibleParameters.Single(r => r.Name == "alpha");
+            vm.SelectedParameter = alpha;
+            vm.DetailDefaultValue = "NEW VALUE";
+            vm.ApplyEditsCommand.Execute(null);
+            Assert.Equal(1, vm.StagedChangeCount);
+
+            var window = new ShellWindow(vm) { ShowInTaskbar = false };
+
+            // The staged state has to be visible in the explorer badge, not only in the view model.
+            Assert.Equal(Visibility.Visible, window.ExplorerStagedBadge.Visibility);
+            Assert.Contains("1 staged", window.StagedSummaryLabel.Text, StringComparison.Ordinal);
+            RenderShell(window, "editing-staged-light.png");
+
+            vm.CompareCommand.Execute(null);
+            Assert.True(vm.IsCompareOpen);
+            Assert.Equal(4, vm.CompareRows.Count); // self plus three other templates
+            // t1's staged value is what the comparison uses, so t2 and t3 both differ on it.
+            Assert.Contains("2 different", vm.CompareSummary, StringComparison.Ordinal);
+            Assert.Contains("0 without this parameter", vm.CompareSummary, StringComparison.Ordinal);
+            Assert.Contains("1 with staged changes", vm.CompareSummary, StringComparison.Ordinal);
+            Assert.True(vm.CompareRows.Single(r => r.IsSelf).HasUnsavedDrafts);
+            Assert.Equal(CompareState.Ineligible, vm.CompareRows.Single(r => r.FileName == "t4.dta").State);
+            RenderShell(window, "editing-compare-light.png");
+            vm.CloseCompareCommand.Execute(null);
+
+            vm.OpenBulkCommand.Execute(null);
+            Assert.True(vm.IsBulkOpen);
+            Assert.Equal(3, vm.BulkEligibleCount); // t4 declares the name twice, so it cannot be written safely
+            Assert.Contains("of 4 template(s)", vm.BulkSummary, StringComparison.Ordinal);
+            RenderShell(window, "editing-bulk-light.png");
+            vm.CloseBulkCommand.Execute(null);
+
+            window.Close();
+            RenderPrompt(new UnsavedWorkWindow(new NavigationPrompt(NavigationReason.ReReadTemplates, 2, 3)), "prompt-unsaved-light.png");
+            DeleteDir(dir);
+        });
+    }
+
+    /// <summary>Plain-XML template with the six observed properties per declaration.</summary>
+    private static string EditableTemplate(params (string Name, string Default, string Access, string Description)[] variables)
+    {
+        string body = string.Concat(variables.Select(v =>
+            "<variable><feature tag=\"definition\">" +
+            $"<property name=\"name\" value=\"{v.Name}\"></property>" +
+            $"<property name=\"description\"><expression type=\"constant\">{v.Description}</expression></property>" +
+            "<property name=\"type\" value=\"user\"></property>" +
+            $"<property name=\"access\" value=\"{v.Access}\"></property>" +
+            $"<property name=\"default\" value=\"{v.Default}\"></property>" +
+            "</feature></variable>"));
+
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?><template><dataset><variables>" +
+               body + "</variables></dataset></template>";
+    }
+
+    private void RenderShell(ShellWindow window, string fileName)
+    {
+        var root = (FrameworkElement)window.Content;
+        root.Measure(WindowRect.Size);
+        root.Arrange(WindowRect);
+        root.UpdateLayout();
+
+        var render = new RenderTargetBitmap((int)WindowRect.Width, (int)WindowRect.Height, 96, 96, PixelFormats.Pbgra32);
+        render.Render(root);
+        Save(render, fileName);
+
+        var pixels = new int[(int)WindowRect.Width * (int)WindowRect.Height];
+        render.CopyPixels(pixels, 4 * (int)WindowRect.Width, 0);
+        Assert.True(pixels.Distinct().Count() > 32, $"snapshot {fileName} looks blank");
+    }
+
+    private static void RenderPrompt(UnsavedWorkWindow prompt, string fileName)
+    {
+        Assert.Contains("2 field change(s)", prompt.MessageLabel.Text, StringComparison.Ordinal);
+        Assert.Equal(Visibility.Visible, prompt.DiscardAllChoice.Visibility);
+
+        var root = (FrameworkElement)prompt.Content;
+        var rect = new Rect(0, 0, 480, 260);
+        root.Measure(rect.Size);
+        root.Arrange(rect);
+        root.UpdateLayout();
+
+        var render = new RenderTargetBitmap((int)rect.Width, (int)rect.Height, 96, 96, PixelFormats.Pbgra32);
+        render.Render(root);
+        Save(render, fileName);
+
+        var pixels = new int[(int)rect.Width * (int)rect.Height];
+        render.CopyPixels(pixels, 4 * (int)rect.Width, 0);
+        Assert.True(pixels.Distinct().Count() > 32, $"snapshot {fileName} looks blank");
+
+        prompt.Close();
+    }
+
+    private static void Save(RenderTargetBitmap render, string fileName)
+    {
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(render));
+        using var stream = File.Create(Path.Combine(ArtifactsDir(), fileName));
+        encoder.Save(stream);
+    }
 
     private static void DeleteDir(string path)
     {

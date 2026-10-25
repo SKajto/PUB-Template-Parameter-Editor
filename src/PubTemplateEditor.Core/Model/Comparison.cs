@@ -32,7 +32,19 @@ public enum FieldCompareState
 /// <summary>Line-oriented diff fragment for readable old/new presentation (including whitespace differences).</summary>
 public sealed record DiffLine(bool Changed, string Text);
 
-public sealed record FieldDiff(FieldKind Field, FieldCompareState State, IReadOnlyList<DiffLine> Lines);
+/// <summary>
+/// One field of one compared template. Values are shown exactly as stored: an empty string and a
+/// missing field are different states, and a draft-marked value tells the user the comparison is
+/// looking at an in-memory proposal rather than the file on disk.
+/// </summary>
+public sealed record FieldDiff(
+    FieldKind Field,
+    FieldCompareState State,
+    string? ActiveValue,
+    string? TargetValue,
+    bool ActiveHasDraft,
+    bool TargetHasDraft,
+    IReadOnlyList<DiffLine> Lines);
 
 public sealed record TemplateComparison(
     string FilePath,
@@ -40,4 +52,8 @@ public sealed record TemplateComparison(
     CompareState State,
     bool HasUnsavedDrafts,
     string? Reason,
-    IReadOnlyList<FieldDiff> Differences);
+    IReadOnlyList<FieldDiff> Differences)
+{
+    /// <summary>Target declaration identity when the exact name matched (null when missing/ambiguous).</summary>
+    public int? DeclarationId { get; init; }
+}
