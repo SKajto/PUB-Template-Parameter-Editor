@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Draft MSIX manifest template for PUB Template Parameter Editor.
+  {{TOKENS}} are replaced by packaging/build-msix.ps1 from packaging/StoreRelease.settings.json.
+  A -Strict (submission) build rejects any unresolved REPLACE_* token; see docs/GITHUB_STORE_RELEASE.md.
+  runFullTrust is required because the payload is a self-contained Win32/WPF executable.
+  Store signing happens after Partner Center certification; this manifest needs no publisher CA certificate.
+-->
+<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+         xmlns:mp="http://schemas.microsoft.com/appx/2014/manifest"
+         xmlns:uap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/universal"
+         xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities">
+
+  <Identity Name="{{PACKAGE_IDENTITY_NAME}}"
+            Publisher="{{PUBLISHER}}"
+            ProcessorArchitecture="x64"
+            Version="{{PACKAGE_VERSION}}" />
+
+  <Properties>
+    <DisplayName>{{DISPLAY_NAME}}</DisplayName>
+    <PublisherDisplayName>{{PUBLISHER_DISPLAY_NAME}}</PublisherDisplayName>
+    <Logo>assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <!-- Windows 11 x64 is the initial target (REQUIREMENTS GEN-02). MaxVersionTested is
+         updated by CI when a newer SDK is actually verified on runners. -->
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.22000.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-US" />
+  </Resources>
+
+  <Applications>
+    <Application Id="PubTemplateEditor"
+                 Executable="PubTemplateEditor.exe"
+                 EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements DisplayName="{{DISPLAY_NAME}}"
+                          Description="Offline editor for PUB template parameters with review-based saving"
+                          BackgroundColor="transparent"
+                          Square44x44Logo="assets\Square44x44Logo.png"
+                          Square150x150Logo="assets\Square150x150Logo.png">
+        <uap:DefaultTile Wide310x150Logo="assets\Wide310x150Logo.png"
+                         Square71x71Logo="assets\Square71x71Logo.png"
+                         Square310x310Logo="assets\Square310x310Logo.png" />
+        <uap:SplashScreen Image="assets\SplashScreen.png" />
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

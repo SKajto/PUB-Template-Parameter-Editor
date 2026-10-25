@@ -1,0 +1,16 @@
+<Application x:Class="PubTemplateEditor.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             ShutdownMode="OnMainWindowClose">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- Theme dictionary is swapped at startup and on toggle; keys are identical in both files. -->
+                <ResourceDictionary Source="Themes/Light.xaml"/>
+                <ResourceDictionary Source="Themes/Controls.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            <infrastructure:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"
+                xmlns:infrastructure="clr-namespace:PubTemplateEditor.App.Infrastructure"/>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

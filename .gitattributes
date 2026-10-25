@@ -1,0 +1,18 @@
+# Normalise line endings in the repository; working copies stay native.
+* text=auto
+
+# Source and markup are CRLF in the working tree on Windows.
+*.cs text eol=crlf
+*.xaml text eol=crlf
+*.csproj text eol=crlf
+*.props text eol=crlf
+*.slnx text eol=crlf
+*.md text eol=lf
+*.yml text eol=lf
+
+# Reference samples and packaging binaries must never be rewritten.
+*.dta binary
+*.png binary
+*.jpg binary
+*.ico binary
+*.msix binary

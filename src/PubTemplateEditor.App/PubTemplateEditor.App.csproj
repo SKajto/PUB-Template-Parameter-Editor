@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>PubTemplateEditor</AssemblyName>
+    <RootNamespace>PubTemplateEditor.App</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PubTemplateEditor.Core\PubTemplateEditor.Core.csproj" />
+    <ProjectReference Include="..\PubTemplateEditor.Infrastructure\PubTemplateEditor.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="..\..\LICENSE" Link="Assets\LICENSE.txt" />
+    <Resource Include="..\..\NOTICE" Link="Assets\NOTICE.txt" />
+  </ItemGroup>
+
+</Project>

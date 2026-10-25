@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PubTemplateEditor.App/PubTemplateEditor.App.csproj" />
+    <Project Path="src/PubTemplateEditor.Core/PubTemplateEditor.Core.csproj" />
+    <Project Path="src/PubTemplateEditor.Infrastructure/PubTemplateEditor.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PubTemplateEditor.App.Tests/PubTemplateEditor.App.Tests.csproj" />
+    <Project Path="tests/PubTemplateEditor.Core.Tests/PubTemplateEditor.Core.Tests.csproj" />
+    <Project Path="tests/PubTemplateEditor.Integration.Tests/PubTemplateEditor.Integration.Tests.csproj" />
+  </Folder>
+</Solution>
