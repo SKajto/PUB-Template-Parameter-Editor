@@ -309,7 +309,7 @@
                                     Command="{Binding CompareCommand}" ToolTipService.ShowOnDisabled="True"
                                     ToolTip="Show this parameter across every read template"
                                     AutomationProperties.Name="Compare this parameter with the other templates"/>
-                            <Button x:Name="BulkButton" Content="Apply value to templates" Margin="0,0,0,0"
+                            <Button x:Name="BulkButton" Content="Apply fields to templates" Margin="0,0,0,0"
                                     infra:Iconics.Icon="{StaticResource IconBrush}"
                                     Command="{Binding OpenBulkCommand}" ToolTipService.ShowOnDisabled="True"
                                     ToolTip="Stage one default value across several templates"
@@ -753,29 +753,57 @@
                         </DockPanel>
                     </Border>
 
-                    <!-- ===== bulk panel: one default value, staged for many templates after review ===== -->
+                    <!-- ===== bulk panel: chosen fields of one parameter, staged for many templates ===== -->
                     <Border Grid.Row="0" Grid.RowSpan="5" Margin="10" Panel.ZIndex="10"
                             Background="{DynamicResource PanelBackgroundBrush}"
                             BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1"
                             Visibility="{Binding IsBulkOpen, Converter={StaticResource BoolToVisibilityConverter}}">
                         <DockPanel LastChildFill="True">
                             <StackPanel DockPanel.Dock="Top" Margin="12,10,12,6">
-                                <TextBlock Text="APPLY ONE VALUE TO TEMPLATES" Style="{StaticResource EyebrowStyle}"/>
+                                <TextBlock Text="APPLY THE FIELDS OF ONE PARAMETER TO TEMPLATES" Style="{StaticResource EyebrowStyle}"/>
                                 <TextBlock Text="{Binding DetailName}" Style="{StaticResource SectionTitleStyle}"/>
                                 <TextBlock Style="{StaticResource FieldNoteStyle}" TextWrapping="Wrap"
-                                           Text="Bulk editing changes the default value only. Target access and description stay untouched."/>
+                                           Text="Choose which fields to copy - the default value, the access (internal/external) and the description each go on their own. Every target is matched by the exact parameter name; a field a template cannot hold stays untouched and says why. Nothing is written until Review Save."/>
                             </StackPanel>
-                            <Grid DockPanel.Dock="Top" Margin="12,0,12,6">
+                            <Grid DockPanel.Dock="Top" Margin="12,4,12,6">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="New default value" VerticalAlignment="Center"
-                                           Margin="0,0,8,0" FontWeight="SemiBold"/>
-                                <TextBox x:Name="BulkValueBox" Grid.Column="1"
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <CheckBox x:Name="BulkValueCheck" Grid.Row="0" Grid.Column="0"
+                                          Content="Default value" IsChecked="{Binding BulkApplyValue}"
+                                          VerticalAlignment="Center" Margin="0,0,8,6" MinWidth="120"
+                                          AutomationProperties.Name="Apply the default value in bulk"/>
+                                <TextBox x:Name="BulkValueBox" Grid.Row="0" Grid.Column="1" Margin="0,0,0,6"
                                          Text="{Binding BulkValueDraft, UpdateSourceTrigger=PropertyChanged}"
                                          FontFamily="{DynamicResource MonoFontFamily}"
-                                         AutomationProperties.Name="New default value for all selected templates"/>
+                                         IsEnabled="{Binding BulkApplyValue}"
+                                         AutomationProperties.Name="Default value to apply to the selected templates"/>
+
+                                <CheckBox x:Name="BulkAccessCheck" Grid.Row="1" Grid.Column="0"
+                                          Content="Access (internal / external)" IsChecked="{Binding BulkApplyAccess}"
+                                          VerticalAlignment="Center" Margin="0,0,8,6" MinWidth="120"
+                                          AutomationProperties.Name="Apply the internal or external access in bulk"/>
+                                <ComboBox x:Name="BulkAccessBox" Grid.Row="1" Grid.Column="1" Margin="0,0,0,6"
+                                          ItemsSource="{Binding AccessChoices}"
+                                          SelectedItem="{Binding BulkAccessChoice}"
+                                          IsEnabled="{Binding BulkApplyAccess}"
+                                          AutomationProperties.Name="Access value to apply to the selected templates"/>
+
+                                <CheckBox x:Name="BulkDescriptionCheck" Grid.Row="2" Grid.Column="0"
+                                          Content="Description" IsChecked="{Binding BulkApplyDescription}"
+                                          VerticalAlignment="Center" Margin="0,0,8,0" MinWidth="120"
+                                          AutomationProperties.Name="Apply the description in bulk"/>
+                                <TextBox x:Name="BulkDescriptionBox" Grid.Row="2" Grid.Column="1"
+                                         Text="{Binding BulkDescriptionDraft, UpdateSourceTrigger=PropertyChanged}"
+                                         IsEnabled="{Binding BulkApplyDescription}"
+                                         AutomationProperties.Name="Description to apply to the selected templates"/>
                             </Grid>
                             <Grid DockPanel.Dock="Bottom" Margin="12,6,12,10">
                                 <Grid.ColumnDefinitions>
@@ -788,12 +816,12 @@
                                 <Button Grid.Column="1" Content="Cancel" Style="{StaticResource LinkButtonStyle}"
                                         infra:Iconics.Icon="{StaticResource IconClose}"
                                         Command="{Binding CloseBulkCommand}" Margin="0,0,8,0"
-                                        AutomationProperties.Name="Cancel bulk value"/>
-                                <Button x:Name="BulkConfirmButton" Grid.Column="2" Content="Apply value to selected templates"
+                                        AutomationProperties.Name="Cancel bulk editing"/>
+                                <Button x:Name="BulkConfirmButton" Grid.Column="2" Content="Apply chosen fields to selected templates"
                                         infra:Iconics.Icon="{StaticResource IconBrush}"
                                         Style="{StaticResource AccentButtonStyle}"
                                         Command="{Binding ConfirmBulkCommand}"
-                                        AutomationProperties.Name="Stage this value in the selected templates"/>
+                                        AutomationProperties.Name="Stage the chosen fields in the selected templates"/>
                             </Grid>
                             <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="12,0,12,0">
                                 <ItemsControl ItemsSource="{Binding BulkTargets}">
@@ -813,9 +841,14 @@
                                                     <StackPanel Grid.Column="1">
                                                         <TextBlock Text="{Binding FileName}" FontWeight="SemiBold"
                                                                    ToolTip="{Binding FilePath}"/>
-                                                        <TextBlock Text="{Binding CurrentValueText}"
+                                                        <TextBlock Text="{Binding CurrentValuesText}"
                                                                    Style="{StaticResource FieldNoteStyle}"
-                                                                   FontFamily="{DynamicResource MonoFontFamily}"/>
+                                                                   FontFamily="{DynamicResource MonoFontFamily}"
+                                                                   TextWrapping="Wrap"
+                                                                   Visibility="{Binding HasCurrentValues, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                        <TextBlock Text="{Binding BlockedText}" TextWrapping="Wrap"
+                                                                   Foreground="{DynamicResource ErrorForegroundBrush}"
+                                                                   Visibility="{Binding HasBlockedText, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                                         <TextBlock Text="{Binding Reason}" TextWrapping="Wrap"
                                                                    Style="{StaticResource FieldNoteStyle}"
                                                                    Visibility="{Binding HasReason, Converter={StaticResource BoolToVisibilityConverter}}"/>

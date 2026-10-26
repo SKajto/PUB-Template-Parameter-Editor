@@ -239,7 +239,8 @@ public class ShellSnapshotTests
             vm.OpenBulkCommand.Execute(null);
             Assert.True(vm.IsBulkOpen);
             Assert.Equal(3, vm.BulkEligibleCount); // t4 declares the name twice, so it cannot be written safely
-            Assert.Contains("of 4 template(s)", vm.BulkSummary, StringComparison.Ordinal);
+            Assert.Contains("listed template(s)", vm.BulkSummary, StringComparison.Ordinal);
+            Assert.Contains("description:", vm.BulkSummary, StringComparison.Ordinal);
             RenderShell(window, "editing-bulk-light.png");
             vm.CloseBulkCommand.Execute(null);
 

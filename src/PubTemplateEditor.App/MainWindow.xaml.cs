@@ -48,6 +48,11 @@ public partial class MainWindow : Window
     public TextBlock CompareSummaryLabel => CompareSummaryText;
     public TextBlock BulkSummaryLabel => BulkSummaryText;
     public TextBox BulkValueEditor => BulkValueBox;
+    public CheckBox BulkValueChoice => BulkValueCheck;
+    public CheckBox BulkAccessChoice => BulkAccessCheck;
+    public CheckBox BulkDescriptionChoice => BulkDescriptionCheck;
+    public ComboBox BulkAccessEditor => BulkAccessBox;
+    public TextBox BulkDescriptionEditor => BulkDescriptionBox;
     public ComboBox DetailAccessChoiceEditor => DetailAccessCombo;
     public Button ApplyEditsActionButton => ApplyEditsButton;
     public Button RevertFormActionButton => RevertFormButton;

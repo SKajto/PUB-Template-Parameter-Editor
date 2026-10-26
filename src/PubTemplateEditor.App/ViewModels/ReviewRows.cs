@@ -258,12 +258,16 @@ public sealed class BulkTargetRowItem : ViewModelBase
 {
     private bool _isChecked;
 
-    public BulkTargetRowItem(BulkTarget target)
+    public BulkTargetRowItem(BulkTarget target, IReadOnlyList<FieldKind> chosenFields)
     {
         Target = target;
+        ChosenFields = chosenFields;
     }
 
     public BulkTarget Target { get; }
+
+    /// <summary>Which fields this run copies; the row explains each of them for this template.</summary>
+    public IReadOnlyList<FieldKind> ChosenFields { get; }
 
     public string FilePath => Target.FilePath;
 
@@ -281,16 +285,20 @@ public sealed class BulkTargetRowItem : ViewModelBase
         }
     }
 
-    public bool IsSelectable => Target.IsSelectable;
+    /// <summary>
+    /// Tickable only when this template can actually receive at least one of the chosen fields. A
+    /// template that takes the value but has no description property stays tickable - the value still
+    /// goes through - and the blocked field is explained below it.
+    /// </summary>
+    public bool IsSelectable => ChosenFields.Any(Target.CanWrite);
 
     public bool IsSelected => IsChecked && IsSelectable;
 
     public string StatusLabel => Target.Status switch
     {
-        BulkTargetStatus.Eligible => "eligible",
+        BulkTargetStatus.Eligible => "one declaration found",
         BulkTargetStatus.Missing => "no such parameter",
         BulkTargetStatus.Ambiguous => "declared more than once",
-        BulkTargetStatus.ReadOnlyShape => "read-only value",
         BulkTargetStatus.NotLoaded => "not read in this session",
         _ => Target.Status.ToString(),
     };
@@ -299,12 +307,34 @@ public sealed class BulkTargetRowItem : ViewModelBase
 
     public bool HasReason => !string.IsNullOrEmpty(Target.Reason);
 
-    public string CurrentValueText => Target.CurrentValue switch
-    {
-        null => "(no default property)",
-        "" => "(empty)",
-        _ => Target.CurrentValue,
-    };
+    /// <summary>What this template holds today for each chosen field, so the change is comparable here.</summary>
+    public string CurrentValuesText => string.Join("   ·   ", ChosenFields.Select(Show));
 
-    public bool CurrentHasDraft => Target.CurrentHasDraft;
+    public bool HasCurrentValues => Target.IsSelectable && ChosenFields.Count > 0;
+
+    private string Show(FieldKind field)
+    {
+        BulkFieldTarget? plan = Target.Field(field);
+        string label = TemplateFieldRules.DisplayName(field);
+        return plan?.CurrentValue switch
+        {
+            null => $"{label}: (nothing to read)",
+            "" => $"{label}: (empty)",
+            string value => $"{label}: {Clip(value)}",
+        };
+    }
+
+    private static string Clip(string value) =>
+        value.Length <= 60 ? value : value[..57] + "…";
+
+    /// <summary>The chosen fields this template cannot take, each with the plan's reason.</summary>
+    public string BlockedText => string.Join(" ", ChosenFields
+        .Where(f => !Target.CanWrite(f))
+        .Select(f =>
+        {
+            BulkFieldTarget? plan = Target.Field(f);
+            return $"{TemplateFieldRules.DisplayName(f)}: {plan?.Reason ?? Target.Reason ?? "not available in this template"}";
+        }));
+
+    public bool HasBlockedText => Target.IsSelectable && BlockedText.Length > 0;
 }

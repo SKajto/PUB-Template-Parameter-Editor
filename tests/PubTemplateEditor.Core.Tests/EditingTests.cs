@@ -23,7 +23,8 @@ internal static class EditingFixtures
         string? defaultValue,
         string access = "internal",
         string? description = "some description",
-        string? type = "user")
+        string? type = "user",
+        bool withAccess = true)
     {
         var sb = new System.Text.StringBuilder();
         sb.Append("<variable><feature tag=\"definition\">");
@@ -38,7 +39,11 @@ internal static class EditingFixtures
             sb.Append($"<property name=\"type\" value=\"{type}\"></property>");
         }
 
-        sb.Append($"<property name=\"access\" value=\"{access}\"></property>");
+        if (withAccess)
+        {
+            sb.Append($"<property name=\"access\" value=\"{access}\"></property>");
+        }
+
         if (defaultValue is not null)
         {
             sb.Append($"<property name=\"default\" value=\"{defaultValue}\"></property>");
@@ -492,6 +497,8 @@ public class BulkPlanTests
     private const string FileC = @"C:\templates\c.dta";
     private const string FileD = @"C:\templates\d.dta";
     private const string FileE = @"C:\templates\e.dta";
+    private const string FileF = @"C:\templates\f.dta";
+    private const string FileG = @"C:\templates\g.dta";
 
     private static TemplateRecord MissingOne() => EditingFixtures.Record(
         FileB, EditingFixtures.Template(EditingFixtures.Variable("alpha", "OLD_B", access: "external", description: "B desc")));
@@ -506,6 +513,15 @@ public class BulkPlanTests
 
     private static TemplateRecord UnsupportedDefault() => EditingFixtures.Record(
         FileE, EditingFixtures.Template(EditingFixtures.Variable("alpha", "one\ntwo")));
+
+    /// <summary>The name is there, but this template has no access property and no description property.</summary>
+    private static TemplateRecord WithoutAccessOrDescription() => EditingFixtures.Record(
+        FileF, EditingFixtures.Template(EditingFixtures.Variable(
+            "alpha", "OLD_F", withAccess: false, description: null)));
+
+    /// <summary>An access value outside the observed vocabulary: shown, never written by bulk.</summary>
+    private static TemplateRecord UnusualAccess() => EditingFixtures.Record(
+        FileG, EditingFixtures.Template(EditingFixtures.Variable("alpha", "OLD_G", access: "public")));
 
     [Fact]
     public void EveryTargetGetsAStatusAndIneligibleTargetsGetAReason()
@@ -529,25 +545,165 @@ public class BulkPlanTests
         Assert.Contains("is not declared", ByPath(FileB).Reason, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(BulkTargetStatus.Ambiguous, ByPath(FileC).Status);
         Assert.Contains("writing would be a guess", ByPath(FileC).Reason, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(BulkTargetStatus.ReadOnlyShape, ByPath(FileD).Status);
-        Assert.Contains("no 'default' property", ByPath(FileD).Reason, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(BulkTargetStatus.ReadOnlyShape, ByPath(FileE).Status);
         Assert.Equal(BulkTargetStatus.NotLoaded, ByPath(FileE + ".unread").Status);
         Assert.False(ByPath(FileC).IsSelectable);
-        Assert.Equal(2, plan.Count(t => t.Status == BulkTargetStatus.ReadOnlyShape));
+
+        // A template is no longer rejected as a whole because one field has an unusual shape: the
+        // field that cannot be written is refused on its own, with the parser's reason.
+        Assert.Equal(BulkTargetStatus.Eligible, ByPath(FileD).Status);
+        Assert.False(ByPath(FileD).CanWrite(FieldKind.DefaultValue));
+        Assert.Contains("'default'", ReasonOf(ByPath(FileD), FieldKind.DefaultValue),
+            StringComparison.Ordinal);
+        Assert.True(ByPath(FileD).CanWrite(FieldKind.Access));
+        Assert.True(ByPath(FileD).CanWrite(FieldKind.Description));
+
+        Assert.Equal(BulkTargetStatus.Eligible, ByPath(FileE).Status);
+        Assert.False(ByPath(FileE).CanWrite(FieldKind.DefaultValue));
+        Assert.True(ByPath(FileE).CanWrite(FieldKind.Access));
+
+        // Every plan lists the three bulk fields, writable or not, so the UI can explain each one.
+        Assert.Equal(3, ByPath(FileA).Fields.Count);
+        Assert.All(BulkPlan.BulkFields, field => Assert.True(ByPath(FileA).CanWrite(field)));
     }
 
+    private static string ReasonOf(BulkTarget target, FieldKind field) =>
+        target.Field(field)?.Reason ?? string.Empty;
+
     [Fact]
-    public void BulkOnlyChangesDefaultValuesAndNeverOffersOtherFields()
+    public void AFieldThatIsAbsentOrOutsideTheVocabularyIsRefusedOnItsOwn()
     {
-        var records = new[] { EditingFixtures.Record(FileA, EditingFixtures.Template(EditingFixtures.Variable("alpha", "OLD_A"))) };
+        var records = new[] { WithoutAccessOrDescription(), UnusualAccess() };
 
-        Assert.Throws<ArgumentException>(() => BulkPlan.Plan("alpha", records, new DraftStore(), null, FieldKind.Access));
-        Assert.Throws<ArgumentException>(() => BulkPlan.Plan("alpha", records, new DraftStore(), null, FieldKind.Description));
+        IReadOnlyList<BulkTarget> plan = BulkPlan.Plan("alpha", records, new DraftStore());
+        BulkTarget noProperties = plan.Single(t => t.FilePath == FileF);
+        BulkTarget oddAccess = plan.Single(t => t.FilePath == FileG);
+
+        Assert.Equal(BulkTargetStatus.Eligible, noProperties.Status);
+        Assert.True(noProperties.CanWrite(FieldKind.DefaultValue));
+        Assert.False(noProperties.CanWrite(FieldKind.Access));
+        Assert.Contains("access", ReasonOf(noProperties, FieldKind.Access), StringComparison.OrdinalIgnoreCase);
+        Assert.False(string.IsNullOrEmpty(ReasonOf(noProperties, FieldKind.Access)));
+        Assert.False(noProperties.CanWrite(FieldKind.Description));
+        Assert.Contains("description", ReasonOf(noProperties, FieldKind.Description), StringComparison.OrdinalIgnoreCase);
+        Assert.False(string.IsNullOrEmpty(ReasonOf(noProperties, FieldKind.Description)));
+
+        Assert.True(oddAccess.CanWrite(FieldKind.DefaultValue));
+        Assert.False(oddAccess.CanWrite(FieldKind.Access));
+        Assert.Contains("access", ReasonOf(oddAccess, FieldKind.Access), StringComparison.OrdinalIgnoreCase);
+        Assert.False(string.IsNullOrEmpty(ReasonOf(oddAccess, FieldKind.Access)));
+
+        // Staging only the fields that work still writes them; the refused ones are reported, not skipped.
+        var drafts = new DraftStore();
+        var outcomes = BulkPlan.Stage(
+            "alpha",
+            new Dictionary<FieldKind, string>
+            {
+                [FieldKind.Access] = "external",
+                [FieldKind.Description] = "A desc",
+            },
+            [noProperties], records, drafts).ToList();
+
+        Assert.Equal(2, outcomes.Count(o => o.Result.Status == StageStatus.Rejected));
+        Assert.False(drafts.HasAny);
+        Assert.Contains("access", outcomes[0].Result.Reason, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void StagedBulkValueLeavesTargetAccessAndDescriptionUntouched()
+    public void ValueAccessAndDescriptionAreStagedTogetherForTheSelectedTargets()
+    {
+        var records = new[] { MissingOne(), EditingFixtures.Record(
+            FileA, EditingFixtures.Template(EditingFixtures.Variable("alpha", "OLD_A"))) };
+
+        // b.dta declares alpha as external, a.dta as internal: the shared access value is a real
+        // change in one template and a no-op in the other, and both answers are reported.
+        string[] baselineAccess =
+        [
+            .. records.Select(r => EditingFixtures.Decl(r, "alpha").Access.LogicalValue ?? string.Empty),
+        ];
+
+        var drafts = new DraftStore();
+        IReadOnlyList<BulkTarget> plan = BulkPlan.Plan("alpha", records, drafts);
+
+        var outcomes = BulkPlan.Stage(
+            "alpha",
+            new Dictionary<FieldKind, string>
+            {
+                [FieldKind.DefaultValue] = "SAME FOR ALL",
+                [FieldKind.Access] = "external",
+                [FieldKind.Description] = "Copied description",
+            },
+            plan.Where(t => t.IsSelectable), records, drafts).ToList();
+
+        Assert.Equal(6, outcomes.Count);
+        Assert.Equal(5, outcomes.Count(o => o.Result.Status == StageStatus.Staged));
+        Assert.Equal(1, outcomes.Count(o => o.Result.Status == StageStatus.ClearedAsNoOp));
+        Assert.DoesNotContain(outcomes, o => o.Result.Status == StageStatus.Rejected);
+        Assert.Equal(5, drafts.Count);
+
+        foreach (TemplateRecord record in records)
+        {
+            VariableDeclaration declaration = EditingFixtures.Decl(record, "alpha");
+            Assert.Equal("SAME FOR ALL", drafts.EffectiveValue(record.FilePath, declaration, FieldKind.DefaultValue));
+            Assert.Equal("external", drafts.EffectiveValue(record.FilePath, declaration, FieldKind.Access));
+            Assert.Equal("Copied description", drafts.EffectiveValue(record.FilePath, declaration, FieldKind.Description));
+        }
+
+        // The parsed baseline model still describes the files as they are on disk.
+        Assert.Equal("external", baselineAccess[0]);
+        Assert.Equal("internal", baselineAccess[1]);
+    }
+
+    [Fact]
+    public void ChoosingOneFieldAloneStagesOnlyThatField()
+    {
+        TemplateRecord record = MissingOne(); // access external, description "B desc"
+        var drafts = new DraftStore();
+        IReadOnlyList<BulkTarget> plan = BulkPlan.Plan("alpha", [record], drafts);
+
+        var noop = BulkPlan.Stage("alpha",
+            new Dictionary<FieldKind, string> { [FieldKind.Access] = "external" },
+            plan, [record], drafts).Single();
+
+        // The target already holds that access: reported as a no-op, and nothing is staged for it.
+        Assert.Equal(StageStatus.ClearedAsNoOp, noop.Result.Status);
+        Assert.False(drafts.HasAny);
+
+        var outcomes = BulkPlan.Stage("alpha",
+            new Dictionary<FieldKind, string> { [FieldKind.Description] = "Only the description" },
+            plan, [record], drafts).ToList();
+
+        Assert.Single(outcomes);
+        Assert.Equal(StageStatus.Staged, outcomes.Single().Result.Status);
+        VariableDeclaration declaration = EditingFixtures.Decl(record, "alpha");
+        Assert.Equal("Only the description", drafts.EffectiveValue(FileB, declaration, FieldKind.Description));
+        Assert.Equal("OLD_B", drafts.EffectiveValue(FileB, declaration, FieldKind.DefaultValue));
+    }
+
+    [Fact]
+    public void BulkNeedsAFieldAndAnAccessValueInTheObservedVocabulary()
+    {
+        TemplateRecord record = MissingOne();
+        var drafts = new DraftStore();
+        IReadOnlyList<BulkTarget> plan = BulkPlan.Plan("alpha", [record], drafts);
+
+        Assert.Throws<ArgumentException>(() => BulkPlan.Stage(
+            "alpha", new Dictionary<FieldKind, string>(), plan, [record], drafts));
+
+        var outcomes = BulkPlan.Stage(
+            "alpha",
+            new Dictionary<FieldKind, string> { [FieldKind.Access] = "public" },
+            plan, [record], drafts).ToList();
+
+        Assert.Single(outcomes);
+        Assert.Equal(StageStatus.Rejected, outcomes.Single().Result.Status);
+        Assert.Contains("internal / external", outcomes.Single().Result.Reason, StringComparison.OrdinalIgnoreCase);
+        Assert.False(drafts.HasAny);
+    }
+
+
+
+    [Fact]
+    public void AValueOnlyBulkRunLeavesTargetAccessAndDescriptionUntouched()
     {
         TemplateRecord target = MissingOne(); // access external, description "B desc"
         VariableDeclaration declaration = EditingFixtures.Decl(target, "alpha");
@@ -575,29 +731,42 @@ public class BulkPlanTests
         var drafts = new DraftStore();
         var records = new[] { Ambiguous(), UnsupportedDefault(), MissingOne() };
 
-        // A hand-made target list that ignores the plan must still be refused by the core layer.
+        var proposed = new Dictionary<FieldKind, string> { [FieldKind.DefaultValue] = "x" };
+
+        // A hand-made target list that ignores the plan must still be refused by the core layer:
+        // ambiguous names and unread templates never stage, whatever the UI sends.
         var forged = new[]
         {
-            new BulkTarget(FileC, "c.dta", BulkTargetStatus.Ambiguous, "'alpha' is declared 2 times", 0, null, false),
-            new BulkTarget(FileE, "e.dta", BulkTargetStatus.ReadOnlyShape, "unobserved default shape", 0, null, false),
+            new BulkTarget(FileC, "c.dta", BulkTargetStatus.Ambiguous, "'alpha' is declared 2 times", -1, []),
+            new BulkTarget(FileE, "e.dta", BulkTargetStatus.NotLoaded, "not read in this session", -1, []),
         };
 
-        foreach ((BulkTarget _, StageResult result) in BulkPlan.StageValues("alpha", "x", forged, records, drafts))
+        foreach ((BulkTarget _, FieldKind _, StageResult result) in BulkPlan.Stage(
+            "alpha", proposed, forged, records, drafts))
         {
             Assert.Equal(StageStatus.Rejected, result.Status);
         }
 
         Assert.False(drafts.HasAny);
 
-        // Only plan-eligible targets stage through the same call, and only default values.
+        // Name-level eligible targets go through; the field-level rule still refuses the one whose
+        // default value has an unsupported shape, and says why.
         IReadOnlyList<BulkTarget> plan = BulkPlan.Plan("alpha", records, drafts);
-        IReadOnlyList<(BulkTarget Target, StageResult Result)> outcomes =
-            BulkPlan.StageValues("alpha", "NEW", plan.Where(t => t.IsSelectable), records, drafts);
+        var outcomes = BulkPlan.Stage(
+            "alpha",
+            new Dictionary<FieldKind, string> { [FieldKind.DefaultValue] = "NEW" },
+            plan.Where(t => t.IsSelectable), records, drafts).ToList();
 
-        Assert.Single(outcomes);
-        Assert.Equal(StageStatus.Staged, outcomes[0].Result.Status);
-        Assert.Equal(1, drafts.Count);
+        Assert.Equal(2, outcomes.Count);
+        Assert.Equal(1, outcomes.Count(o => o.Result.Status == StageStatus.Staged));
+        Assert.Single(drafts.Changes);
         Assert.Equal(FieldKind.DefaultValue, drafts.Changes.Single().Field);
+
+        (BulkTarget refusedTarget, FieldKind refusedField, StageResult refused) =
+            outcomes.Single(o => o.Result.Status == StageStatus.Rejected);
+        Assert.Equal(FileE, refusedTarget.FilePath);
+        Assert.Equal(FieldKind.DefaultValue, refusedField);
+        Assert.False(string.IsNullOrEmpty(refused.Reason));
     }
 
     [Fact]

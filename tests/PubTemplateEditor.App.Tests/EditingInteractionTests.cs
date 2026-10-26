@@ -379,7 +379,14 @@ public class EditingInteractionTests
 
             vm.OpenBulkCommand.Execute(null);
             Assert.True(vm.IsBulkOpen);
+
+            // The panel starts as "copy this parameter": each of the three fields carries the source's
+            // current value and is offered on its own.
             Assert.Equal("OLD_A", vm.BulkValueDraft);
+            Assert.Equal("external", vm.BulkAccessChoice);
+            Assert.Equal("A desc", vm.BulkDescriptionDraft);
+            Assert.True(vm.BulkApplyValue && vm.BulkApplyAccess && vm.BulkApplyDescription);
+            Assert.Equal([FieldKind.DefaultValue, FieldKind.Access, FieldKind.Description], vm.ChosenBulkFields);
 
             BulkTargetRowItem ByName(string name) => vm.BulkTargets.Single(t => t.FileName == name);
             Assert.Equal(BulkTargetStatus.Eligible, ByName("t1.dta").Target.Status);
@@ -389,17 +396,34 @@ public class EditingInteractionTests
             Assert.False(ByName("t2.dta").IsChecked);
             Assert.Contains("declared 2 times", ByName("t2.dta").Reason, StringComparison.Ordinal);
             Assert.Equal(BulkTargetStatus.Missing, ByName("t3.dta").Target.Status);
-            Assert.Equal(BulkTargetStatus.ReadOnlyShape, ByName("t4.dta").Target.Status);
-            Assert.Contains("no 'default' property", ByName("t4.dta").Reason, StringComparison.OrdinalIgnoreCase);
+
+            // t4 has the name but no default property: it is still a target, it simply cannot receive
+            // that one field, and the card says so instead of disappearing from the list.
+            Assert.Equal(BulkTargetStatus.Eligible, ByName("t4.dta").Target.Status);
+            Assert.True(ByName("t4.dta").Target.CanWrite(FieldKind.Access));
+            Assert.True(ByName("t4.dta").Target.CanWrite(FieldKind.Description));
+            Assert.False(ByName("t4.dta").Target.CanWrite(FieldKind.DefaultValue));
+            Assert.True(ByName("t4.dta").IsSelectable);
+            Assert.Contains("default value", ByName("t4.dta").BlockedText, StringComparison.OrdinalIgnoreCase);
+
             Assert.Equal(BulkTargetStatus.NotLoaded, ByName("t5.dta").Target.Status);
             Assert.Equal("not read in this session", ByName("t5.dta").StatusLabel);
 
-            Assert.Contains("can receive this value", vm.BulkSummary, StringComparison.Ordinal);
+            Assert.Contains("default value:", vm.BulkSummary, StringComparison.Ordinal);
+            Assert.Contains("access:", vm.BulkSummary, StringComparison.Ordinal);
+            Assert.Contains("description:", vm.BulkSummary, StringComparison.Ordinal);
+            Assert.Contains("can receive at least one chosen field", vm.BulkSummary, StringComparison.Ordinal);
 
+            // This run asks for the value only: the two other switches are turned off first.
+            vm.BulkApplyAccess = false;
+            vm.BulkApplyDescription = false;
+            Assert.Equal([FieldKind.DefaultValue], vm.ChosenBulkFields);
             vm.BulkValueDraft = "SAME FOR ALL";
             vm.ConfirmBulkCommand.Execute(null);
 
             Assert.False(vm.IsBulkOpen);
+            Assert.Contains("Staged 1 change(s) across 1 template(s): default value 1.", vm.ActionNotice,
+                StringComparison.Ordinal);
             Assert.Equal(1, vm.StagedChangeCount);
             Assert.Equal("SAME FOR ALL", alpha.DefaultPreview);
             Assert.Equal(1, vm.AllFiles.Single(f => f.FileName == "t1.dta").StagedEditCount);
@@ -412,6 +436,125 @@ public class EditingInteractionTests
             Assert.False(vm.DetailHasAccessDraft);
             Assert.False(vm.DetailHasDescriptionDraft);
             Assert.True(vm.DetailHasDefaultValueDraft);
+        });
+    }
+
+    [Fact]
+    public async Task BulkCopiesAccessAndDescriptionOntoTheSameNamedParameter()
+    {
+        string templates = TempDir("templates");
+        Write(templates, "t1.dta", TemplateXml(Variable("alpha", "SRC_VALUE", access: "internal", description: "SRC desc")));
+        Write(templates, "t2.dta", TemplateXml(
+            Variable("alpha", "OTHER_VALUE", access: "external", description: "OTHER desc"),
+            Variable("beta", "keep me")));
+        Write(templates, "t3.dta", TemplateXml(Variable("alpha", "THIRD", access: "external", description: "THIRD desc")));
+
+        string settings = TempDir("settings");
+        WorkspaceViewModel vm = null!;
+        Task read = Task.CompletedTask;
+        _host.Do(() =>
+        {
+            vm = NewViewModel(settings, templates);
+            read = vm.ReadParametersCommand.ExecuteAsync(null);
+        });
+        await read;
+
+        _host.Do(() =>
+        {
+            vm.SelectedParameter = vm.VisibleParameters.Single(r => r.Name == "alpha");
+            vm.OpenBulkCommand.Execute(null);
+
+            // All three fields are already offered with the source's values; the user only picks targets.
+            vm.BulkTargets.Single(t => t.FileName == "t1.dta").IsChecked = false;
+            Assert.Equal(2, vm.SelectedBulkTargetCount);
+
+            vm.ConfirmBulkCommand.Execute(null);
+
+            Assert.Equal(6, vm.StagedChangeCount);   // three fields in each of two templates
+            Assert.Contains("Staged 6 change(s) across 2 template(s)", vm.ActionNotice, StringComparison.Ordinal);
+            Assert.Contains("default value 2, access 2, description 2", vm.ActionNotice, StringComparison.Ordinal);
+
+            foreach (string file in new[] { "t2.dta", "t3.dta" })
+            {
+                Assert.Equal(3, vm.AllFiles.Single(f => f.FileName == file).StagedEditCount);
+            }
+
+            // The review list names each field per file, so nothing is applied invisibly.
+            vm.OpenReviewCommand.Execute(null);
+            string[] applied = vm.ReviewRows
+                .Where(r => r.FileName == "t2.dta")
+                .Select(r => r.FieldLabel)
+                .ToArray();
+            // The review list keeps the form's own field order; what matters is that all three appear.
+            Assert.Equal(["access", "default value", "description"], applied.OrderBy(x => x, StringComparer.Ordinal).ToArray());
+            vm.CloseReviewCommand.Execute(null);
+        });
+
+        // Reading another template's row shows the staged access and description, not the file's.
+        _host.Do(() =>
+        {
+            vm.SelectActiveFile(vm.AllFiles.Single(f => f.FileName == "t2.dta"));
+            vm.SelectedParameter = vm.VisibleParameters.Single(r => r.Name == "alpha");
+
+            Assert.Equal("SRC_VALUE", vm.DetailDefaultValue);
+            Assert.Equal("internal", vm.DetailAccess);
+            Assert.Equal("SRC desc", vm.DetailDescription);
+            Assert.True(vm.DetailHasDefaultValueDraft);
+            Assert.True(vm.DetailHasAccessDraft);
+            Assert.True(vm.DetailHasDescriptionDraft);
+
+            // An untouched parameter in the same file is untouched: bulk matched the exact name.
+            vm.SelectedParameter = vm.VisibleParameters.Single(r => r.Name == "beta");
+            Assert.Equal("keep me", vm.DetailDefaultValue);
+            Assert.False(vm.DetailHasDefaultValueDraft);
+            Assert.False(vm.DetailHasAccessDraft);
+            Assert.False(vm.DetailHasDescriptionDraft);
+        });
+    }
+
+    [Fact]
+    public async Task BulkWritesTheFieldsATargetCanHoldAndLeavesTheRestExplained()
+    {
+        string templates = TempDir("templates");
+        Write(templates, "t1.dta", TemplateXml(Variable("alpha", "SRC", access: "internal", description: "SRC desc")));
+
+        // This target has no default property at all: the access and description still apply to it.
+        string noDefault = "<variable><feature tag=\"definition\">" +
+                           "<property name=\"name\" value=\"alpha\"></property>" +
+                           "<property name=\"description\"><expression type=\"constant\">OLD desc</expression></property>" +
+                           "<property name=\"type\" value=\"user\"></property>" +
+                           "<property name=\"access\" value=\"external\"></property>" +
+                           "</feature></variable>";
+        Write(templates, "t2.dta", TemplateXml(noDefault));
+
+        string settings = TempDir("settings");
+        WorkspaceViewModel vm = null!;
+        Task read = Task.CompletedTask;
+        _host.Do(() =>
+        {
+            vm = NewViewModel(settings, templates);
+            read = vm.ReadParametersCommand.ExecuteAsync(null);
+        });
+        await read;
+
+        _host.Do(() =>
+        {
+            vm.SelectedParameter = vm.VisibleParameters.Single(r => r.Name == "alpha");
+            vm.OpenBulkCommand.Execute(null);
+
+            BulkTargetRowItem target = vm.BulkTargets.Single(t => t.FileName == "t2.dta");
+            Assert.True(target.IsSelectable);
+            Assert.Contains("default value", target.BlockedText, StringComparison.OrdinalIgnoreCase);
+
+            vm.ConfirmBulkCommand.Execute(null);
+
+            Assert.Equal(2, vm.StagedChangeCount);
+            Assert.Contains("1 field(s) were refused", vm.ActionNotice, StringComparison.Ordinal);
+            Assert.Contains("no 'default' property", vm.ActionError, StringComparison.Ordinal);
+
+            Assert.Equal("internal", vm.DetailAccess);
+            Assert.Equal("SRC desc", vm.DetailDescription);
+            Assert.False(vm.DetailHasDefaultValueDraft);
         });
     }
 

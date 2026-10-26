@@ -40,6 +40,11 @@ public sealed partial class WorkspaceViewModel
     private string _detailDefaultValue = string.Empty;
     private string _detailDescription = string.Empty;
     private string? _bulkValueDraft;
+    private string _bulkAccessChoice = "external";
+    private string _bulkDescriptionDraft = string.Empty;
+    private bool _bulkApplyValue;
+    private bool _bulkApplyAccess;
+    private bool _bulkApplyDescription;
     private bool _isCompareOpen;
     private bool _isBulkOpen;
     private bool _compareSelectedOnly;
@@ -48,6 +53,9 @@ public sealed partial class WorkspaceViewModel
     private bool _canEditDescription;
     private string _compareSummary = string.Empty;
     private string _bulkSummary = string.Empty;
+
+    /// <summary>Which templates the user ticked, by path, so switching fields keeps their choice.</summary>
+    private readonly HashSet<string> _bulkChecked = new(StringComparer.Ordinal);
 
     public RelayCommand ApplyEditsCommand { get; private set; } = null!;
     public RelayCommand RevertFormCommand { get; private set; } = null!;
@@ -307,6 +315,84 @@ public sealed partial class WorkspaceViewModel
         set => Set(ref _bulkValueDraft, value);
     }
 
+    /// <summary>
+    /// Which fields the bulk operation copies. Each of the three can be applied on its own: a user
+    /// who wants the same access everywhere but different defaults per template must be able to say
+    /// so, and a user who wants all three must not have to run the panel three times.
+    /// </summary>
+    public bool BulkApplyValue
+    {
+        get => _bulkApplyValue;
+        set
+        {
+            if (Set(ref _bulkApplyValue, value))
+            {
+                BulkFieldChoiceChanged();
+            }
+        }
+    }
+
+    public bool BulkApplyAccess
+    {
+        get => _bulkApplyAccess;
+        set
+        {
+            if (Set(ref _bulkApplyAccess, value))
+            {
+                BulkFieldChoiceChanged();
+            }
+        }
+    }
+
+    public bool BulkApplyDescription
+    {
+        get => _bulkApplyDescription;
+        set
+        {
+            if (Set(ref _bulkApplyDescription, value))
+            {
+                BulkFieldChoiceChanged();
+            }
+        }
+    }
+
+    public string BulkAccessChoice
+    {
+        get => _bulkAccessChoice;
+        set => Set(ref _bulkAccessChoice, value);
+    }
+
+    public string BulkDescriptionDraft
+    {
+        get => _bulkDescriptionDraft;
+        set => Set(ref _bulkDescriptionDraft, value);
+    }
+
+    /// <summary>The fields chosen for this bulk run, in the order Core expects them.</summary>
+    public IReadOnlyList<FieldKind> ChosenBulkFields
+    {
+        get
+        {
+            var fields = new List<FieldKind>(3);
+            if (_bulkApplyValue)
+            {
+                fields.Add(FieldKind.DefaultValue);
+            }
+            if (_bulkApplyAccess)
+            {
+                fields.Add(FieldKind.Access);
+            }
+            if (_bulkApplyDescription)
+            {
+                fields.Add(FieldKind.Description);
+            }
+
+            return fields;
+        }
+    }
+
+    public bool HasBulkFieldChoice => ChosenBulkFields.Count > 0;
+
     public string BulkSummary
     {
         get => _bulkSummary;
@@ -320,6 +406,9 @@ public sealed partial class WorkspaceViewModel
     }
 
     public int BulkEligibleCount => BulkTargets.Count(t => t.IsSelectable);
+
+    /// <summary>How many of the selected targets would receive a given field.</summary>
+    public int BulkFieldCount(FieldKind field) => BulkTargets.Count(t => t.IsChecked && t.Target.CanWrite(field));
 
     public bool HasBulkSummary => !string.IsNullOrEmpty(_bulkSummary);
 
@@ -580,10 +669,48 @@ public sealed partial class WorkspaceViewModel
         }
 
         _isBulkOpen = true;
+
+        // The panel starts as "make the other templates look like this one": every field carries this
+        // parameter's current value, and each of the three can be switched off. A field this parameter
+        // cannot even offer (read-only shape, absent property) starts switched off, because copying it
+        // would stage nothing anywhere.
+        string? sourceAccess = _selectedParameter.EffectiveAccess;
+        bool accessIsCopyable = _canEditAccess
+            && sourceAccess is not null
+            && TemplateFieldRules.IsSupportedAccess(sourceAccess);
+
         _bulkValueDraft = _selectedParameter.EffectiveDefaultValue ?? string.Empty;
+        _bulkAccessChoice = accessIsCopyable ? sourceAccess! : TemplateFieldRules.SupportedAccessChoices[0];
+        _bulkDescriptionDraft = _selectedParameter.EffectiveDescription ?? string.Empty;
+        _bulkApplyValue = _canEditDefaultValue;
+        _bulkApplyAccess = accessIsCopyable;
+        _bulkApplyDescription = _canEditDescription;
+        _bulkChecked.Clear();
+
         RebuildBulkTargets();
         Raise(nameof(IsBulkOpen));
         Raise(nameof(BulkValueDraft));
+        RaiseBulkChoices();
+    }
+
+    private void RaiseBulkChoices()
+    {
+        Raise(nameof(BulkApplyValue));
+        Raise(nameof(BulkApplyAccess));
+        Raise(nameof(BulkApplyDescription));
+        Raise(nameof(BulkAccessChoice));
+        Raise(nameof(BulkDescriptionDraft));
+        Raise(nameof(ChosenBulkFields));
+        Raise(nameof(HasBulkFieldChoice));
+        CommandManager.InvalidateRequerySuggested();
+    }
+
+    private void BulkFieldChoiceChanged()
+    {
+        // Which targets can receive anything depends on the chosen fields, so the list and the summary
+        // are rebuilt; the ticks the user made are remembered per file.
+        RebuildBulkTargets();
+        RaiseBulkChoices();
     }
 
     private void CloseBulk()
@@ -592,8 +719,12 @@ public sealed partial class WorkspaceViewModel
         BulkTargets.Clear();
         BulkSummary = string.Empty;
         _bulkValueDraft = null;
+        _bulkDescriptionDraft = string.Empty;
+        _bulkApplyValue = _bulkApplyAccess = _bulkApplyDescription = false;
+        _bulkChecked.Clear();
         Raise(nameof(IsBulkOpen));
         Raise(nameof(BulkValueDraft));
+        RaiseBulkChoices();
     }
 
     private void RebuildBulkTargets()
@@ -604,18 +735,45 @@ public sealed partial class WorkspaceViewModel
             return;
         }
 
+        IReadOnlyList<FieldKind> chosen = ChosenBulkFields;
+
         foreach (BulkTarget target in BulkPlan.Plan(_selectedParameter.Name, CandidateRecords, Drafts, BulkScope))
         {
-            BulkTargets.Add(new BulkTargetRowItem(target)
-            {
-                IsChecked = target.Status == BulkTargetStatus.Eligible,
-            });
+            var row = new BulkTargetRowItem(target, chosen);
+            row.IsChecked = _bulkChecked.Count == 0
+                ? row.IsSelectable
+                : _bulkChecked.Contains(target.FilePath);
+            BulkTargets.Add(row);
         }
 
-        BulkSummary = $"{BulkTargets.Count(t => t.IsSelectable)} of {BulkTargets.Count} template(s) can receive this value.";
+        BulkSummary = DescribeBulkPlan(chosen);
         Raise(nameof(SelectedBulkTargetCount));
         Raise(nameof(BulkEligibleCount));
     }
+
+    /// <summary>
+    /// One line that answers the question the panel is really asking: for each chosen field, how many
+    /// of the listed templates can receive it. A single aggregate number would hide the interesting
+    /// case - a template that takes the value but has no description property to write into.
+    /// </summary>
+    private string DescribeBulkPlan(IReadOnlyList<FieldKind> chosen)
+    {
+        if (chosen.Count == 0)
+        {
+            return "Choose at least one field - the default value, the access or the description.";
+        }
+
+        string perField = string.Join("  ·  ", chosen.Select(f =>
+            $"{TemplateFieldRules.DisplayName(f)}: {BulkFieldCountFor(f)} of {BulkTargets.Count(t => t.Target.IsSelectable)}"));
+
+        int receiving = BulkTargets.Count(t => t.IsSelectable);
+        int blocked = BulkTargets.Count(t => !t.IsSelectable);
+        return $"{perField} (of {BulkTargets.Count} listed template(s))  ·  "
+             + $"{receiving} can receive at least one chosen field"
+             + (blocked > 0 ? $"  ·  {blocked} cannot, and will be explained" : string.Empty);
+    }
+
+    private int BulkFieldCountFor(FieldKind field) => BulkTargets.Count(t => t.Target.CanWrite(field));
 
     private void ConfirmBulkApply()
     {
@@ -624,16 +782,29 @@ public sealed partial class WorkspaceViewModel
             return;
         }
 
-        string proposed = _bulkValueDraft ?? string.Empty;
-        var selected = BulkTargets.Where(t => t.IsChecked).Select(t => t.Target).ToList();
-        if (selected.Count == 0)
+        IReadOnlyList<FieldKind> chosen = ChosenBulkFields;
+        if (chosen.Count == 0)
         {
-            ActionError = "No target template is selected for this value.";
+            ActionError = "Choose at least one field to apply: the default value, the access or the description.";
             return;
         }
 
-        IReadOnlyList<(BulkTarget Target, StageResult Result)> outcomes =
-            BulkPlan.StageValues(_selectedParameter.Name, proposed, selected, CandidateRecords, Drafts);
+        var selected = BulkTargets.Where(t => t.IsChecked && t.IsSelectable).Select(t => t.Target).ToList();
+        if (selected.Count == 0)
+        {
+            ActionError = "No target template is selected for this change.";
+            return;
+        }
+
+        var proposed = new Dictionary<FieldKind, string>
+        {
+            [FieldKind.DefaultValue] = _bulkValueDraft ?? string.Empty,
+            [FieldKind.Access] = _bulkAccessChoice,
+            [FieldKind.Description] = _bulkDescriptionDraft,
+        };
+
+        IReadOnlyList<(BulkTarget Target, FieldKind Field, StageResult Result)> outcomes =
+            BulkPlan.Stage(_selectedParameter.Name, proposed, selected, CandidateRecords, Drafts);
 
         int staged = outcomes.Count(o => o.Result.Status == StageStatus.Staged);
         int cleared = outcomes.Count(o => o.Result.Status == StageStatus.ClearedAsNoOp);
@@ -642,10 +813,24 @@ public sealed partial class WorkspaceViewModel
             .Select(o => o.Result.Reason ?? "the change was refused")
             .ToArray();
 
-        var parts = new List<string> { $"Staged the default value in {staged} template(s)." };
+        string perField = string.Join(", ", chosen.Select(field =>
+            $"{TemplateFieldRules.DisplayName(field)} {outcomes.Count(o => o.Field == field && o.Result.Status == StageStatus.Staged)}"));
+        int touched = outcomes.Where(o => o.Result.Status == StageStatus.Staged)
+            .Select(o => o.Target.FilePath).Distinct(StringComparer.Ordinal).Count();
+
+        var parts = new List<string>
+        {
+            $"Staged {staged} change(s) across {touched} template(s): {perField}.",
+        };
+
         if (cleared > 0)
         {
-            parts.Add($"{cleared} target(s) already held that value and needed no change.");
+            parts.Add($"{cleared} field(s) already held that value and needed no change.");
+        }
+
+        if (rejected.Length > 0)
+        {
+            parts.Add($"{rejected.Length} field(s) were refused and stay as they are.");
         }
 
         if (rejected.Length > 0)
@@ -911,7 +1096,7 @@ public sealed partial class WorkspaceViewModel
         OpenBulkCommand = new RelayCommand(OpenBulk, () => !IsBusy && _selectedParameter is not null);
         CloseBulkCommand = new RelayCommand(CloseBulk, () => IsBulkOpen);
         ConfirmBulkCommand = new RelayCommand(ConfirmBulkApply,
-            () => !IsBusy && IsBulkOpen && SelectedBulkTargetCount > 0 && _bulkValueDraft is not null);
+            () => !IsBusy && IsBulkOpen && SelectedBulkTargetCount > 0 && HasBulkFieldChoice);
         DiscardAllStagedCommand = new RelayCommand(DiscardAllStaged,
             () => !IsBusy && (HasStagedChanges || HasUnappliedFormEdits));
         UndoLastStagedCommand = new RelayCommand(UndoLastStaged, () => !IsBusy && Drafts.HasAny);

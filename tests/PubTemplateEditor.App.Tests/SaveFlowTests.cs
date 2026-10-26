@@ -427,6 +427,89 @@ public sealed class SaveFlowTests : IDisposable
     }
 
     [Fact]
+    public async Task BulkAppliedFieldsAreWrittenAndTheRestOfTheContainerSurvives()
+    {
+        // Bulk offers three fields at once, so the save path is checked for all of them in one go:
+        // the default value, the access (internal/external) and the description of one parameter are
+        // copied into the same-named parameter of another real .dta container.
+        string templates = Sub("templates");
+        // Written in the attribute form for access, which is the form this editor can edit; the
+        // expression form stays read-only, and the panel would then start with access switched off.
+        TestSamples.WriteSyntheticContainer(templates, "t1.dta", TemplateXml(
+            "<variable><feature tag=\"definition\">" +
+            "<property name=\"name\" value=\"alpha\"></property>" +
+            "<property name=\"description\"><expression type=\"constant\">SRC desc</expression></property>" +
+            "<property name=\"type\" value=\"user\"></property>" +
+            "<property name=\"access\" value=\"internal\"></property>" +
+            "<property name=\"default\" value=\"SRC\"></property>" +
+            "</feature></variable>"));
+
+        string target = Path.Combine(templates, "t2.dta");
+        TestSamples.WriteSyntheticContainer(templates, "t2.dta", TemplateXml(
+            "<variable><feature tag=\"definition\">" +
+            "<property name=\"name\" value=\"alpha\"></property>" +
+            "<property name=\"description\"><expression type=\"constant\">OTHER &amp; desc</expression></property>" +
+            "<property name=\"type\" value=\"user\"></property>" +
+            "<property name=\"access\" value=\"external\"></property>" +
+            "<property name=\"default\" value=\"OTHER\"></property>" +
+            "</feature></variable>"));
+
+        string source = Path.Combine(templates, "t1.dta");
+        var entriesBefore = ReadEntries(target);
+        string sourceBefore = CurrentHash(source);
+        string state = Sub("state");
+
+        WorkspaceViewModel vm = await ReadAllAsync(templates, state);
+
+        _host.Do(() =>
+        {
+            vm.SelectedParameter = vm.VisibleParameters.Single(r => r.Name == "alpha");
+            vm.OpenBulkCommand.Execute(null);
+
+            Assert.True(vm.BulkApplyValue && vm.BulkApplyAccess && vm.BulkApplyDescription);
+            vm.BulkTargets.Single(t => t.FileName == "t1.dta").IsChecked = false;
+            vm.ConfirmBulkCommand.Execute(null);
+
+            Assert.Equal(3, vm.StagedChangeCount);
+        });
+
+        await SaveAsync(vm);
+
+        _host.Do(() => Assert.True(vm.LastSaveOutcome == "Written",
+            $"{vm.LastSaveOutcome}: {vm.ActionError} {vm.SaveOutcomeSummary}"));
+
+        // Only the template entry changed; every other entry of the container keeps its bytes.
+        var entriesAfter = ReadEntries(target);
+        Assert.Equal(entriesBefore.Keys, entriesAfter.Keys);
+        foreach ((string name, byte[] before) in entriesBefore)
+        {
+            if (!string.Equals(name, "template.xml", StringComparison.OrdinalIgnoreCase))
+            {
+                Assert.True(before.SequenceEqual(entriesAfter[name]), $"{name} must keep its bytes");
+            }
+        }
+
+        // The source template was never staged, so its bytes are untouched as well.
+        Assert.Equal(sourceBefore, CurrentHash(source));
+
+        // Reading the written file back shows the copied fields, and a name that was never written.
+        var reloaded = new TemplateReaderService().Load(target, CancellationToken.None);
+        Assert.Equal(TemplateReadState.Loaded, reloaded.ReadState);
+        VariableDeclaration alpha = reloaded.Declarations.Single(d => d.ExactName == "alpha");
+        Assert.Equal("internal", alpha.Access.LogicalValue);
+        Assert.Equal("SRC", alpha.DefaultValue.LogicalValue);
+        Assert.Equal("SRC desc", alpha.Description.LogicalValue);
+        Assert.Equal("user", alpha.XmlTypeProperty);
+
+        // The access property keeps the shape this file used (a value attribute), and the description
+        // keeps its constant-expression element: the patch replaced text, not structure.
+        string writtenXml = System.Text.Encoding.UTF8.GetString(entriesAfter["template.xml"]);
+        Assert.Contains("<property name=\"access\" value=\"internal\">", writtenXml, StringComparison.Ordinal);
+        Assert.DoesNotContain("external", writtenXml, StringComparison.Ordinal);
+        Assert.DoesNotContain("OTHER", writtenXml, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ASavedChangeInARealContainerSurvivesASecondSaveWithoutLookingLikeAnOutsideEdit()
     {
         // A real .dta container: the native sample when the machine has one, otherwise a synthetic

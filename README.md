@@ -4,8 +4,8 @@ A Windows desktop editor for the variable declarations of PUB template files
 (`.dta`). It is an offline tool: no service, no web view, no telemetry. Edits are
 staged in memory and reach the disk only through an explicit review step.
 
-**Status:** development milestones S0–S5 are implemented and covered by 213 automated
-tests (197 of them run without the local template samples, which are not shipped).
+**Status:** development milestones S0–S5 are implemented and covered by 223 automated
+tests (207 of them run without the local template samples, which are not shipped).
 The Windows CI pipeline is green on GitHub: build, all three test projects, the
 licensing and content checks, a portable single-file executable and a draft MSIX.
 Native PUB round-trip compatibility, a real Microsoft Store identity and a signed
@@ -15,7 +15,8 @@ downloadable executable are open gates — see [PLAN.md](PLAN.md).
 
 - Lists the templates of one folder and reads their declarations without writing anything.
 - Shows parameters in a table: name (read-only), internal/external access, description, default value.
-- Stages value and access changes; Compare and bulk value application work over the same stage.
+- Stages value, access and description changes; Compare and bulk field application (each of the
+  three fields on its own, matched by exact parameter name) work over the same stage.
 - **Review Save** is the only write path: it lists every pending change per file, shows the
   change in place inside the full value, lets you select the rows to apply, and then patches the
   exact source spans of the XML — unrelated bytes and other container entries stay untouched.

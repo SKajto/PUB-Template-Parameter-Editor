@@ -1066,6 +1066,72 @@ Commit identity
   and `git gc --prune=now` run, and the branch is updated with `git push --force-with-lease` - a
   forced update of a branch that existed for two hours and that nobody else can have based on yet.
 
+### 2026-10-26 - Bulk editing now copies the access and the description too (owner-reported bug)
+
+What was wrong
+- The owner's report: "Apply value to selected templates" copied only the default value; changes to
+  internal/external (the access property) and to the description were not applied to the other
+  templates. That was the design at the time - `REQUIREMENTS.md` line "Bulk editing | Copy only the
+  value" and `BulkPlan.Plan(..., field)` even **threw** `ArgumentException` for
+  `FieldKind.Access`/`Description` - but the owner has now superseded that requirement, so the
+  restriction was removed rather than worked around in the UI. `REQUIREMENTS.md` and `AGENTS.md` are
+  the owner's documents and keep the old wording; this section is the record that the later
+  instruction wins.
+
+How it works now
+- `BulkPlan` plans **per field**: a target's name-level status is `Eligible` (exactly one declaration
+  with that exact name), `Missing`, `Ambiguous` or `NotLoaded`, and `BulkTarget.Fields` carries one
+  `BulkFieldTarget` per bulk field - default value, access, description - saying whether this template
+  can receive it, its current value, and the parser's reason when it cannot. `ReadOnlyShape` is gone
+  from the name-level enum: a template with no `default` property is still a target for the access and
+  the description, and the card for it names the field it cannot take.
+- `BulkPlan.Stage(name, proposedByField, selected, records, drafts)` stages each chosen field on each
+  selected target and returns `(target, field, result)` triples, so a no-op (`ClearedAsNoOp`) and a
+  refusal are both reported per field instead of silently disappearing. Guards that stay: an ambiguous
+  or unread target never stages, a field the plan marked unwritable is refused even if a forged target
+  list asks for it, an access value outside `internal / external` is refused, and at least one field
+  must be chosen (`ArgumentException` otherwise).
+- The panel: three switches, each with its own input - the default value text, an access ComboBox
+  (`internal`/`external`) and a description text - prefilled with the focused parameter's current
+  values, and each switch **off** to start with if the source itself cannot offer that field. All three
+  start on when they are copyable, which is what the report asked for. The summary counts per field
+  (`default value: 3 of 3 · access: 3 of 3 · description: 2 of 3`) instead of one aggregate number,
+  because the interesting case is a template that takes the value but has nothing to write the
+  description into. Ticks are remembered per file path so switching a field does not discard the
+  user's target selection. Buttons: "Apply fields to templates" / "Apply chosen fields to selected
+  templates".
+- The notice after a run names the fields: `Staged 6 change(s) across 2 template(s): default value 2,
+  access 2, description 2.` plus how many were no-ops and how many were refused.
+
+Tests (suite now Core 89 + Integration 48 + App/WPF 86 = **223**; 89 + 32 + 86 = 207 with
+`examples/` moved away; 0 warnings)
+- Core: `ValueAccessAndDescriptionAreStagedTogetherForTheSelectedTargets` (5 staged + 1 honest no-op,
+  parsed baseline untouched), `ChoosingOneFieldAloneStagesOnlyThatField`,
+  `AFieldThatIsAbsentOrOutsideTheVocabularyIsRefusedOnItsOwn` (no access property, no description
+  property, `access="public"`), `BulkNeedsAFieldAndAnAccessValueInTheObservedVocabulary`, and the
+  per-field half of `EveryTargetGetsAStatusAndIneligibleTargetsGetAReason`.
+- WPF shell: `BulkCopiesAccessAndDescriptionOntoTheSameNamedParameter` (three fields into two
+  templates, review rows name all three per file, `beta` in the same file untouched, the re-read form
+  shows the staged access/description) and
+  `BulkWritesTheFieldsATargetCanHoldAndLeavesTheRestExplained` (no `default` property: 2 staged, 1
+  refused and the reason shown).
+- Save path: `BulkAppliedFieldsAreWrittenAndTheRestOfTheContainerSurvives` - bulk value+access+
+  description into a real `.dta` container, every non-template entry byte-identical, the source file
+  byte-unchanged, the written XML keeps this file's own access shape (`value="internal"`, no
+  structure invented) and the description stays a constant expression.
+- Fixture lesson again: an access written as
+  `<property name="access"><expression type="constant">internal</expression></property>` is *not*
+  editable in this editor, so a bulk run started from such a parameter correctly begins with the
+  access switch off - the first version of the save-flow test tripped over exactly that.
+
+Side finding while re-running the evidence tests: the owner had saved again at 19:56 UTC, which
+changed `examples/requirements_specification_yps.dta` (234/162/72 no longer matched) and
+`..._yps_landscape.dta`. Both originals were restored from the application's own backups
+(`20261026-195652-…bak`) and their SHA-256 equals the pristine fixtures recorded earlier
+(`a6a48a02…`, `280d4c24…`) - the backup layer preserved real templates byte for byte, and the
+evidence fixtures are back to the verified state. Published `PUB_Template_Parameter_Editor.exe`
+(131,273,851 bytes, product version 0.1.0) starts with the right title.
+
 ## Deferred scope
 
 Linux UI, additional architectures, parameter creation/deletion/renaming, presets, recursive folders, in-app PUB generation, browser hosting and custom installer/updater services are outside this initial Windows release. Keep the domain core independent without building a second UI.

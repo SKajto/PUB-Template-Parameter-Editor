@@ -14,7 +14,7 @@ Automate deterministic core and filesystem checks. Exercise workflows through th
 | T08 Minimal patches | PAR-08, SAVE-06 | Change each supported field separately; only authorized source spans differ; preserve comments, entity representations elsewhere, scripts, images and unknown properties; no-op produces no write |
 | T09 Format variants | FILE-06, PAR-08 | Exercise native DTA, exported XML adapter, malformed files, unsupported encodings and complex expressions; correct support status, untouched unsupported content, no app crash |
 | T10 Compare | CMP-01..04 | Compare exact name against selected/all loaded templates; verify value/access/description diffs, empty vs missing and visible draft markers |
-| T11 Bulk boundaries | BULK-01..05 | Include matching, missing, duplicate-name and pre-edited targets; stage only checked eligible targets and only their defaults; description/access stay unchanged |
+| T11 Bulk boundaries | BULK-01..05 | Include matching, missing, duplicate-name and pre-edited targets; stage only checked targets; the value, the access and the description are offered as three switches and each target receives only the fields it can hold, with the refused ones named |
 | T12 Dirty normalization | PAR-06 | Change and restore a field to baseline; dirty status clears for field, parameter and file when appropriate |
 | T13 Review Back | SAVE-01..04 | Edit multiple files/fields, deselect changes, press Back; no disk writes and all proposals remain available |
 | T14 Review selection | SAVE-02..06,10 | Exclude description but include value for one variable, save; value changes and description stays baseline; excluded draft clears after complete success |
