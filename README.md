@@ -59,14 +59,6 @@ synthetic containers of the same shape when it does not — see
 `tests/TestSampleSupport.cs`. Before pushing, run the suite once with `examples/`
 renamed away: that is what a fresh clone and CI see.
 
-## Template samples are not part of this repository
-
-`examples/*.dta` is user content. It is ignored by git and must not be committed
-or published: redistributing someone else's template data is a separate right, and
-it is not the "corresponding source" the GPL refers to. The format knowledge gained
-from those files is written up in [docs/SAMPLE_FINDINGS.md](docs/SAMPLE_FINDINGS.md)
-and asserted by evidence tests on the machine that holds the files.
-
 ## Licensing
 
 Copyright (C) PUB Template Parameter Editor contributors. Licensed under
