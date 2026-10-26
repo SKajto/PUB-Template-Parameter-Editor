@@ -36,12 +36,14 @@
     <Application Id="PubTemplateEditor"
                  Executable="PubTemplateEditor.exe"
                  EntryPoint="Windows.FullTrustApplication">
+      <!-- StoreLogo is not a valid uap:VisualElements attribute in the manifest schema that makeappx
+           validates against (it rejects the package with C00CE015); the Store logo is declared once,
+           as Properties/Logo above. -->
       <uap:VisualElements DisplayName="{{DISPLAY_NAME}}"
                           Description="Offline editor for PUB template parameters with review-based saving"
                           BackgroundColor="transparent"
                           Square44x44Logo="assets\Square44x44Logo.png"
-                          Square150x150Logo="assets\Square150x150Logo.png"
-                          StoreLogo="assets\StoreLogo.png">
+                          Square150x150Logo="assets\Square150x150Logo.png">
         <uap:DefaultTile Wide310x150Logo="assets\Wide310x150Logo.png"
                          Square71x71Logo="assets\Square71x71Logo.png"
                          Square310x310Logo="assets\Square310x310Logo.png" />
