@@ -4,7 +4,9 @@
   Token placeholders are replaced by packaging/build-msix.ps1 from packaging/StoreRelease.settings.json.
   A -Strict (submission) build rejects any unresolved REPLACE_* token; see docs/GITHUB_STORE_RELEASE.md.
   runFullTrust is required because the payload is a self-contained Win32/WPF executable.
-  Store signing happens after Partner Center certification; this manifest needs no publisher CA certificate.
+  This package is local/packaged-app tooling, not a distribution channel: the project ships a
+  SignPath-signed single-file executable on GitHub and publishes nothing to the Microsoft Store.
+  The identity values below stay unresolved placeholders, and no publisher CA certificate is bought.
 -->
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
          xmlns:mp="http://schemas.microsoft.com/appx/2014/manifest"

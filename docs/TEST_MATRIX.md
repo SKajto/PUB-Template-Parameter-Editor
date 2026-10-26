@@ -1,5 +1,16 @@
 # PUB Template Parameter Editor verification matrix
 
+> [!NOTE]
+> **Channel update, 2026-10-26 (owner decision).** This application is **not** distributed through
+> the Microsoft Store: no Store product or identity is reserved, and no artifact of this project is
+> Store-signed. The shipped artifact is the self-contained single-file
+> `PUB_Template_Parameter_Editor.exe` attached to a GitHub Release, signed by SignPath.io with a
+> certificate by SignPath Foundation. The MSIX packaging in `packaging/` remains as local tooling.
+> Current wording: [docs/RELEASE_PACKAGING.md](RELEASE_PACKAGING.md) and
+> [docs/CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md). The Store-specific lines below are kept as
+> written history rather than rewritten after the fact.
+
+
 Automate deterministic core and filesystem checks. Exercise workflows through the real WPF application where practical. Perform PUB checks in the actual target PUB environment and packaged runtime checks on the supported Windows baseline and intended managed Windows environment. Maintain requirement traceability as implementation develops.
 
 | Test | Requirements | Procedure and expected result |

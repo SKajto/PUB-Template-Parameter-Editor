@@ -1,5 +1,16 @@
 # PUB Template Parameter Editor requirements
 
+> [!NOTE]
+> **Channel update, 2026-10-26 (owner decision).** This application is **not** distributed through
+> the Microsoft Store: no Store product or identity is reserved, and no artifact of this project is
+> Store-signed. The shipped artifact is the self-contained single-file
+> `PUB_Template_Parameter_Editor.exe` attached to a GitHub Release, signed by SignPath.io with a
+> certificate by SignPath Foundation. The MSIX packaging in `packaging/` remains as local tooling.
+> Current wording: [docs/RELEASE_PACKAGING.md](RELEASE_PACKAGING.md) and
+> [docs/CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md). The Store-specific lines below are kept as
+> written history rather than rewritten after the fact.
+
+
 Status: fresh Windows C# project baseline, revision 4, 25 October 2026. Build the application from the requirements below; no implementation or completed checks are assumed. The user description is authoritative. Added interpretations are explicit implementation defaults.
 
 ## Purpose and scope

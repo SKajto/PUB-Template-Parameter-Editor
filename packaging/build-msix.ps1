@@ -3,7 +3,10 @@ build-msix.ps1 - assembles the draft/self-contained MSIX payload with Windows SD
 
 Design notes (docs/GITHUB_STORE_RELEASE.md):
 - The MSIX payload is a normal self-contained win-x64 layout, not a single-file bundle.
-- No publisher CA certificate is used: for the Store channel Microsoft signs after certification.
+- A package built here is for running the app as a packaged app during development. It is not a
+  distribution channel (this project publishes a SignPath-signed single-file executable on GitHub),
+  it is built unsigned, and if such a package is ever published it goes through SignPath like any
+  other artifact of this project. Nothing here is, or may be called, Store-signed.
   The produced .msix is therefore NOT trusted for arbitrary sideload; it is a submission artifact.
 - -Strict rejects every unresolved REPLACE_* value in packaging/StoreRelease.settings.json,
   which is what a release/submission build must do (REL-04).
@@ -178,7 +181,7 @@ $record = [ordered]@{
     packageSizeBytes        = (Get-Item $msixPath).Length
     identityName            = $identity.Name
     publisher               = $identity.Publisher
-    signedBy                = "none (Store signs after Partner Center certification)"
+    signedBy                = "none (built unsigned; publish through SignPath if this artifact is ever distributed)"
     generatedUtc            = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 }
 $recordPath = Join-Path (Split-Path $msixPath -Parent) "build-info.json"

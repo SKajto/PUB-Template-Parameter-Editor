@@ -4,12 +4,12 @@ A Windows desktop editor for the variable declarations of PUB template files
 (`.dta`). It is an offline tool: no service, no web view, no telemetry. Edits are
 staged in memory and reach the disk only through an explicit review step.
 
-**Status:** development milestones S0–S5 are implemented and covered by 223 automated
-tests (207 of them run without the local template samples, which are not shipped).
+**Status:** development milestones S0–S5 are implemented and covered by 227 automated
+tests (211 of them run without the local template samples, which are not shipped).
 The Windows CI pipeline is green on GitHub: build, all three test projects, the
-licensing and content checks, a portable single-file executable and a draft MSIX.
-Native PUB round-trip compatibility, a real Microsoft Store identity and a signed
-downloadable executable are open gates — see [PLAN.md](PLAN.md).
+licensing and content checks, and the portable single-file executable.
+Distribution is a GitHub Release, signed through SignPath.io; the signing
+subscription and a native PUB round trip are open gates — see [PLAN.md](PLAN.md).
 
 ## What it does
 
@@ -36,7 +36,7 @@ downloadable executable are open gates — see [PLAN.md](PLAN.md).
 | `packaging/` | MSIX manifest, tile assets, `build-msix.ps1` |
 | `tools/brand/` | draws the application icon and tile artwork (see `NOTICE`) |
 | `docs/` | setup, release and format findings |
-| `.github/workflows/` | CI validation, release packaging, Store submission (all pinned by commit SHA) |
+| `.github/workflows/` | CI validation, release packaging, signing and release publishing (all pinned by commit SHA) |
 
 ## Build and test
 
@@ -51,13 +51,19 @@ dotnet test  PubTemplateEditor.slnx -c Release
 dotnet publish src/PubTemplateEditor.App/PubTemplateEditor.App.csproj `
   -c Release -p:PublishProfile=PortableWin_x64 -o artifacts/publish/portable-win-x64
 
-# draft MSIX with placeholder identity
+# optional: package the app locally (not a distribution channel)
 powershell -File packaging/build-msix.ps1 -Version 0.1.0 -Mode Draft
 ```
 
-The downloadable program is `PUB_Template_Parameter_Editor.exe`; the Store package is
-named after the same product. Underscores instead of spaces keep the name usable on
-the command line, in scripts and inside package paths.
+The shipped artifact is `PUB_Template_Parameter_Editor.exe` - a single self-contained
+file, attached to a GitHub Release. Packaging to MSIX is kept as local tooling for
+running the app as a packaged app; it is not published, and no identity values exist
+for it.
+
+The program is called `PUB_Template_Parameter_Editor.exe` - the executable, the
+assembly and (for a locally built package) the manifest entry all carry the product
+name. Underscores instead of spaces keep the name usable on the command line, in
+scripts and inside package paths.
 
 The test suite prefers real PUB templates when the machine has them, and writes
 synthetic containers of the same shape when it does not — see
@@ -66,10 +72,12 @@ renamed away: that is what a fresh clone and CI see.
 
 ## Code signing policy
 
-The downloadable executable is signed with a free certificate provided by
-[SignPath.io](https://signpath.io), certificate by
-[SignPath Foundation](https://signpath.org). The MSIX for the Microsoft Store
-is signed by Microsoft after certification instead.
+Everything this project publishes is signed the same way: a free certificate
+provided by [SignPath.io](https://signpath.io), certificate by
+[SignPath Foundation](https://signpath.org). That covers the downloadable
+executable, and a package would be signed through the same job if a packaged
+channel were ever used. No other signer is used, and nothing here is
+Store-signed.
 
 - **Privacy:** this program will not transfer any information to other networked
   systems unless specifically requested by the user or the person installing or
@@ -77,9 +85,9 @@ is signed by Microsoft after certification instead.
 - **System changes:** it installs nothing, needs no elevation, and changes template
   files only through Review Save, which shows every pending change, keeps a backup
   of each file it replaces and can be cancelled per file.
-- **Uninstall:** the Store package through Windows Settings → Apps; the portable
-  executable by deleting its folder, with `%LOCALAPPDATA%\PubTemplateEditor`
-  holding its settings, backups and recovery journal.
+- **Uninstall:** delete the program's folder - there is no installer, no service and no
+  startup entry. Its user data lives in `%LOCALAPPDATA%\PubTemplateEditor`
+  (settings, backups and the recovery journal) and can be removed separately.
 - **Team roles** (Author / Reviewer / Approver), the signing configuration and the
   build provenance are described in
   [docs/CODE_SIGNING_POLICY.md](docs/CODE_SIGNING_POLICY.md).
@@ -96,7 +104,7 @@ bundled .NET runtime, which is not relicensed.
 - [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [SECURITY.md](SECURITY.md)
 - [REQUIREMENTS.md](REQUIREMENTS.md), [ARCHITECTURE.md](ARCHITECTURE.md), [PLAN.md](PLAN.md)
 - [docs/PROJECT_SETUP.md](docs/PROJECT_SETUP.md) — machine and solution setup
-- [docs/GITHUB_STORE_RELEASE.md](docs/GITHUB_STORE_RELEASE.md) — CI, MSIX, Microsoft Store, signing
+- [docs/RELEASE_PACKAGING.md](docs/RELEASE_PACKAGING.md) — CI, release packaging, signing, GitHub Releases
 - [docs/CODE_SIGNING_POLICY.md](docs/CODE_SIGNING_POLICY.md) — who approves signing, what is signed, privacy
 - [docs/GPL_RELEASE.md](docs/GPL_RELEASE.md) — source-availability obligations
 - [docs/SAMPLE_FINDINGS.md](docs/SAMPLE_FINDINGS.md) — what the native templates look like

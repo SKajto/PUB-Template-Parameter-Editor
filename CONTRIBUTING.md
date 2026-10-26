@@ -61,8 +61,8 @@ discussed in the pull request. Windows is required for the WPF test project.
 ## Pull requests
 
 Fill in the template. In short: describe the behaviour change, name the tests that prove it,
-state what you could not verify (native PUB round trip, Store certification, a real desktop
-session), and do not add build outputs, binaries or template files.
+state what you could not verify (native PUB round trip, the SignPath signing subscription, a
+real desktop session), and do not add build outputs, binaries or template files.
 
 Build scripts, `global.json`, `Directory.Build.props` and `.github/workflows/*` are reviewed as
 carefully as program code: a signature over a release attests to the automated build of those

@@ -3,7 +3,7 @@ PROVISIONAL packaging artwork generator.
 
 Creates placeholder PNG tiles so the MSIX layout is complete and certifiable in shape.
 These are NOT final branding: they are solid-tile placeholders with the letters "PUB".
-Replace them with designed assets before the Store listing is finished (PLAN S0 gate).
+Replace them with designed assets before any packaged channel is used; the designed artwork now lives in tools/brand/generate-brand-assets.ps1.
 
 Uses only Windows built-in PowerShell 5.1 + WPF imaging; nothing is downloaded.
 #>

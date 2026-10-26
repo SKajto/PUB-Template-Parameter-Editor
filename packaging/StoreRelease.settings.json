@@ -9,7 +9,7 @@
   "architecture": "x64",
   "targetFramework": "net10.0-windows",
   "versionPolicy": "vMAJOR.MINOR.PATCH -> MAJOR.MINOR.PATCH.0 after Store range/order validation",
-  "_comment": "Draft packaging configuration. Values beginning with REPLACE_ are unresolved and make a Strict submission build fail. Real values come from the reserved Partner Center product; never invented.",
+  "_comment": "Packaging identity configuration for the optional MSIX build. This project does not distribute through the Microsoft Store, so no Partner Center product is reserved and the REPLACE_ placeholders stay: a package build then fails instead of inventing an identity. Never invent these values.",
   "minVersion": "10.0.22000.0",
   "maxVersionTested": "10.0.22621.0"
 }

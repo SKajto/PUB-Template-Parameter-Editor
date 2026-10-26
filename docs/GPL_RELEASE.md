@@ -1,5 +1,16 @@
 # GPLv3 source and binary release instructions
 
+> [!NOTE]
+> **Channel update, 2026-10-26 (owner decision).** This application is **not** distributed through
+> the Microsoft Store: no Store product or identity is reserved, and no artifact of this project is
+> Store-signed. The shipped artifact is the self-contained single-file
+> `PUB_Template_Parameter_Editor.exe` attached to a GitHub Release, signed by SignPath.io with a
+> certificate by SignPath Foundation. The MSIX packaging in `packaging/` remains as local tooling.
+> Current wording: [docs/RELEASE_PACKAGING.md](RELEASE_PACKAGING.md) and
+> [docs/CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md). The Store-specific lines below are kept as
+> written history rather than rewritten after the fact.
+
+
 Fresh project licensing baseline, 25 October 2026. Use GPL version 3 for the new GitHub application. GPL-3.0-only is the provisional SPDX choice unless the owner explicitly selects GPL-3.0-or-later. GPL-3.0-or-later grants an additional version choice and must not be silently substituted. This document is an engineering release checklist derived from the license, not a blanket determination of every possible Store agreement.
 
 ## Repository and application notices

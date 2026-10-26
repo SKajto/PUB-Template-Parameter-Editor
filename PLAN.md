@@ -1132,6 +1132,79 @@ changed `examples/requirements_specification_yps.dta` (234/162/72 no longer matc
 evidence fixtures are back to the verified state. Published `PUB_Template_Parameter_Editor.exe`
 (131,273,851 bytes, product version 0.1.0) starts with the right title.
 
+### 2026-10-26 - No Microsoft Store channel: the distribution is a SignPath-signed GitHub Release
+
+Why
+- The owner rejected a sentence in the README - "The MSIX for the Microsoft Store is signed by
+  Microsoft after certification instead" - and then stated the channel directly: **the application
+  will not be distributed via the Microsoft Store**, and **only SignPath.io is used for signing**.
+  The claim was not just badly worded: it described a route this project no longer takes, and a
+  sentence like that makes an unsigned build look trusted.
+
+What changed
+- **Channel:** the GitHub Release built by the `Release packaging` workflow, carrying
+  `PUB_Template_Parameter_Editor.exe`, the complete corresponding source archive, the notices and the
+  hash/provenance record. **Signing:** SignPath.io with a SignPath Foundation certificate - the
+  executable, and an optional package too, in the same job. No publisher CA certificate, no Store
+  product, no Store identity, no Store fees, and no artifact of this project may be described with a
+  store signature.
+- `docs/GITHUB_STORE_RELEASE.md` is **removed** and replaced by `docs/RELEASE_PACKAGING.md`: channels
+  and who signs them, the makeappx lessons that stay relevant for local packaging, the four workflow
+  jobs and their permissions, the pinned-and-verified action table (including SignPath's
+  `v3.0 = f6d04783b4569d051e0c80105fe66e82819d0092`), the free-plan runner budget table, the
+  SignPath-conditions checklist, the owner's open configuration gates, and version/provenance rules.
+- `ci.yml`: the draft-MSIX step is gone (CI no longer spends runner time or artifact storage on a
+  package nobody ships), the job is renamed "Build, test and publish the portable payload", hashes
+  and artifacts no longer reference `artifacts/packaging/out`, and the artifact upload step is
+  labelled plainly "unsigned". The packaging tooling is still covered by the packaging-configuration
+  tests, so removing the step does not remove the coverage.
+- `release.yml`: `includeStorePackage` becomes **`buildMsix` defaulting to false** (packaged-app
+  testing, opt-in); the identity check now reads "reject unresolved packaging identity when a package
+  is built" instead of the old REL-04 submission framing; the optional package is uploaded as its own
+  artifact and, when it exists, is submitted to SignPath in the same signing job - if the artifact
+  configuration on SignPath's side does not authorise package signing, their service rejects the
+  request and the job fails rather than publishing an unsigned package under a signed name. The
+  `SIGNING.txt` note now records the channel instead of a store claim.
+- New job **`publish-github-release`**: runs only when the repository variable
+  `PUBLISH_GITHUB_RELEASE=true` **and** `needs.sign-portable-exe.result == 'success'`, with
+  `contents: write` and `actions: read` on the protected `release-packaging` environment. It downloads
+  this run's artifacts with the runner's preinstalled GitHub CLI, picks the **signed** executable by
+  path (refusing to publish if no signed copy is present), and creates `v<version>` with the signed
+  binary, the source archive, `SHA256SUMS.txt` and `SIGNING.txt`, with release notes that state the
+  signer, the commit, GPL-3.0-only and the absence of a Store channel. Using `gh release create`
+  instead of a third-party release action keeps the pinned-action list unchanged.
+- Wording swept across the project's own documents: README (status, layout table, build section,
+  program name, code signing section, uninstall), `docs/CODE_SIGNING_POLICY.md` (what is signed and
+  what is not, uninstallation, open gates, the non-commercial condition), `SECURITY.md`,
+  `CONTRIBUTING.md`, the PR template, `packaging/build-msix.ps1` and `StoreRelease.settings.json`
+  comments (the `REPLACE_*` identity placeholders stay on purpose, and are now described as exactly
+  that rather than as "pending Partner Center values"), and `packaging/AppxManifest.template.xml`.
+  The supplied baseline documents (`REQUIREMENTS.md`, `docs/PROJECT_SETUP.md`,
+  `docs/WINDOWS_PUBLISH.md`, `docs/TEST_MATRIX.md`, `docs/GPL_RELEASE.md`) keep their original text
+  under a clearly marked "Channel update, 2026-10-26" note, except `WINDOWS_PUBLISH.md`, whose
+  signing paragraph made the claim the owner rejected and was corrected rather than annotated.
+  `AGENTS.md` is the instruction file and was left untouched - this section is the record that its
+  "primary release is Store MSIX" line no longer describes the project.
+- New guard test `ChannelPolicyTests` (4 tests): no README/doc/workflow/packaging text may contain
+  the affirmative claims ("signed by Microsoft", "Microsoft signs", "Store signs", "Store signing
+  happens", "after Partner Center certification", "Store submission", "Store-signed package"); the
+  real channel must be named where it matters (GitHub Release, SignPath, `gh release create`, the
+  refusal to publish an unsigned binary, `buildMsix` opt-in, and **no** `build-msix.ps1` call in CI);
+  the old Store design document must be gone while the baseline documents carry the update note; and
+  every relative link in README must resolve - which is what catches a doc rename that leaves links
+  behind. Writing it caught two of my own negations ("nothing here is signed by Microsoft", "no
+  channel in which Microsoft signs") that a blunt phrase check cannot distinguish from a claim, and
+  those sentences were reworded instead of weakening the test.
+
+Verified locally: Core 89 + Integration 52 + App/WPF 86 = **227** tests, 0 failed, 0 warnings; with
+`examples/` moved away, 89 + 36 + 86 = **211**, 0 failed. Both workflows still parse as YAML; the
+release workflow now has jobs `package`, `sign-portable-exe`, `publish-github-release`.
+
+Still open, in order: SignPath registration and the four variables + token; MFA and branch
+protection; a version tag plus `PUBLISH_GITHUB_RELEASE=true` for the first signed release; the native
+PUB round trip. Publishing a GitHub Release and registering with SignPath are owner actions - they
+need the account and the agreement, and neither is done from here without an explicit instruction.
+
 ## Deferred scope
 
 Linux UI, additional architectures, parameter creation/deletion/renaming, presets, recursive folders, in-app PUB generation, browser hosting and custom installer/updater services are outside this initial Windows release. Keep the domain core independent without building a second UI.

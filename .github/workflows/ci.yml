@@ -35,7 +35,7 @@ env:
 
 jobs:
   build-test-package:
-    name: Build, test and draft-package (windows-latest)
+    name: Build, test and publish the portable payload (windows-latest)
     runs-on: windows-latest
 
     steps:
@@ -113,27 +113,22 @@ jobs:
           }
         shell: pwsh
 
-      - name: Draft MSIX (placeholder identity, unsigned)
-        run: >
-          powershell -NoProfile -ExecutionPolicy Bypass -File packaging/build-msix.ps1
-          -Version 0.0.0 -Mode Draft
-        shell: pwsh
-
+      # No package build here: this application is not distributed through the Microsoft
+      # Store, and CI should not spend runner time or artifact storage on a package nobody ships.
+      # The packaging tooling itself is covered by the packaging-configuration tests.
       - name: Record artifact hashes
         run: |
-          Get-ChildItem artifacts/publish/portable-win-x64/PUB_Template_Parameter_Editor.exe,
-                       artifacts/packaging/out/*.msix |
+          Get-ChildItem artifacts/publish/portable-win-x64/PUB_Template_Parameter_Editor.exe |
             ForEach-Object { '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash, $_.Name } |
             Tee-Object artifacts/sha256.txt
         shell: pwsh
 
-      - name: Upload CI artifacts (not Store-signed)
+      - name: Upload CI artifacts (unsigned)
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: ci-outputs-${{ github.run_id }}
           path: |
-            artifacts/packaging/out
             artifacts/publish/portable-win-x64
             artifacts/sha256.txt
           retention-days: 7

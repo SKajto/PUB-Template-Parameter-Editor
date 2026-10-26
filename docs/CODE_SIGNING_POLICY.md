@@ -15,15 +15,17 @@ Status in this project: the subscription is **not active yet**. The project has 
 registered with SignPath Foundation and approved by them, and the binary has to be
 released in the form that is to be signed (see [open gates](#open-gates)). Until then
 every artifact produced here is **unsigned**, and no artifact may be described as
-signed.
+signed. Distribution is a GitHub Release: this application is not published through
+the Microsoft Store, so Microsoft never signs anything for it, and no artifact may be
+presented as a package signed by a store.
 
 What is signed and what is not:
 
 | Artifact | Signature |
 | --- | --- |
-| `PUB_Template_Parameter_Editor.exe` — the downloadable portable single-file executable | SignPath Foundation certificate, through the `sign-portable-exe` job in `.github/workflows/release.yml` |
-| MSIX for the Microsoft Store | signed by Microsoft after Partner Center certification; we need no publisher certificate and we never sign it ourselves |
-| any artifact built by CI or by a developer machine | **unsigned** — it must never be presented as Store-signed or SignPath-signed |
+| `PUB_Template_Parameter_Editor.exe` — the distributed single-file executable, attached to a GitHub Release | SignPath Foundation certificate, submitted by the `sign-portable-exe` job in `.github/workflows/release.yml` |
+| `PUB_Template_Parameter_Editor_<version>_win-x64.msix` — built only on request, not a distribution channel | unsigned by default; if it is ever published it goes through the same SignPath job, and no identity values exist for it yet |
+| any artifact built by CI or by a developer machine | **unsigned** — it must never be presented as signed, and this project has no Store channel that could sign anything on its behalf |
 
 ## Team roles
 
@@ -66,10 +68,10 @@ view shows offline.
   lets the user select which ones to apply, keeps a timestamped backup of each file it
   replaces, and reports per file whether it was written, rejected or partially written.
   It detects outside edits by content fingerprint before writing.
-- Uninstallation: the Store package is removed with Windows Settings → Apps (or the
-  Store's own uninstall). The portable executable is removed by deleting its folder;
-  user-scoped data can be deleted with `%LOCALAPPDATA%\PubTemplateEditor`, which holds
-  settings, backups and the journal and is never touched by another program.
+- Uninstallation: deleting the program's folder is enough - there is no installer, no
+  service and no startup entry. User-scoped data lives in
+  `%LOCALAPPDATA%\PubTemplateEditor` (settings, backups, recovery journal) and can be
+  deleted separately; nothing else on the system is touched.
 
 ## Source, build and metadata of a signed binary
 
@@ -109,7 +111,7 @@ view shows offline.
   synthetic containers where the real files are not present.
 - Documented functionality: [README.md](../README.md) and
   [REQUIREMENTS.md](../REQUIREMENTS.md) describe what the program does; the release page
-  and the Store entry must carry the same description.
+  and the release page must carry the same description.
 
 ## Open gates
 
@@ -126,6 +128,9 @@ These are actions for the project owner, not things a workflow can do by itself:
    certificate requires the project to be already released and documented in that form.
 3. Enable branch protection with required review, and MFA for the accounts that hold
    Author, Reviewer and Approver roles.
-4. Keep the Store listing consistent with a free open-source certificate: the SignPath
-   Foundation offer is for open-source projects; charging for the app, or any commercial
-   dual licensing, needs SignPath's paid offering instead of the Foundation certificate.
+4. Keep the distribution consistent with a free open-source certificate: the SignPath
+   Foundation offer covers open-source, non-commercially-licensed distribution. Charging for
+   copies is not forbidden by GPL, but commercial dual licensing of components is, and a
+   commercial arrangement needs SignPath's paid offering rather than the Foundation
+   certificate. This project distributes from GitHub Releases, with no Store listing and no
+   Store fees.

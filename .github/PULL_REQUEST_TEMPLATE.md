@@ -23,8 +23,8 @@ redesign is hard to review and hard to revert.
 
 Tests run: Core __ / Integration __ / App(WPF) __ → total __.
 
-**What could not be verified here:** <!-- say it plainly. Native PUB round trip, Store
-certification, an interactive desktop session and real Partner Center values are routinely
+**What could not be verified here:** <!-- say it plainly. Native PUB round trip, SignPath
+signing, an interactive desktop session and a packaged/sideload scenario are routinely
 unavailable; an unverified gate is acceptable, an implied pass is not. -->
 
 ## Constraints this respects

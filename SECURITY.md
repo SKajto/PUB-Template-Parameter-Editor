@@ -4,7 +4,7 @@
 
 | Version | Supported |
 | --- | --- |
-| latest release from the Releases page and the Microsoft Store listing | yes |
+| latest release from the GitHub Releases page (the signed single-file executable) | yes |
 | `main` branch (what CI builds) | yes, best effort |
 | older releases | security fixes are applied to the newest release; older ones are rebuilt from the tag when a fix matters |
 
@@ -30,9 +30,9 @@ The program is offline by design, so the interesting attack surface is *the file
   the other files in the folder are still listed.
 - **No elevated privileges, no service, no startup entry.** Settings, backups and the journal live
   under `%LOCALAPPDATA%\PubTemplateEditor` of the running user.
-- **The Store package and the portable executable** install and run subject to normal Windows
-  policies; the portable build is a single file that extracts its native parts to the user's temp
-  directory, which is ordinary self-contained .NET behaviour and not an installer.
+- **The distributed executable** is a single self-contained file that extracts its native
+  parts to the user's temp directory - ordinary self-contained .NET behaviour, not an installer. It
+  runs under normal Windows policies, and its signature comes from SignPath Foundation.
 
 ## Reporting a problem
 
@@ -63,4 +63,4 @@ This project has one maintainer working on it in their own time, so there is no 
 bounty. What you can expect: an acknowledgement, a fix in the next release when the problem is real
 and reproducible, and a credit in the release notes if you want one. What you should not expect:
 support for constructs the format documentation does not define, or a promise about the
-certification decisions of the Microsoft Store.
+review decisions of third parties such as SignPath Foundation.
