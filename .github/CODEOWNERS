@@ -1,0 +1,18 @@
+# Review ownership, which the SignPath conditions also ask for: people who may change the
+# source are the people responsible for the signed binaries, and every change from outside
+# has to be reviewed by a team member before it is merged.
+#
+# Branch protection with "require a review before merging" and the CODEOWNERS check are
+# repository settings (Settings -> Branches); this file declares who the owners are.
+
+* @SKajto
+
+# Build, packaging and CI configuration are part of the source of a signed binary: a
+# signature confirms that the artifact is the automated build of this repository, including
+# these files, so changes here deserve the same attention as program code.
+.github/ @SKajto
+packaging/ @SKajto
+Directory.Build.props @SKajto
+global.json @SKajto
+*.yml @SKajto
+*.ps1 @SKajto

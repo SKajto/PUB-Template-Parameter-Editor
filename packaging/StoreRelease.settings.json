@@ -4,7 +4,7 @@
   "publisher": "REPLACE_WITH_EXACT_PARTNER_CENTER_PUBLISHER",
   "publisherDisplayName": "REPLACE_WITH_REAL_DISPLAY_NAME",
   "displayName": "PUB Template Parameter Editor",
-  "sourceRepositoryUrl": "REPLACE_WITH_PUBLIC_GITHUB_REPOSITORY_URL",
+  "sourceRepositoryUrl": "https://github.com/SKajto/PUB-Template-Parameter-Editor",
   "licenseExpression": "GPL-3.0-only",
   "architecture": "x64",
   "targetFramework": "net10.0-windows",

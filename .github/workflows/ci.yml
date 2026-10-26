@@ -108,8 +108,8 @@ jobs:
         run: |
           $loose = Get-ChildItem artifacts/publish/portable-win-x64 -Recurse -Include *.pdb,*.xml
           if ($loose) { throw "unexpected files: $($loose.Name -join ', ')" }
-          if (-not (Test-Path artifacts/publish/portable-win-x64/PubTemplateEditor.exe)) {
-            throw 'PubTemplateEditor.exe missing from the portable payload'
+          if (-not (Test-Path artifacts/publish/portable-win-x64/PUB_Template_Parameter_Editor.exe)) {
+            throw 'PUB_Template_Parameter_Editor.exe missing from the portable payload'
           }
         shell: pwsh
 
@@ -121,7 +121,7 @@ jobs:
 
       - name: Record artifact hashes
         run: |
-          Get-ChildItem artifacts/publish/portable-win-x64/PubTemplateEditor.exe,
+          Get-ChildItem artifacts/publish/portable-win-x64/PUB_Template_Parameter_Editor.exe,
                        artifacts/packaging/out/*.msix |
             ForEach-Object { '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash, $_.Name } |
             Tee-Object artifacts/sha256.txt

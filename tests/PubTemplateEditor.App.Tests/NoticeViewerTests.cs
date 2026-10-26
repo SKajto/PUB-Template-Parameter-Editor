@@ -93,7 +93,7 @@ public class NoticeViewerTests
     [Fact]
     public void TheApplicationIconIsEmbeddedAndResolvesForEveryWindow() => _host.Dispatcher.Invoke(() =>
     {
-        var uri = new Uri("pack://application:,,,/PubTemplateEditor;component/Assets/app.ico");
+        var uri = new Uri("pack://application:,,,/PUB_Template_Parameter_Editor;component/Assets/app.ico");
         StreamResourceInfo? resource = Application.GetResourceStream(uri);
         Assert.NotNull(resource);
         Assert.True(resource!.Stream.Length > 1000, "the icon resource looks truncated");

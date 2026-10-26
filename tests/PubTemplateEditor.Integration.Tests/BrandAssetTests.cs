@@ -116,7 +116,7 @@ public class BrandAssetTests
         {
             string xaml = File.ReadAllText(Path_("src", "PubTemplateEditor.App", window));
             Assert.Contains(
-                "Icon=\"pack://application:,,,/PubTemplateEditor;component/Assets/app.ico\"",
+                "Icon=\"pack://application:,,,/PUB_Template_Parameter_Editor;component/Assets/app.ico\"",
                 xaml, StringComparison.Ordinal);
             Assert.Contains("<Resource Include=\"Assets\\app.ico\"",
                 File.ReadAllText(Path_("src", "PubTemplateEditor.App", "PubTemplateEditor.App.csproj")),

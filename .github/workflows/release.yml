@@ -3,12 +3,21 @@
 # PR code is not executed here. Requires the 'release-packaging' environment so a
 # maintainer must approve the run (Settings -> Environments -> protection rules).
 #
+# The signing job implements the SignPath Foundation conditions for open source projects
+# (https://signpath.org/terms, see docs/CODE_SIGNING_POLICY.md): the binary is built by CI from
+# this repository's source, one release equals one signing request, the request needs a manual
+# approval by an Approver through the protected 'signing-signpath' environment, the executable's
+# file metadata is set and verified to match the release version, and only artifacts of this
+# project are ever signed.
+#
 # Free GitHub plan: the repository is public, so this Windows job runs on the free GitHub-hosted
 # runner under the fair-use policy for public repositories. It stays deliberately single-runner -
 # no build matrix, no larger runners, no self-hosted machine - and the artifact retention is 90
 # days, which is inside the free plan's storage allowance for a project of this size.
 #
-# Pinned action SHAs are the same verified refs as .github/workflows/ci.yml.
+# Pinned action SHAs are the same verified refs as .github/workflows/ci.yml, plus
+#   signpath/github-action-submit-signing-request  v3.0
+#     f6d04783b4569d051e0c80105fe66e82819d0092   (resolved from the GitHub tags API 2026-10-26)
 
 name: Release packaging
 
@@ -23,6 +32,14 @@ on:
         description: App version MAJOR.MINOR.PATCH (MSIX version becomes MAJOR.MINOR.PATCH.0)
         required: true
         default: 0.1.0
+      includeStorePackage:
+        description: Build the MSIX for Store submission too (needs the real Partner Center values)
+        type: choice
+        required: true
+        options:
+          - 'true'
+          - 'false'
+        default: 'true'
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
@@ -43,6 +60,10 @@ jobs:
     outputs:
       appVersion: ${{ steps.version.outputs.appVersion }}
       packageVersion: ${{ steps.version.outputs.packageVersion }}
+      # The unsigned payload travels to the signer as its own artifact; SignPath's action picks it
+      # up by id, so what gets signed is exactly what this job built.
+      payloadArtifactId: ${{ steps.unsigned_payload.outputs.artifact-id }}
+      payloadSha256: ${{ steps.payload_hash.outputs.sha256 }}
 
     steps:
       - name: Resolve and validate the version inputs
@@ -77,6 +98,7 @@ jobs:
         shell: pwsh
 
       - name: Reject unresolved identity in a submission build (REL-04)
+        if: inputs.includeStorePackage != 'false'
         run: |
           $settings = Get-Content packaging/StoreRelease.settings.json -Raw | ConvertFrom-Json
           $bad = @($settings.PSObject.Properties | Where-Object {
@@ -94,22 +116,65 @@ jobs:
         shell: pwsh
 
       - name: Package MSIX for Store submission (unsigned at build time)
+        if: inputs.includeStorePackage != 'false'
         run: >
           powershell -NoProfile -ExecutionPolicy Bypass -File packaging/build-msix.ps1
           -Version ${{ steps.version.outputs.appVersion }} -Mode Strict
         shell: pwsh
 
+      # One version everywhere: SignPath's artifact configuration requires the product name to be
+      # the project name and the product version to be the same in every file of a build, so the
+      # release version is passed in and the produced executable is then read back and checked.
       - name: Publish portable single-file EXE (separate, never Store-signed)
         run: >
           dotnet publish src/PubTemplateEditor.App/PubTemplateEditor.App.csproj
           -c Release -p:PublishProfile=PortableWin_x64
+          -p:Version=${{ steps.version.outputs.appVersion }}
+          -p:AssemblyVersion=${{ steps.version.outputs.appVersion }}
+          -p:FileVersion=${{ steps.version.outputs.appVersion }}
+          -p:InformationalVersion=${{ steps.version.outputs.appVersion }}
+          -p:IncludeSourceRevisionInInformationalVersion=false
           -o artifacts/publish/portable-win-x64
         shell: pwsh
+
+      - name: File metadata of the payload (SignPath artifact configuration)
+        run: |
+          $exe = 'artifacts/publish/portable-win-x64/PUB_Template_Parameter_Editor.exe'
+          $info = (Get-Item $exe).VersionInfo
+          'productName={0}' -f $info.ProductName | Tee-Object -FilePath artifacts/file-metadata.txt
+          'productVersion={0}' -f $info.ProductVersion | Tee-Object -FilePath artifacts/file-metadata.txt -Append
+          'fileVersion={0}' -f $info.FileVersion | Tee-Object -FilePath artifacts/file-metadata.txt -Append
+          if ($info.ProductName -ne 'PUB Template Parameter Editor') {
+            throw "product name must be the project name, got '$($info.ProductName)'"
+          }
+          $expected = '${{ steps.version.outputs.appVersion }}'
+          if ($info.ProductVersion -ne $expected -or $info.FileVersion -ne $expected) {
+            throw "version metadata must be $expected, got ProductVersion='$($info.ProductVersion)' FileVersion='$($info.FileVersion)'"
+          }
+        shell: pwsh
+
+      - name: Record the hash of the unsigned payload
+        id: payload_hash
+        run: |
+          $exe = 'artifacts/publish/portable-win-x64/PUB_Template_Parameter_Editor.exe'
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash
+          "sha256=$hash" >> $env:GITHUB_OUTPUT
+          "unsigned payload: $hash  $exe" | Tee-Object artifacts/unsigned-payload.txt
+        shell: pwsh
+
+      - name: Upload the unsigned payload for signing
+        id: unsigned_payload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: unsigned-portable-${{ steps.version.outputs.appVersion }}
+          path: artifacts/publish/portable-win-x64/PUB_Template_Parameter_Editor.exe
+          retention-days: 90
+          if-no-files-found: error
 
       - name: Corresponding source archive (GPL obligation)
         run: |
           New-Item -ItemType Directory -Force artifacts/source | Out-Null
-          git archive --format=tar.gz -o artifacts/source/PubTemplateEditor-${{ steps.version.outputs.appVersion }}-source.tar.gz HEAD
+          git archive --format=tar.gz -o artifacts/source/PUB_Template_Parameter_Editor-${{ steps.version.outputs.appVersion }}-source.tar.gz HEAD
           git rev-parse HEAD | Tee-Object artifacts/source/commit.txt
         shell: pwsh
 
@@ -146,69 +211,107 @@ jobs:
           if-no-files-found: error
 
   # ---------------------------------------------------------------------------
-  # SignPath Foundation preparation - signing itself is not wired up yet.
+  # SignPath Foundation signing of the downloadable executable.
   #
-  # Only the downloadable portable EXE needs third-party signing: the Microsoft Store signs the
-  # MSIX after certification, so a Store payload is not signed here and a CI-built MSIX is never
-  # presented as Store-signed. SignPath Foundation signs open-source binaries free of charge, on
-  # their terms (see https://signpath.org/terms): the project has to be registered and approved by
-  # them, the repository has to stay public and open source, and the distribution has to remain
-  # non-commercial. None of that is asserted by this workflow, so the job below does not sign -
-  # it checks the prerequisites, produces the input file that SignPath's signer consumes, and stops
-  # with an actionable message until a maintainer has verified and pinned their GitHub action.
+  # Only the portable EXE that this repository serves needs a third-party signature: the Microsoft
+  # Store signs the MSIX itself after Partner Center certification, so the Store payload is built
+  # unsigned here and must never be described as SignPath-signed or Store-signed by this workflow.
   #
-  # Open the 'signing-signpath' environment only after SignPath approved the project, then set the
-  # repository variables SIGNPATH_ORGANIZATION_ID and SIGNPATH_SIGNATION_POLICY_ID, the environment
-  # secret SIGNPATH_API_TOKEN, and finally SIGNPATH_ENABLED=true to make this job speak.
-  signpath-preparation:
-    name: SignPath signing prerequisites (does not sign)
+  # The conditions at https://signpath.org/terms are implemented as follows, and documented in
+  # docs/CODE_SIGNING_POLICY.md:
+  #   - the binary comes from this repository's own CI build of its own source (no prebuilt input);
+  #   - exactly one release equals one signing request, submitted by the maintainers themselves;
+  #   - every request needs a manual approval by an Approver, which is the required-reviewer rule of
+  #     the 'signing-signpath' environment - the token is only available to that approved job;
+  #   - the file metadata (product name, one version across the build) is set and verified before
+  #     signing, and SignPath's artifact configuration enforces the same rule on their side;
+  #   - pull-request code never runs in a job that can see the SignPath token.
+  #
+  # Configuration the owner sets after SignPath approved the project (repository variables, plus one
+  # environment secret): SIGNPATH_ORGANIZATION_ID, SIGNPATH_PROJECT_SLUG, SIGNPATH_SIGNING_POLICY_SLUG,
+  # SIGNPATH_ARTIFACT_CONFIGURATION_SLUG, secret SIGNPATH_API_TOKEN in environment 'signing-signpath',
+  # and SIGNPATH_ENABLED=true to switch this job on.
+  sign-portable-exe:
+    name: Sign the downloadable EXE (SignPath Foundation)
     runs-on: ubuntu-latest
+    needs: package
     if: vars.SIGNPATH_ENABLED == 'true'
+    environment:
+      name: signing-signpath
+      url: ${{ steps.request.outputs.signing-request-web-url }}
     permissions:
       contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      actions: read          # the action reads the unsigned artifact produced by the package job
 
-      - name: Require the SignPath project identifiers
+    steps:
+      - name: Require the SignPath project configuration
         env:
-          SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
-          SIGNPATH_SIGNATION_POLICY_ID: ${{ vars.SIGNPATH_SIGNATION_POLICY_ID }}
-          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          ORGANIZATION: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          PROJECT: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          POLICY: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          ARTIFACT: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+          TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
         run: |
           missing=()
-          [ -n "$SIGNPATH_ORGANIZATION_ID" ]     || missing+=("variable SIGNPATH_ORGANIZATION_ID")
-          [ -n "$SIGNPATH_SIGNATION_POLICY_ID" ] || missing+=("variable SIGNPATH_SIGNATION_POLICY_ID")
-          [ -n "$SIGNPATH_API_TOKEN" ]           || missing+=("secret SIGNPATH_API_TOKEN in environment signing-signpath")
+          [ -n "$ORGANIZATION" ] || missing+=("variable SIGNPATH_ORGANIZATION_ID")
+          [ -n "$PROJECT" ]      || missing+=("variable SIGNPATH_PROJECT_SLUG")
+          [ -n "$POLICY" ]       || missing+=("variable SIGNPATH_SIGNING_POLICY_SLUG")
+          # The artifact configuration is where SignPath holds the file metadata restrictions that
+          # the free Foundation certificates require, so signing without it is refused.
+          [ -n "$ARTIFACT" ]     || missing+=("variable SIGNPATH_ARTIFACT_CONFIGURATION_SLUG")
+          [ -n "$TOKEN" ]        || missing+=("secret SIGNPATH_API_TOKEN in environment signing-signpath")
           if [ ${#missing[@]} -gt 0 ]; then
-            echo "SignPath is enabled but not configured:"; printf '  - %s\n' "${missing[@]}"
-            echo "Register the project with SignPath Foundation first: https://signpath.org/terms"
+            echo "SignPath signing is enabled but not configured. Missing:"
+            printf '  - %s\n' "${missing[@]}"
+            echo "Register the project first: https://signpath.org/terms - and see docs/CODE_SIGNING_POLICY.md"
             exit 1
           fi
         shell: bash
 
-      - name: Emit the signature config file
-        run: |
-          mkdir -p artifacts-signpath
-          printf '%s\n' "$SIGN_CONFIG" > artifacts-signpath/sign-path-signature-config.json
-          cat artifacts-signpath/sign-path-signature-config.json
-        env:
-          SIGN_CONFIG: |
-            {
-              "PubTemplateEditor.exe": {
-                "description": "PUB Template Parameter Editor",
-                "descriptionUrl": "https://github.com/SKajto/PUB-Template-Parameter-Editor"
-              }
-            }
-        shell: bash
+      - name: Submit the signing request for this release's payload
+        id: request
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0
+        with:
+          api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
+          organization-id: '${{ vars.SIGNPATH_ORGANIZATION_ID }}'
+          project-slug: '${{ vars.SIGNPATH_PROJECT_SLUG }}'
+          signing-policy-slug: '${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}'
+          artifact-configuration-slug: '${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}'
+          github-artifact-id: '${{ needs.package.outputs.payloadArtifactId }}'
+          wait-for-completion: true
+          # An Approver must approve the request in SignPath as well as the environment run above:
+          # leave enough time for a human to look at it.
+          wait-for-completion-timeout-in-seconds: '3600'
+          output-artifact-directory: signed-portable
 
-      - name: Stop before signing - the signer action is not pinned yet
+      - name: Record the signed payload and its identity
         run: |
-          echo "Signing has not been wired into this workflow. To finish it:"
-          echo "  1. Get the project approved by SignPath Foundation (public repo, GPL-3.0-only, no commercial distribution)."
-          echo "  2. Resolve the current tag of signpath/action-sign through the GitHub tags API and verify the commit SHA,"
-          echo "     exactly as documented for the other pinned actions in docs/GITHUB_STORE_RELEASE.md."
-          echo "  3. Add a step that hands the portable EXE artifact plus artifacts-signpath/sign-path-signature-config.json"
-          echo "     to that pinned action, and re-hash the signed output before it is attached to a release."
-          echo "A draft package that was never signed must never be described as signed, so this job fails instead."
-          exit 1
+          set -eu
+          mkdir -p artifacts-signed
+          exe=$(find signed-portable -type f -name '*.exe' -print -quit)
+          if [ -z "${exe:-}" ]; then
+            echo "the signed artifact contains no executable:"; find signed-portable -type f; exit 1
+          fi
+          unsigned='${{ needs.package.outputs.payloadSha256 }}'
+          signed=$(sha256sum "$exe" | cut -d' ' -f1 | tr 'a-z' 'A-Z')
+          {
+            echo "release:            ${{ needs.package.outputs.appVersion }}"
+            echo "commit:             ${{ github.sha }}"
+            echo "unsigned sha256:    $unsigned"
+            echo "signed sha256:      $signed"
+            echo "signing request:    ${{ steps.request.outputs.signing-request-web-url }}"
+            echo "signed by:          SignPath.io, certificate by SignPath Foundation"
+            echo "not signed here:    the MSIX - the Store signs it after certification"
+          } | tee artifacts-signed/SIGNING.txt
         shell: bash
+        continue-on-error: false
+
+      - name: Upload the signed payload (signed by SignPath Foundation, not by the Store)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: signed-portable-${{ needs.package.outputs.appVersion }}
+          path: |
+            signed-portable
+            artifacts-signed/SIGNING.txt
+          retention-days: 90
+          if-no-files-found: error

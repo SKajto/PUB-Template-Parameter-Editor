@@ -34,7 +34,7 @@
 
   <Applications>
     <Application Id="PubTemplateEditor"
-                 Executable="PubTemplateEditor.exe"
+                 Executable="PUB_Template_Parameter_Editor.exe"
                  EntryPoint="Windows.FullTrustApplication">
       <!-- StoreLogo is not a valid uap:VisualElements attribute in the manifest schema that makeappx
            validates against (it rejects the package with C00CE015); the Store logo is declared once,

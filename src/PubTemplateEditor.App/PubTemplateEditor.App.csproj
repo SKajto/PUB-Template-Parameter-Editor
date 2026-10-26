@@ -4,8 +4,13 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
-    <AssemblyName>PubTemplateEditor</AssemblyName>
+    <!-- The executable and assembly carry the product name: the file a user downloads and
+     sees in Task Manager is called the same thing as the application. Underscores rather
+     than spaces keep it usable on the command line, in scripts and in package paths. -->
+     <AssemblyName>PUB_Template_Parameter_Editor</AssemblyName>
     <RootNamespace>PubTemplateEditor.App</RootNamespace>
+    <!-- Task Manager and the file properties dialog show the product, not the file stem. -->
+    <AssemblyTitle>PUB Template Parameter Editor</AssemblyTitle>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- File icon of the executable and of the window. The artwork is drawn by
          tools/brand/generate-brand-assets.ps1 in this repository; nothing third-party is embedded. -->

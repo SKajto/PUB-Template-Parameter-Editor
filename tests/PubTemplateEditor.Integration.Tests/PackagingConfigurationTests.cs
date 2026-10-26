@@ -52,7 +52,7 @@ public class PackagingConfigurationTests
         Assert.Equal("Windows.Desktop", family.GetAttribute("Name"));
 
         XmlElement application = (XmlElement)doc.SelectSingleNode("/p:Package/p:Applications/p:Application", ns)!;
-        Assert.Equal("PubTemplateEditor.exe", application.GetAttribute("Executable"));
+        Assert.Equal("PUB_Template_Parameter_Editor.exe", application.GetAttribute("Executable"));
         Assert.Equal("Windows.FullTrustApplication", application.GetAttribute("EntryPoint"));
     }
 
@@ -90,6 +90,24 @@ public class PackagingConfigurationTests
     }
 
     [Fact]
+    public void TheManifestNamesTheExecutableThatTheProjectActuallyBuilds()
+    {
+        // The executable is named after the product, and the manifest has to name the same file the
+        // build produces. Renaming one without the other yields a package that installs and then
+        // refuses to start, which is exactly the kind of failure a test should catch.
+        string root = Path.GetDirectoryName(FindPackagingDir())!;
+        string project = File.ReadAllText(Path.Combine(root, "src", "PubTemplateEditor.App", "PubTemplateEditor.App.csproj"));
+        string assembly = System.Text.RegularExpressions.Regex.Match(project, "<AssemblyName>([^<]+)</AssemblyName>").Groups[1].Value;
+        Assert.False(string.IsNullOrWhiteSpace(assembly), "the app project must declare an assembly name");
+
+        string manifest = File.ReadAllText(Path.Combine(root, "packaging", "AppxManifest.template.xml"));
+        string executable = System.Text.RegularExpressions.Regex.Match(manifest, "Executable=\"([^\"]+)\"").Groups[1].Value;
+
+        Assert.Equal(assembly + ".exe", executable);
+        Assert.Equal("PUB_Template_Parameter_Editor", assembly);
+    }
+
+    [Fact]
     public void Draft_settings_still_contain_unresolved_identity_placeholders()
     {
         // REL-04: identity comes from the real reserved product. Until the owner supplies it,
@@ -98,10 +116,15 @@ public class PackagingConfigurationTests
         using JsonDocument doc = JsonDocument.Parse(json);
         JsonElement root = doc.RootElement;
 
-        foreach (string key in new[] { "productId", "packageIdentityName", "publisher", "publisherDisplayName", "sourceRepositoryUrl" })
+        foreach (string key in new[] { "productId", "packageIdentityName", "publisher", "publisherDisplayName" })
         {
             Assert.StartsWith("REPLACE_", root.GetProperty(key).GetString());
         }
+
+        // The source repository is not an identity value, and it is no longer unknown: the project is
+        // developed in the open at this URL, which is also where the GPL's corresponding source lives.
+        Assert.Equal("https://github.com/SKajto/PUB-Template-Parameter-Editor",
+            root.GetProperty("sourceRepositoryUrl").GetString());
 
         Assert.Equal("GPL-3.0-only", root.GetProperty("licenseExpression").GetString());
         Assert.Equal("x64", root.GetProperty("architecture").GetString());

@@ -81,8 +81,8 @@ if (-not $SkipPublish) {
     if ($LASTEXITCODE -ne 0) { Fail "dotnet publish failed with exit code $LASTEXITCODE" }
 }
 $payload = Resolve-Path $PayloadDir -ErrorAction Stop
-$appExe = Join-Path $payload "PubTemplateEditor.exe"
-if (-not (Test-Path $appExe)) { Fail "Payload has no PubTemplateEditor.exe: $payload" }
+$appExe = Join-Path $payload "PUB_Template_Parameter_Editor.exe"
+if (-not (Test-Path $appExe)) { Fail "Payload has no PUB_Template_Parameter_Editor.exe: $payload" }
 
 $loosePdb = @(Get-ChildItem -Path $payload -Filter *.pdb -Recurse)
 if ($loosePdb.Count -gt 0) {
@@ -130,7 +130,7 @@ $sdkVersion = [version]($makeappx -replace '^.*\\bin\\([^\\]+)\\.*$', '$1')
 Write-Output " Using $makeappx (Windows SDK $sdkVersion)"
 
 if (-not (Test-Path $OutDir)) { New-Item -ItemType Directory -Force -Path $OutDir | Out-Null }
-$msixName = "PubTemplateEditor_${Version}_win-x64.msix"
+$msixName = "PUB_Template_Parameter_Editor_${Version}_win-x64.msix"
 $msixPath = Join-Path (Resolve-Path $OutDir) $msixName
 if (Test-Path $msixPath) { Remove-Item -Force $msixPath }
 
@@ -142,7 +142,7 @@ if (-not (Test-Path $msixPath)) { Fail "makeappx reported success but produced n
 $inspectDir = Join-Path $env:TEMP ("msix-inspect-" + [Guid]::NewGuid().ToString("N"))
 & $makeappx unpack /p $msixPath /d $inspectDir /o | Out-Host
 if ($LASTEXITCODE -ne 0) { Fail "makeappx unpack verification failed" }
-foreach ($required in @("AppxManifest.xml", "PubTemplateEditor.exe", "assets\Square44x44Logo.png", "notices\LICENSE.txt", "notices\THIRD-PARTY-NOTICES.txt")) {
+foreach ($required in @("AppxManifest.xml", "PUB_Template_Parameter_Editor.exe", "assets\Square44x44Logo.png", "notices\LICENSE.txt", "notices\THIRD-PARTY-NOTICES.txt")) {
     if (-not (Test-Path (Join-Path $inspectDir $required))) { Fail "Package is missing '$required'" }
 }
 if (@(Get-ChildItem -Path $inspectDir -Filter *.pdb -Recurse).Count -gt 0) { Fail "Package contains loose .pdb files" }

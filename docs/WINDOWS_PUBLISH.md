@@ -4,7 +4,7 @@
 
 The new project uses Microsoft Store MSIX as the primary distribution channel; read docs/GITHUB_STORE_RELEASE.md for packaging and submission. This document retains the one-EXE portable build profile. The app remains self-contained and does not require a separately installed .NET Desktop Runtime/SDK. Store packages also contain manifests, visual assets and required notices; they need not be reduced to one internal EXE.
 
-For the portable channel, distribute PubTemplateEditor.exe. Its application resources, project assemblies and runtime are bundled. Native components may extract under the user's %TEMP%/.net directory; settings and journals use user application data. No elevated setup or writes beside the EXE are required. Test packaged mode separately; a portable launch does not prove the Store install/identity lifecycle.
+For the portable channel, distribute PUB_Template_Parameter_Editor.exe. Its application resources, project assemblies and runtime are bundled. Native components may extract under the user's %TEMP%/.net directory; settings and journals use user application data. No elevated setup or writes beside the EXE are required. Test packaged mode separately; a portable launch does not prove the Store install/identity lifecycle.
 
 ## App project settings
 
@@ -15,7 +15,7 @@ The .csproj.example in examples/ is a reference, not an implemented project. Inc
   <OutputType>WinExe</OutputType>
   <TargetFramework>net10.0-windows</TargetFramework>
   <UseWPF>true</UseWPF>
-  <AssemblyName>PubTemplateEditor</AssemblyName>
+  <AssemblyName>PUB_Template_Parameter_Editor</AssemblyName>
   <RuntimeIdentifier>win-x64</RuntimeIdentifier>
   <SelfContained>true</SelfContained>
   <PublishSingleFile>true</PublishSingleFile>
@@ -41,7 +41,7 @@ dotnet test tests/PubTemplateEditor.Core.Tests/PubTemplateEditor.Core.Tests.cspr
 dotnet test tests/PubTemplateEditor.Integration.Tests/PubTemplateEditor.Integration.Tests.csproj -c Release
 dotnet publish src/PubTemplateEditor.App/PubTemplateEditor.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -p:PublishAot=false -p:DebugType=embedded -o artifacts/publish/win-x64
 Get-ChildItem artifacts/publish/win-x64 -Recurse -File
-Get-FileHash artifacts/publish/win-x64/PubTemplateEditor.exe -Algorithm SHA256
+Get-FileHash artifacts/publish/win-x64/PUB_Template_Parameter_Editor.exe -Algorithm SHA256
 ```
 
 Do not substitute dotnet run for published-EXE acceptance. Build success is not a Windows runtime test. A WPF build produced on a non-Windows host also requires real Windows execution; if cross-compilation is used, verify the SDK requirements and record that it did not run the Windows UI.
@@ -49,7 +49,7 @@ Do not substitute dotnet run for published-EXE acceptance. Build success is not 
 ## Acceptance checks
 
 1. Enumerate the clean publish directory. Explain and resolve every unexpected DLL/config/theme/resource file needed at runtime. Store optional developer symbols and metadata separately.
-2. Copy only PubTemplateEditor.exe to an empty directory on a supported Windows machine without separately installed .NET/SDK or development tools. Launch directly by double-click as a standard user.
+2. Copy only PUB_Template_Parameter_Editor.exe to an empty directory on a supported Windows machine without separately installed .NET/SDK or development tools. Launch directly by double-click as a standard user.
 3. Exercise both themes, native folder selection, persisted preferences, file reading and editing, comparison, bulk staging and review/save using test copies. Run offline.
 4. Repeat with the executable directory read-only, leaving user application data, TEMP and the selected template test folder writable. No UAC prompt or manual extraction configuration should be required.
 5. Observe runtime extraction and record startup time, artifact size, actual supported OS build and bundled runtime patch. Do not assert zero extracted libraries.

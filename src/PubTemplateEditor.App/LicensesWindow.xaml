@@ -1,7 +1,7 @@
 <Window x:Class="PubTemplateEditor.App.LicensesWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Icon="pack://application:,,,/PubTemplateEditor;component/Assets/app.ico"
+        Icon="pack://application:,,,/PUB_Template_Parameter_Editor;component/Assets/app.ico"
         Title="About, licence and bundled components"
         Width="820" Height="620"
         WindowStartupLocation="CenterOwner"

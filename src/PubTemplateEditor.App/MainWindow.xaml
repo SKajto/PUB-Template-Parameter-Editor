@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:infra="clr-namespace:PubTemplateEditor.App.Infrastructure"
         Title="PUB Template Parameter Editor"
-        Icon="pack://application:,,,/PubTemplateEditor;component/Assets/app.ico"
+        Icon="pack://application:,,,/PUB_Template_Parameter_Editor;component/Assets/app.ico"
         Width="1240" Height="780" MinWidth="900" MinHeight="520"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource WindowBackgroundBrush}"

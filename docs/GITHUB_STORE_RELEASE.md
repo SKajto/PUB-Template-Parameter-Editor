@@ -76,37 +76,75 @@ Two different signature questions exist and they must not be merged:
 - **MSIX for the Microsoft Store** needs no publisher certificate from us. The Store signs the
   package after certification. A CI-built MSIX is unsigned, and neither a CI MSIX nor a GitHub EXE
   may ever be labelled Store-signed.
-- **The portable single-file `PubTemplateEditor.exe`** that GitHub serves is the binary that
-  benefits from a real Authenticode signature (mark-of-the-web and SmartScreen behaviour), and that
-  is the one SignPath Foundation can sign free of charge for open-source projects.
+- **The portable single-file `PUB_Template_Parameter_Editor.exe`** that GitHub serves is the binary
+  that benefits from a real Authenticode signature (mark-of-the-web and SmartScreen behaviour), and
+  that is the one SignPath Foundation signs free of charge for open-source projects.
 
-SignPath's free signing is offered on the conditions at <https://signpath.org/terms>. For this
-project the concrete requirements are:
+### What the conditions require, and where this project meets them
 
-1. The project is genuinely open source and the repository stays public; this source is GPL-3.0-only
-   and carries LICENSE, NOTICE and the third-party notices.
-2. The distribution being signed is the project's own build, from that public source, and the
-   binaries are not sold or put behind a paid gate. Charging for the Store listing would need a
-   commercial SignPath plan instead of the Foundation's free certificates - this project ships the
-   Store package at the price the owner chooses, and the free signing route covers non-commercial
-   open-source distribution, so the Store price question and the signing route have to be reviewed
-   together before the portable EXE is offered publicly.
-3. SignPath registers and approves the project (organisation, project, signation policy) and issues
-   an organisation API token. They also ask for a way to identify the project (its homepage or
-   repository) - for us that is <https://github.com/SKajto/PUB-Template-Parameter-Editor>.
-4. Only trusted, maintainer-approved commits are signed. In this repository the release workflow is
-   gated by a protected environment, and signing secrets live in a separate environment so the CI
-   job that runs untrusted pull-request code never sees the token.
+Checked against <https://signpath.org/terms> on 2026-10-26. The project-facing page is
+[CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md), because the conditions ask the *project's home
+page* to carry a section named "Code signing policy".
 
-The workflow side is prepared but deliberately not yet executing: the `signpath-preparation` job in
-`.github/workflows/release.yml` runs only when the repository variable `SIGNPATH_ENABLED` is
-`true`, checks that `SIGNPATH_ORGANIZATION_ID`, `SIGNPATH_SIGNATION_POLICY_ID` and the environment
-secret `SIGNPATH_API_TOKEN` are all present, writes the signature configuration file that names the
-executable and its source URL, and then stops with the remaining instruction. It does not reference
-SignPath's GitHub action, because that action's commit SHA has not been resolved and verified with
-the procedure below; adding an unpinned or guessed third-party action would break the immutability
-rule this repository follows for every other action. Until signing is actually wired and a signed
-build was produced, every artifact in this project is recorded as unsigned.
+| Condition | Status here |
+| --- | --- |
+| No malware or potentially unwanted programs | met - offline editor, no network capability, no services, no elevation |
+| OSI-approved licence, no commercial dual licensing of any component | met - GPL-3.0-only everywhere, recorded in `Directory.Build.props`, LICENSE, NOTICE |
+| No proprietary code; System Libraries (GPL v3 sec. 1) allowed | met - only this project's sources; the owner's `.dta` template data is excluded from the repository, and the .NET runtime/WPF are Microsoft system-library-style inclusions that stay under their own terms |
+| Actively maintained | met - issues/CI on the main branch; the gate is the owner's continuing activity |
+| Already released in the form to be signed | **open** - no GitHub Release carries the executable yet |
+| Functionality documented on the download page or Store entry | met in README/Store metadata text; the release page text still has to be written when the release is made |
+| Sign own projects and own binaries only | met - CI builds this repository's sources; upstream .NET binaries are *included unsigned*, never signed with our subscription |
+| No hacking tools, respect privacy and security | met - the program transfers no information; the policy page states it in the wording the conditions suggest |
+| Announce system changes | met - writes happen only through Review Save, with backups and a journal; described in the policy page |
+| Provide uninstallation | met - Store uninstall, and portable uninstall documented in README/policy |
+| MFA for repository and SignPath accounts | **owner setting** - required before the subscription is used |
+| Author / Reviewer / Approver role structure | documented in the policy page; enforced by `.github/CODEOWNERS`, branch protection (owner) and required reviewers of the `signing-signpath` environment |
+| Code signing policy section on the home page | met - README section links to `docs/CODE_SIGNING_POLICY.md` with the required SignPath sentence, roles, and privacy statement |
+| Artifact configuration: product name = project name, one product version per build | met in `release.yml` - the release version is passed into the publish and the produced executable's `VersionInfo` (ProductName/ProductVersion/FileVersion) is read back and must match, or the run fails |
+| Binaries built from source in a verifiable way | met - the release workflow builds, tests, hashes and records commit plus SDK; SignPath's connector reads the job and artifact identity |
+| Every release needs manual approval for signing | met in design - the `package` job runs in the protected `release-packaging` environment, and the signing job in `signing-signpath`, both requiring maintainer approval; the request also waits inside SignPath for an Approver |
+| Do not fight the system / investigate accusations | accepted by using their action and pipeline connector rather than any local signing shortcut |
+
+Their "verifiable reputation" expectation is worth stating plainly: for a program that people
+download and run because of the signature, SignPath weighs the project's standing, and a brand-new
+repository can be declined. That decision is theirs and there is no arbitration mechanism, so the
+realistic path is to publish the release, get some usage and requests, and apply with the public
+repository and the release page as evidence.
+
+### How the workflow signs
+
+`.github/workflows/release.yml`:
+
+1. `package` (windows-latest, protected environment `release-packaging`) restores, builds, runs all
+   three test projects, publishes the single-file executable with the release version in its
+   metadata, verifies that metadata, hashes the payload and uploads it as the artifact
+   `unsigned-portable-<version>`. Store packaging is a separate step and can be skipped
+   (`includeStorePackage=false`) so a signed portable release can exist before the Partner Center
+   identity values are in place; a tag push always builds the Store package and refuses unresolved
+   `REPLACE_*` identity values (REL-04).
+2. `sign-portable-exe` (ubuntu-latest, protected environment `signing-signpath`, `actions: read`)
+   runs only when the repository variable `SIGNPATH_ENABLED=true`. It refuses to start unless
+   `SIGNPATH_ORGANIZATION_ID`, `SIGNPATH_PROJECT_SLUG`, `SIGNPATH_SIGNING_POLICY_SLUG`,
+   `SIGNPATH_ARTIFACT_CONFIGURATION_SLUG` and the environment secret `SIGNPATH_API_TOKEN` are all
+   present, then submits the signing request for exactly the artifact the `package` job built, waits
+   for the Approver's decision in SignPath, records unsigned and signed SHA-256, the release version,
+   the commit and the request URL in `SIGNING.txt`, and uploads
+   `signed-portable-<version>`.
+3. Nothing in this workflow ever signs an MSIX, and the recorded note states that the signed binary
+   came from SignPath.io with a SignPath Foundation certificate - not from the Store.
+
+The action is pinned to an immutable commit, resolved from the GitHub tags API on 2026-10-26:
+`signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092` (tag
+`v3.0`). Its verified inputs are `api-token`, `organization-id`, `project-slug`,
+`signing-policy-slug`, `artifact-configuration-slug`, `github-artifact-id`,
+`wait-for-completion`, `output-artifact-directory` - note that they take **slugs**, not the numeric
+ids, and that the file-metadata restrictions live in SignPath's artifact configuration, not in a
+file in this repository.
+
+An SBOM is not produced yet. The conditions say such practices may become mandatory later, so if
+the subscription is granted, adding a `cyclonedx`-style SBOM step to the release job is the next
+configuration change to expect.
 
 ## Identity version and provenance
 
