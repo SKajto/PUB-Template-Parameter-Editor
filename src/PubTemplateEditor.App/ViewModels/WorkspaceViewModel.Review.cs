@@ -34,6 +34,9 @@ public sealed partial class WorkspaceViewModel
 
     public ObservableCollection<StagedReviewRow> ReviewRows { get; } = [];
 
+    /// <summary>The same staged changes, one group per template file, for the review cards.</summary>
+    public ObservableCollection<ReviewFileGroup> ReviewGroups { get; } = [];
+
     public bool IsReviewOpen => _isReviewOpen;
 
     /// <summary>A save in flight blocks a second one; the command and this flag are the same gate.</summary>
@@ -128,9 +131,11 @@ public sealed partial class WorkspaceViewModel
     private void RebuildReviewRows()
     {
         ReviewRows.Clear();
+        // Grouped by file first: the review cards are read as "what happens to this template", and a
+        // batch is written one file at a time, so the file is the unit a reviewer reasons about.
         foreach (DraftChange change in Drafts.Changes
-                     .OrderBy(c => c.DeclarationName, StringComparer.CurrentCultureIgnoreCase)
-                     .ThenBy(c => c.FilePath, StringComparer.OrdinalIgnoreCase)
+                     .OrderBy(c => c.FilePath, StringComparer.OrdinalIgnoreCase)
+                     .ThenBy(c => c.DeclarationName, StringComparer.CurrentCultureIgnoreCase)
                      .ThenBy(c => c.Field))
         {
             var row = new StagedReviewRow(change);
@@ -155,6 +160,13 @@ public sealed partial class WorkspaceViewModel
                 Raise(nameof(ReviewSummary));
             };
             ReviewRows.Add(row);
+        }
+
+        // Same row objects, seen per file. Ticking, discarding and saving keep working on one set.
+        ReviewGroups.Clear();
+        foreach (IGrouping<string, StagedReviewRow> group in ReviewRows.GroupBy(r => r.FilePath, StringComparer.OrdinalIgnoreCase))
+        {
+            ReviewGroups.Add(new ReviewFileGroup(group.Key, group.ToList()));
         }
 
         _reviewDeselected.RemoveWhere(key => ReviewRows.All(r => r.Key != key));

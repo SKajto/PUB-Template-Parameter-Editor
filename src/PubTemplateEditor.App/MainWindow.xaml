@@ -430,70 +430,139 @@
                                     </Grid>
                                 </Border>
 
-                                <ListView x:Name="ReviewListView" ItemsSource="{Binding ReviewRows}"
-                                          BorderThickness="0" Margin="12,0,12,0" IsTabStop="False"
-                                          AutomationProperties.Name="Staged changes waiting for review">
-                                    <ListView.View>
-                                        <GridView>
-                                            <GridViewColumn Header="" Width="30">
-                                                <GridViewColumn.CellTemplate>
-                                                    <DataTemplate>
-                                                        <CheckBox IsChecked="{Binding IsSelected}"
-                                                                  HorizontalAlignment="Center"
-                                                                  AutomationProperties.Name="Include this change"/>
-                                                    </DataTemplate>
-                                                </GridViewColumn.CellTemplate>
-                                            </GridViewColumn>
-                                            <GridViewColumn Header="Parameter" Width="120">
-                                                <GridViewColumn.CellTemplate>
-                                                    <DataTemplate>
-                                                        <TextBlock Text="{Binding ParameterName}" FontFamily="{DynamicResource MonoFontFamily}"/>
-                                                    </DataTemplate>
-                                                </GridViewColumn.CellTemplate>
-                                            </GridViewColumn>
-                                            <GridViewColumn Header="Template" Width="110">
-                                                <GridViewColumn.CellTemplate>
-                                                    <DataTemplate>
-                                                        <TextBlock Text="{Binding FileName}" ToolTip="{Binding FilePath}"/>
-                                                    </DataTemplate>
-                                                </GridViewColumn.CellTemplate>
-                                            </GridViewColumn>
-                                            <GridViewColumn Header="Field" Width="80">
-                                                <GridViewColumn.CellTemplate>
-                                                    <DataTemplate>
-                                                        <TextBlock Text="{Binding FieldLabel}"
-                                                                   Foreground="{DynamicResource MutedForegroundBrush}"/>
-                                                    </DataTemplate>
-                                                </GridViewColumn.CellTemplate>
-                                            </GridViewColumn>
-                                            <GridViewColumn Header="Now" Width="110">
-                                                <GridViewColumn.CellTemplate>
-                                                    <DataTemplate>
-                                                        <TextBlock Text="{Binding BaselineText}" FontFamily="{DynamicResource MonoFontFamily}"
-                                                                   TextTrimming="CharacterEllipsis" MaxWidth="104"/>
-                                                    </DataTemplate>
-                                                </GridViewColumn.CellTemplate>
-                                            </GridViewColumn>
-                                            <GridViewColumn Header="After save" Width="130">
-                                                <GridViewColumn.CellTemplate>
-                                                    <DataTemplate>
-                                                        <TextBlock Text="{Binding ProposedText}" FontFamily="{DynamicResource MonoFontFamily}"
-                                                                   TextTrimming="CharacterEllipsis" MaxWidth="124"
-                                                                   Foreground="{DynamicResource AccentBrush}"/>
-                                                    </DataTemplate>
-                                                </GridViewColumn.CellTemplate>
-                                            </GridViewColumn>
-                                            <GridViewColumn Header="Writes" Width="86">
-                                                <GridViewColumn.CellTemplate>
-                                                    <DataTemplate>
-                                                        <TextBlock Text="{Binding WriteStateText}" Foreground="{DynamicResource MutedForegroundBrush}"
-                                                                   ToolTip="{Binding NoOpHint}" ToolTipService.ShowOnDisabled="True"/>
-                                                    </DataTemplate>
-                                                </GridViewColumn.CellTemplate>
-                                            </GridViewColumn>
-                                        </GridView>
-                                    </ListView.View>
-                                </ListView>
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="12,0,12,6"
+                                              AutomationProperties.Name="Staged changes waiting for review">
+                                    <!-- One card per staged change, grouped per template file. A GridView
+                                     clipped long values, which made the review useless: the whole point is
+                                     reading what the value says now and what it would say after the save.
+                                     Values therefore get full-width wrapping text blocks, and the changed
+                                     stretch is highlighted separately for long single-line descriptions. -->
+                                    <ItemsControl x:Name="ReviewGroupsList" ItemsSource="{Binding ReviewGroups}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Margin="0,8,0,0">
+                                                    <StackPanel Orientation="Horizontal" Margin="2,0,0,4"
+                                                              ToolTip="{Binding FilePath}"
+                                                              AutomationProperties.Name="Changes of one template">
+                                                        <Path Style="{StaticResource IconLineStyle}" Data="{StaticResource IconListChecks}"
+                                                              Width="14" Height="14" Margin="0,0,6,0"
+                                                              Stroke="{DynamicResource MutedForegroundBrush}"/>
+                                                        <TextBlock Text="{Binding FileName}" FontWeight="SemiBold"/>
+                                                        <Border Style="{StaticResource BadgeBorderStyle}" Margin="8,0,0,0">
+                                                            <TextBlock Text="{Binding ChangeCountText}" FontSize="11"
+                                                                       Foreground="{DynamicResource MutedForegroundBrush}"/>
+                                                        </Border>
+                                                    </StackPanel>
+
+                                                    <ItemsControl ItemsSource="{Binding Rows}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Border Style="{StaticResource CardStyle}" Margin="0,0,0,6">
+                                                                    <Grid>
+                                                                        <Grid.ColumnDefinitions>
+                                                                            <ColumnDefinition Width="Auto"/>
+                                                                            <ColumnDefinition Width="*"/>
+                                                                        </Grid.ColumnDefinitions>
+
+                                                                        <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}"
+                                                                                VerticalAlignment="Top" Margin="0,3,10,0"
+                                                                                AutomationProperties.Name="Include this change in the save"/>
+
+                                                                        <StackPanel Grid.Column="1">
+                                                                            <WrapPanel>
+                                                                                <TextBlock Text="{Binding ParameterName}"
+                                                                                           FontFamily="{DynamicResource MonoFontFamily}"
+                                                                                           FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                                                <Border Style="{StaticResource BadgeBorderStyle}" Margin="8,0,0,0">
+                                                                                    <TextBlock Text="{Binding FieldLabel}" FontSize="11"
+                                                                                               Foreground="{DynamicResource MutedForegroundBrush}"/>
+                                                                                </Border>
+                                                                                <Border Style="{StaticResource BadgeBorderStyle}" Margin="6,0,0,0"
+                                                                                        ToolTip="{Binding NoOpHint}">
+                                                                                    <TextBlock Text="{Binding WriteStateText}" FontSize="11"
+                                                                                               Foreground="{DynamicResource MutedForegroundBrush}"/>
+                                                                                </Border>
+                                                                                <Border Style="{StaticResource BadgeBorderStyle}" Margin="6,0,0,0"
+                                                                                        Visibility="{Binding HasHiddenWhitespace, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                                                        ToolTip="{Binding HiddenWhitespaceHint}">
+                                                                                    <TextBlock Text="spaces at the edge" FontSize="11"
+                                                                                               Style="{StaticResource DirtyBadgeStyle}"/>
+                                                                                </Border>
+                                                                            </WrapPanel>
+
+                                                                            <Grid Margin="0,8,0,0">
+                                                                                <Grid.ColumnDefinitions>
+                                                                                    <ColumnDefinition Width="124"/>
+                                                                                    <ColumnDefinition Width="*"/>
+                                                                                </Grid.ColumnDefinitions>
+                                                                                <Grid.RowDefinitions>
+                                                                                    <RowDefinition Height="Auto"/>
+                                                                                    <RowDefinition Height="Auto"/>
+                                                                                </Grid.RowDefinitions>
+
+                                                                                <TextBlock Grid.Row="0" Grid.Column="0" Text="In the template"
+                                                                                           Style="{StaticResource FieldNoteStyle}"/>
+                                                                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding BaselineText}"
+                                                                                           TextWrapping="Wrap"
+                                                                                           FontFamily="{DynamicResource MonoFontFamily}"/>
+
+                                                                                <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,6,0,0"
+                                                                                           Text="After the save"
+                                                                                           Style="{StaticResource FieldNoteStyle}"/>
+                                                                                <TextBlock Grid.Row="1" Grid.Column="1" Margin="0,6,0,0"
+                                                                                           Text="{Binding ProposedText}" TextWrapping="Wrap"
+                                                                                           FontFamily="{DynamicResource MonoFontFamily}"
+                                                                                           Foreground="{DynamicResource AccentBrush}"/>
+                                                                            </Grid>
+
+                                                                            <StackPanel Margin="0,8,0,0"
+                                                                                      Visibility="{Binding HasValueDiff, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                                                <TextBlock Text="The change in place"
+                                                                                           Style="{StaticResource FieldNoteStyle}"/>
+                                                                                <Border Margin="0,4,0,0" Padding="8,6" CornerRadius="4"
+                                                                                        BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}"
+                                                                                        Background="{DynamicResource WindowBackgroundBrush}"
+                                                                                        Visibility="{Binding IsCompleteReplacement, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                                                                                    <WrapPanel>
+                                                                                        <TextBlock Text="{Binding Delta.PrefixShown}"
+                                                                                                   FontFamily="{DynamicResource MonoFontFamily}" TextWrapping="Wrap"
+                                                                                                   Foreground="{DynamicResource MutedForegroundBrush}"
+                                                                                                   Visibility="{Binding Delta.PrefixShown, Converter={StaticResource NonEmptyStringToVisibilityConverter}}"/>
+                                                                                        <TextBlock Text="{Binding Delta.RemovedShown}"
+                                                                                                   Margin="2,0" TextDecorations="Strikethrough"
+                                                                                                   FontFamily="{DynamicResource MonoFontFamily}" TextWrapping="Wrap"
+                                                                                                   Foreground="{DynamicResource DirtyBrush}"
+                                                                                                   Visibility="{Binding Delta.RemovedShown, Converter={StaticResource NonEmptyStringToVisibilityConverter}}"/>
+                                                                                        <TextBlock Text="{Binding Delta.AddedShown}"
+                                                                                                   Margin="2,0" TextDecorations="Underline"
+                                                                                                   FontFamily="{DynamicResource MonoFontFamily}" TextWrapping="Wrap"
+                                                                                                   Foreground="{DynamicResource AccentBrush}"
+                                                                                                   Visibility="{Binding Delta.AddedShown, Converter={StaticResource NonEmptyStringToVisibilityConverter}}"/>
+                                                                                        <TextBlock Text="{Binding Delta.SuffixShown}"
+                                                                                                   FontFamily="{DynamicResource MonoFontFamily}" TextWrapping="Wrap"
+                                                                                                   Foreground="{DynamicResource MutedForegroundBrush}"
+                                                                                                   Visibility="{Binding Delta.SuffixShown, Converter={StaticResource NonEmptyStringToVisibilityConverter}}"/>
+                                                                                    </WrapPanel>
+                                                                                </Border>
+                                                                                <TextBlock Text="The whole value is replaced; none of the old text is kept."
+                                                                                           Style="{StaticResource FieldNoteStyle}" Margin="0,4,0,0"
+                                                                                           Visibility="{Binding IsCompleteReplacement, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                                            </StackPanel>
+
+                                                                            <TextBlock Text="{Binding NoOpHint}" TextWrapping="Wrap" Margin="0,8,0,0"
+                                                                                       Foreground="{DynamicResource DirtyBrush}"
+                                                                                       Visibility="{Binding IsNoOp, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                                        </StackPanel>
+                                                                    </Grid>
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
                             </DockPanel>
                         </Border>
 

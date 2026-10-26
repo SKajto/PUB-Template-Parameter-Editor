@@ -274,19 +274,20 @@ public class ReviewTests
     }
 
     /// <summary>
-    /// A typo in a binding path shows up as an empty cell, not as an exception. The review table binds
-    /// every column to one property of <see cref="StagedReviewRow"/>; each expected column is checked
-    /// against the XAML and against the row type, so a rename cannot silently blank a column.
+    /// A typo in a binding path shows up as a blank card, not as an exception. The review list binds group
+    /// properties on <see cref="ReviewFileGroup"/> and row properties on <see cref="StagedReviewRow"/>; the
+    /// properties a reviewer needs to judge a change are named here, and every path inside the list is
+    /// resolved against the type that owns it, so a rename cannot silently blank part of the review.
     /// </summary>
     [Fact]
-    public void EveryReviewColumnBindsToAPropertyOfTheReviewRow()
+    public void EveryReviewCardBindingResolvesOnTheTypeThatOwnsIt()
     {
         string xaml = File.ReadAllText(Path.Combine(RepoRoot(), "src", "PubTemplateEditor.App", "MainWindow.xaml"));
-        int start = xaml.IndexOf("x:Name=\"ReviewListView\"", StringComparison.Ordinal);
-        Assert.True(start >= 0, "ReviewListView is missing from MainWindow.xaml");
-        // Only the columns bind to a row object; the ListView's own ItemsSource binds the view model.
-        int grid = xaml.IndexOf("<GridView", start, StringComparison.Ordinal);
-        string block = xaml[grid..xaml.IndexOf("</ListView>", start, StringComparison.Ordinal)];
+        int start = xaml.IndexOf("x:Name=\"ReviewGroupsList\"", StringComparison.Ordinal);
+        Assert.True(start >= 0, "ReviewGroupsList is missing from MainWindow.xaml");
+        // The list's own ItemsSource binds the view model; only what is inside the list binds a group or a row.
+        int contentStart = xaml.IndexOf('>', start) + 1;
+        string block = xaml[contentStart..xaml.IndexOf("</ScrollViewer>", contentStart, StringComparison.Ordinal)];
 
         var bound = new HashSet<string>(
             System.Text.RegularExpressions.Regex.Matches(block, @"\{Binding\s+([A-Za-z_][A-Za-z0-9_.]*)")
@@ -294,32 +295,213 @@ public class ReviewTests
                 .Select(m => m.Groups[1].Value),
             StringComparer.Ordinal);
 
-        string[] expected =
+        string[] rowPaths =
         [
             nameof(StagedReviewRow.IsSelected),
             nameof(StagedReviewRow.ParameterName),
-            nameof(StagedReviewRow.FileName),
             nameof(StagedReviewRow.FieldLabel),
             nameof(StagedReviewRow.BaselineText),
             nameof(StagedReviewRow.ProposedText),
             nameof(StagedReviewRow.WriteStateText),
             nameof(StagedReviewRow.NoOpHint),
+            nameof(StagedReviewRow.HasValueDiff),
+            nameof(StagedReviewRow.IsCompleteReplacement),
+            nameof(StagedReviewRow.HasHiddenWhitespace),
+            nameof(StagedReviewRow.HiddenWhitespaceHint),
+            $"{nameof(StagedReviewRow.Delta)}.{nameof(PubTemplateEditor.Core.Editing.TextDelta.PrefixShown)}",
+            $"{nameof(StagedReviewRow.Delta)}.{nameof(PubTemplateEditor.Core.Editing.TextDelta.RemovedShown)}",
+            $"{nameof(StagedReviewRow.Delta)}.{nameof(PubTemplateEditor.Core.Editing.TextDelta.AddedShown)}",
+            $"{nameof(StagedReviewRow.Delta)}.{nameof(PubTemplateEditor.Core.Editing.TextDelta.SuffixShown)}",
         ];
 
-        foreach (string path in expected)
+        foreach (string path in rowPaths)
         {
-            Assert.True(bound.Contains(path), $"the review table does not bind {path}");
-            Assert.NotNull(typeof(StagedReviewRow).GetProperty(path));
+            Assert.True(bound.Contains(path), $"the review does not bind {path}");
+            Resolve(typeof(StagedReviewRow), path);
         }
 
+        string[] groupPaths =
+        [
+            nameof(ReviewFileGroup.Rows),
+            nameof(ReviewFileGroup.ChangeCountText),
+            nameof(ReviewFileGroup.FilePath),
+        ];
+
+        foreach (string path in groupPaths)
+        {
+            Assert.True(bound.Contains(path), $"the review does not bind {path}");
+            Resolve(typeof(ReviewFileGroup), path);
+        }
+
+        // Nothing else may dangle: every path in the block belongs to the group or to the row.
         foreach (string path in bound)
         {
-            Type current = typeof(StagedReviewRow);
-            foreach (string segment in path.Split('.'))
+            Assert.True(TryResolve(typeof(StagedReviewRow), path) || TryResolve(typeof(ReviewFileGroup), path),
+                $"the review binds {path}, which belongs to neither a staged row nor a file group");
+        }
+    }
+
+    private static void Resolve(Type start, string path)
+    {
+        Assert.True(TryResolve(start, path), $"{path} does not resolve from {start.Name}");
+    }
+
+    private static bool TryResolve(Type start, string path)
+    {
+        Type current = start;
+        foreach (string segment in path.Split('.'))
+        {
+            PropertyInfo? property = current.GetProperty(segment);
+            if (property is null)
             {
-                PropertyInfo? property = current.GetProperty(segment);
-                Assert.True(property is not null, $"the review table binds {path}, which has no {segment} on {current.Name}");
-                current = property!.PropertyType;
+                return false;
+            }
+
+            current = property.PropertyType;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// The reason the review exists: a reviewer has to be able to read the value. A GridView clipped
+    /// these to a column width, so the card layout is checked against a value far longer than the panel.
+    /// </summary>
+    [Fact]
+    public async Task TheReviewShowsAWholeLongValueInsteadOfCuttingItOff()
+    {
+        string settings = TempDir("settings");
+        string templates = TempDir("templates");
+        string longBaseline = "Sets how many units the player collects per level " + new string('.', 260) + " level";
+        string longProposed = "Sets how many units the player collects per town " + new string('.', 260) + " town";
+        Write(templates, "one.dta", TemplateXml(Variable("alpha", longBaseline)));
+
+        WorkspaceViewModel vm = await ReadAllAsync(settings, templates);
+        Stage(vm, "one.dta", "alpha", FieldKind.DefaultValue, longProposed);
+
+        _host.Do(() =>
+        {
+            vm.OpenReviewCommand.Execute(null);
+            var window = new ShellWindow(vm) { ShowInTaskbar = false };
+            FrameworkElement root = (FrameworkElement)window.Content;
+            root.Measure(new Size(1240, 780));
+            root.Arrange(new Rect(new Size(1240, 780)));
+            root.UpdateLayout();
+
+            TextBlock[] values = Tree(window.ReviewList).OfType<TextBlock>().ToArray();
+            TextBlock? baseline = values.FirstOrDefault(t => t.Text == longBaseline);
+            TextBlock? proposed = values.FirstOrDefault(t => t.Text == longProposed);
+
+            Assert.True(baseline is not null, "the full value in the template is not shown in the review");
+            Assert.True(proposed is not null, "the full proposed value is not shown in the review");
+            Assert.Equal(TextWrapping.Wrap, baseline!.TextWrapping);
+            Assert.Equal(TextTrimming.None, baseline.TextTrimming);
+            // The middle panel is only part of a 1240 px window; what matters is that the value gets the
+            // whole width of its card and wraps, instead of being cut at a fixed column width.
+            Assert.True(baseline.ActualWidth > 240, $"value column is only {baseline.ActualWidth} wide");
+            Assert.True(baseline.ActualHeight > 40, $"value draws in {baseline.ActualHeight} px, not wrapped");
+
+            vm.NavigationGuard = _ => NavigationDecision.KeepEditing;
+            window.Close();
+            vm.NavigationGuard = null;
+        });
+    }
+
+    [Fact]
+    public async Task TheReviewMarksTheExactStretchThatChanges()
+    {
+        string settings = TempDir("settings");
+        string templates = TempDir("templates");
+        Write(templates, "one.dta", TemplateXml(Variable("alpha", "Sets how many units the player collects per level")));
+
+        WorkspaceViewModel vm = await ReadAllAsync(settings, templates);
+        Stage(vm, "one.dta", "alpha", FieldKind.DefaultValue, "Sets how many units the player collects per town");
+
+        _host.Do(() =>
+        {
+            vm.OpenReviewCommand.Execute(null);
+            var window = new ShellWindow(vm) { ShowInTaskbar = false };
+            FrameworkElement root = (FrameworkElement)window.Content;
+            root.Measure(new Size(1240, 780));
+            root.Arrange(new Rect(new Size(1240, 780)));
+            root.UpdateLayout();
+
+            TextBlock[] pieces = Tree(window.ReviewList).OfType<TextBlock>().ToArray();
+            TextBlock? removed = pieces.FirstOrDefault(t => t.Text == "level" && t.TextDecorations.Count > 0);
+            TextBlock? added = pieces.FirstOrDefault(t => t.Text == "town" && t.TextDecorations.Count > 0);
+
+            Assert.True(removed is not null, "the removed stretch is not marked in the review");
+            Assert.True(added is not null, "the added stretch is not marked in the review");
+
+            // The unchanged context stays visible too, shortened from the inner edge so the changed
+            // stretch is on screen without showing hundreds of characters of context.
+            Assert.Contains(pieces, t => t.Text!.StartsWith("…", StringComparison.Ordinal)
+                                         && t.Text!.EndsWith("collects per ", StringComparison.Ordinal));
+
+            vm.NavigationGuard = _ => NavigationDecision.KeepEditing;
+            window.Close();
+            vm.NavigationGuard = null;
+        });
+    }
+
+    [Fact]
+    public async Task TheReviewGroupsStagedChangesOneTemplateFileAtATime()
+    {
+        string settings = TempDir("settings");
+        string templates = TempDir("templates");
+        Write(templates, "one.dta", TemplateXml(Variable("alpha", "OLD_A"), Variable("beta", "OLD_B")));
+        Write(templates, "two.dta", TemplateXml(Variable("alpha", "OLD_A2")));
+
+        WorkspaceViewModel vm = await ReadAllAsync(settings, templates);
+        Stage(vm, "one.dta", "alpha", FieldKind.DefaultValue, "NEW_A");
+        Stage(vm, "one.dta", "beta", FieldKind.DefaultValue, "NEW_B");
+        Stage(vm, "two.dta", "alpha", FieldKind.DefaultValue, "NEW_A2");
+
+        _host.Do(() =>
+        {
+            vm.OpenReviewCommand.Execute(null);
+
+            Assert.Equal(3, vm.ReviewRows.Count);
+            Assert.Equal(2, vm.ReviewGroups.Count);
+            Assert.Equal("one.dta|two.dta", string.Join("|", vm.ReviewGroups.Select(g => g.FileName)));
+            Assert.Equal(2, vm.ReviewGroups[0].Rows.Count);
+            Assert.Equal("2 changes", vm.ReviewGroups[0].ChangeCountText);
+            Assert.Same(vm.ReviewRows.Single(r => r.FileName == "two.dta"), vm.ReviewGroups[1].Rows.Single());
+
+            var window = new ShellWindow(vm) { ShowInTaskbar = false };
+            FrameworkElement root = (FrameworkElement)window.Content;
+            root.Measure(new Size(1240, 780));
+            root.Arrange(new Rect(new Size(1240, 780)));
+            root.UpdateLayout();
+
+            Assert.Equal(2, window.ReviewList.Items.Count);
+            var headers = Tree(window.ReviewList).OfType<TextBlock>()
+                .Where(t => t.Text is "one.dta" or "two.dta")
+                .Select(t => t.Text)
+                .Distinct()
+                .ToList();
+            Assert.Equal("one.dta|two.dta", string.Join("|", headers));
+
+            // Ticking stays a per-change decision, inside the group it belongs to.
+            vm.ReviewRows.Single(r => r.FileName == "two.dta").IsSelected = false;
+            Assert.Equal(2, vm.SelectedReviewCount);
+
+            vm.NavigationGuard = _ => NavigationDecision.KeepEditing;
+            window.Close();
+            vm.NavigationGuard = null;
+        });
+    }
+
+    private static IEnumerable<DependencyObject> Tree(DependencyObject node)
+    {
+        for (int i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(node); i++)
+        {
+            DependencyObject child = System.Windows.Media.VisualTreeHelper.GetChild(node, i);
+            yield return child;
+
+            foreach (DependencyObject grand in Tree(child))
+            {
+                yield return grand;
             }
         }
     }

@@ -134,6 +134,64 @@ public sealed class StagedReviewRow : ViewModelBase
 
     public string ProposedText => Show(Change.ProposedValue);
 
+    private TextDelta? _delta;
+
+    /// <summary>
+    /// What differs, in the shape a reviewer reads: unchanged context around the changed stretch. The
+    /// review cards show both full values anyway; this is what makes the difference easy to find when a
+    /// description is a long single line.
+    /// </summary>
+    public TextDelta Delta => _delta ??= new TextDelta(Change.BaselineValue, Change.ProposedValue);
+
+    public bool HasValueDiff => Delta.HasChange;
+
+    /// <summary>Nothing is shared between the two values, so a "changed part" strip would be noise.</summary>
+    public bool IsCompleteReplacement => Delta.IsCompleteReplacement;
+
+    /// <summary>
+    /// Leading or trailing spaces and tabs are invisible in a table, and the editor deliberately does not
+    /// trim them. Say so rather than let a reviewer wonder whether the value really ends with a space.
+    /// </summary>
+    public bool HasHiddenWhitespace => ShowsHiddenWhitespace(Change.BaselineValue) || ShowsHiddenWhitespace(Change.ProposedValue);
+
+    public string HiddenWhitespaceHint
+    {
+        get
+        {
+            static string EdgeOf(string? value)
+            {
+                if (value is not { Length: > 0 })
+                {
+                    return string.Empty;
+                }
+
+                bool starts = char.IsWhiteSpace(value[0]);
+                bool ends = char.IsWhiteSpace(value[^1]);
+                return (starts, ends) switch
+                {
+                    (true, true) => "starts and ends with whitespace",
+                    (true, false) => "starts with whitespace",
+                    (false, true) => "ends with whitespace",
+                    _ => string.Empty,
+                };
+            }
+
+            string baseline = EdgeOf(Change.BaselineValue);
+            string proposed = EdgeOf(Change.ProposedValue);
+            if (baseline.Length == 0 && proposed.Length == 0)
+            {
+                return string.Empty;
+            }
+
+            return "Whitespace at the edge of a value is kept: in the template "
+                 + (baseline.Length > 0 ? baseline : "no edge whitespace")
+                 + (proposed.Length > 0 ? $"; the proposed value {proposed}" : string.Empty);
+        }
+    }
+
+    private static bool ShowsHiddenWhitespace(string? value) =>
+        value is { Length: > 0 } && (char.IsWhiteSpace(value[0]) || char.IsWhiteSpace(value[^1]));
+
     public bool IsSelected
     {
         get => _isSelected;
@@ -165,6 +223,31 @@ public sealed class StagedReviewRow : ViewModelBase
         "" => "(empty)",
         _ => value,
     };
+}
+
+/// <summary>
+/// One template file inside the save review: its staged changes are kept together so a reviewer can
+/// judge "what happens to this file" at a glance. The rows are the same objects as the flat list, so
+/// ticking, discarding and saving address one row set, not two copies.
+/// </summary>
+public sealed class ReviewFileGroup : ViewModelBase
+{
+    public ReviewFileGroup(string filePath, IReadOnlyList<StagedReviewRow> rows)
+    {
+        FilePath = filePath;
+        FileName = System.IO.Path.GetFileName(filePath);
+        Rows = rows;
+    }
+
+    public string FilePath { get; }
+
+    public string FileName { get; }
+
+    public IReadOnlyList<StagedReviewRow> Rows { get; }
+
+    public string ChangeCountText => Rows.Count == 1 ? "1 change" : $"{Rows.Count} changes";
+
+    public string Headline => $"{FileName} - {ChangeCountText}";
 }
 
 /// <summary>

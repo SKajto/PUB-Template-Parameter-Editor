@@ -55,7 +55,7 @@ public partial class MainWindow : Window
     public Button ReviewSaveActionButton => ReviewSaveButton;
     public Button BulkConfirmActionButton => BulkConfirmButton;
     public Border ExplorerStagedBadge => StagedBadge;
-    public ListView ReviewList => ReviewListView;
+    public ItemsControl ReviewList => ReviewGroupsList;
     public TextBlock ReviewSummaryLabel => ReviewSummaryText;
     // The single review entry, in the top bar beside the staged-count badge. It is deliberately not
     // repeated next to a parameter: the review always covers the whole session, never only the selection.
