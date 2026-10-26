@@ -4,9 +4,11 @@ A Windows desktop editor for the variable declarations of PUB template files
 (`.dta`). It is an offline tool: no service, no web view, no telemetry. Edits are
 staged in memory and reach the disk only through an explicit review step.
 
-**Status:** development milestones S0–S5 are implemented and covered by 208
-automated tests; the app builds and runs on Windows 11 x64. Native PUB
-round-trip compatibility, a real Microsoft Store identity and a signed
+**Status:** development milestones S0–S5 are implemented and covered by 212 automated
+tests (196 of them run without the local template samples, which are not shipped).
+The Windows CI pipeline is green on GitHub: build, all three test projects, the
+licensing and content checks, a portable single-file executable and a draft MSIX.
+Native PUB round-trip compatibility, a real Microsoft Store identity and a signed
 downloadable executable are open gates — see [PLAN.md](PLAN.md).
 
 ## What it does
@@ -54,7 +56,8 @@ powershell -File packaging/build-msix.ps1 -Version 0.1.0 -Mode Draft
 
 The test suite prefers real PUB templates when the machine has them, and writes
 synthetic containers of the same shape when it does not — see
-`tests/TestSampleSupport.cs`.
+`tests/TestSampleSupport.cs`. Before pushing, run the suite once with `examples/`
+renamed away: that is what a fresh clone and CI see.
 
 ## Template samples are not part of this repository
 
