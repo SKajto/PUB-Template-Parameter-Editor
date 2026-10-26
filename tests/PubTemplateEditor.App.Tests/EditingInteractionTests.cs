@@ -183,6 +183,50 @@ public class EditingInteractionTests
         });
     }
 
+    /// <summary>
+    /// A form that is holding a value back has to name it. Choosing "apply the form changes and
+    /// continue" and seeing nothing happen is the worst possible outcome for the user, so the reason is
+    /// part of the state and shown in the details panel.
+    /// </summary>
+    [Fact]
+    public async Task TheFormNamesTheValueItIsHoldingBack()
+    {
+        string templates = TempDir("templates");
+        Write(templates, "one.dta", TemplateXml(Variable("alpha", "OLD")));
+        Write(templates, "two.dta", TemplateXml(Variable("gamma", "THREE")));
+
+        WorkspaceViewModel vm = await ReadAllAsync(TempDir("settings"), templates);
+
+        _host.Do(() =>
+        {
+            TemplateItem one = vm.ActiveFile!;
+            var other = vm.AllFiles.Single(f => !ReferenceEquals(f, one));
+
+            vm.SelectedParameter = vm.VisibleParameters.Single();
+            Assert.Equal(string.Empty, vm.UnappliedFieldReport);
+
+            vm.DetailDefaultValue = "TYPED BUT NOT APPLIED";
+            Assert.True(vm.HasUnappliedFieldReport);
+            Assert.Contains("default value", vm.UnappliedFieldReport, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("TYPED BUT NOT APPLIED", vm.DetailDefaultValue, StringComparison.Ordinal);
+
+            // Staying put keeps the report available, so the user can see what is still outstanding.
+            vm.NavigationGuard = _ => NavigationDecision.KeepEditing;
+            vm.SelectActiveFile(other);
+            Assert.Same(one, vm.ActiveFile);
+            Assert.True(vm.HasUnappliedFieldReport);
+
+            // Discarding the typing removes both the dirty state and the report.
+            vm.NavigationGuard = _ => NavigationDecision.DiscardForms;
+            vm.SelectActiveFile(other);
+            Assert.Same(other, vm.ActiveFile);
+            Assert.False(vm.HasUnappliedFormEdits);
+            Assert.Equal(string.Empty, vm.UnappliedFieldReport);
+
+            vm.NavigationGuard = null;
+        });
+    }
+
     [Fact]
     public async Task SwitchingParameterAsksAboutUnappliedTypingAndAlwaysKeepsStagedWork()
     {

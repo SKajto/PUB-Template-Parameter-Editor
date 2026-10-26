@@ -152,26 +152,37 @@ public sealed partial class WorkspaceViewModel
                 return 0;
             }
 
-            string path = row.File.FilePath;
-            int id = row.DeclarationId;
             int count = 0;
-            if (_canEditAccess && !string.Equals(_detailAccess, row.EffectiveAccess, StringComparison.Ordinal))
+            foreach (FieldKind field in new[] { FieldKind.Access, FieldKind.DefaultValue, FieldKind.Description })
             {
-                count++;
-            }
-
-            if (_canEditDefaultValue && !string.Equals(_detailDefaultValue, EffectiveOrEmpty(path, id, FieldKind.DefaultValue, row), StringComparison.Ordinal))
-            {
-                count++;
-            }
-
-            if (_canEditDescription && !string.Equals(_detailDescription, EffectiveOrEmpty(path, id, FieldKind.Description, row), StringComparison.Ordinal))
-            {
-                count++;
+                if (IsFieldDirtyInForm(field))
+                {
+                    count++;
+                }
             }
 
             return count;
         }
+    }
+
+    private bool IsFieldDirtyInForm(FieldKind field)
+    {
+        ParameterRowItem? row = _selectedParameter;
+        if (row is null)
+        {
+            return false;
+        }
+
+        return field switch
+        {
+            FieldKind.Access => _canEditAccess
+                && !string.Equals(_detailAccess, row.EffectiveAccess, StringComparison.Ordinal),
+            FieldKind.DefaultValue => _canEditDefaultValue
+                && !string.Equals(_detailDefaultValue, EffectiveOrEmpty(row.File.FilePath, row.DeclarationId, field, row), StringComparison.Ordinal),
+            FieldKind.Description => _canEditDescription
+                && !string.Equals(_detailDescription, EffectiveOrEmpty(row.File.FilePath, row.DeclarationId, field, row), StringComparison.Ordinal),
+            _ => false,
+        };
     }
 
     public string FormSummary => _selectedParameter is null
@@ -361,6 +372,8 @@ public sealed partial class WorkspaceViewModel
                      nameof(EditorFields),
                      nameof(HasUnappliedFormEdits),
                      nameof(UnappliedFieldCount),
+                     nameof(UnappliedFieldReport),
+                     nameof(HasUnappliedFieldReport),
                      nameof(FormSummary),
                      nameof(DetailReadOnlyReason),
                      nameof(HasDetailReadOnlyReason),
@@ -384,12 +397,13 @@ public sealed partial class WorkspaceViewModel
     /// Stages every field of the form that differs from the session state. Names are never staged;
     /// unsupported or missing fields are reported instead of silently dropped.
     /// </summary>
-    private void ApplyEditorForm()
+    /// <summary>True when the form ended up fully staged, so a navigation may continue.</summary>
+    private bool ApplyEditorForm()
     {
         ParameterRowItem? row = _selectedParameter;
         if (row is null)
         {
-            return;
+            return true;
         }
 
         VariableDeclaration declaration = row.Declaration;
@@ -447,7 +461,43 @@ public sealed partial class WorkspaceViewModel
         }
 
         RefreshAfterDraftChange();
+        Raise(nameof(UnappliedFieldReport));
+        Raise(nameof(HasUnappliedFieldReport));
+        return !HasUnappliedFormEdits;
     }
+
+    /// <summary>
+    /// Names the fields the form holds that could not be staged, with the reason each one failed. When a
+    /// navigation was told to "apply the changes first" and that fails, the action has to say so - other-
+    /// wise the click simply does nothing and nothing explains why.
+    /// </summary>
+    public string UnappliedFieldReport
+    {
+        get
+        {
+            if (_selectedParameter is null || !HasUnappliedFormEdits)
+            {
+                return string.Empty;
+            }
+
+            string name = _selectedParameter.Name.Length == 0 ? "(parameter without a name)" : _selectedParameter.Name;
+            var parts = new List<string>();
+            foreach (EditorFieldState field in EditorFields)
+            {
+                if (!IsFieldDirtyInForm(field.Field))
+                {
+                    continue;
+                }
+
+                string why = field.Reason is { Length: > 0 } reason ? $": {reason}" : string.Empty;
+                parts.Add($"{field.Label} of '{name}'{why}");
+            }
+
+            return parts.Count > 0 ? string.Join(", ", parts) : $"{UnappliedFieldCount} field(s) of '{name}'";
+        }
+    }
+
+    public bool HasUnappliedFieldReport => UnappliedFieldReport.Length > 0;
 
     private void RevertEditorForm()
     {
@@ -657,8 +707,18 @@ public sealed partial class WorkspaceViewModel
         switch (decision)
         {
             case NavigationDecision.ApplyForms:
-                ApplyEditorForm();
-                return !HasUnappliedFormEdits;
+                if (ApplyEditorForm())
+                {
+                    return true;
+                }
+
+                // The user agreed to apply their typing so the view could change. If that typing cannot be
+                // staged, the safe outcome is to stay put - and to say why, instead of dropping the action.
+                ActionError = "Stayed where you were: " + UnappliedFieldReport
+                            + " cannot be staged, so nothing was changed.";
+                Raise(nameof(UnappliedFieldReport));
+                Raise(nameof(HasUnappliedFieldReport));
+                return false;
 
             case NavigationDecision.DiscardForms:
                 RevertEditorForm();
@@ -767,6 +827,63 @@ public sealed partial class WorkspaceViewModel
         CommandManager.InvalidateRequerySuggested();
     }
 
+    /// <summary>
+    /// Typing that was never applied to the staged set belongs to the user, not to the file. A
+    /// programmatic re-read - for instance after a save wrote a different field of the same template -
+    /// must therefore keep it instead of quietly refilling the form with the stored values.
+    /// </summary>
+    private Dictionary<FieldKind, string>? CaptureUnappliedFormEdits()
+    {
+        if (_selectedParameter is null || !HasUnappliedFormEdits)
+        {
+            return null;
+        }
+
+        var edits = new Dictionary<FieldKind, string>();
+        if (_canEditAccess)
+        {
+            edits[FieldKind.Access] = _detailAccess;
+        }
+
+        if (_canEditDefaultValue)
+        {
+            edits[FieldKind.DefaultValue] = _detailDefaultValue;
+        }
+
+        if (_canEditDescription)
+        {
+            edits[FieldKind.Description] = _detailDescription;
+        }
+
+        return edits.Count > 0 ? edits : null;
+    }
+
+    private void RestoreUnappliedFormEdits(IReadOnlyDictionary<FieldKind, string>? edits)
+    {
+        if (edits is null || _selectedParameter is null)
+        {
+            return;
+        }
+
+        if (_canEditAccess && edits.TryGetValue(FieldKind.Access, out string? access))
+        {
+            _detailAccess = access;
+        }
+
+        if (_canEditDefaultValue && edits.TryGetValue(FieldKind.DefaultValue, out string? value))
+        {
+            _detailDefaultValue = value;
+        }
+
+        if (_canEditDescription && edits.TryGetValue(FieldKind.Description, out string? description))
+        {
+            _detailDescription = description;
+        }
+
+        RaiseAllEditorProperties();
+        RefreshReviewAndActionStates();
+    }
+
     private void RefreshReviewAndActionStates()
     {
         foreach (string property in new[]
@@ -784,7 +901,7 @@ public sealed partial class WorkspaceViewModel
 
     private void InitEditingCommands()
     {
-        ApplyEditsCommand = new RelayCommand(ApplyEditorForm, () => !IsBusy && HasUnappliedFormEdits);
+        ApplyEditsCommand = new RelayCommand(_ => ApplyEditorForm(), () => !IsBusy && HasUnappliedFormEdits);
         RevertFormCommand = new RelayCommand(RevertEditorForm, () => !IsBusy && HasUnappliedFormEdits);
         DiscardDraftsForParameterCommand = new RelayCommand(DiscardDraftsForSelectedParameter,
             () => !IsBusy && _selectedParameter is not null &&

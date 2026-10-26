@@ -79,6 +79,11 @@ public class ContrastAuditTests
             Audit(new ShellWindow(vm) { ShowInTaskbar = false }, offenders);
             vm.CloseReviewCommand.Execute(null);
 
+            // The row popups are not part of the shell's visual tree until a pointer hovers a row, so
+            // their cards are rendered here against real data: labels, values and badges on the popup
+            // background have to be readable in both themes like everything else.
+            Audit(HoverCardWindow(vm), offenders);
+
             Audit(new UnsavedWorkWindow(new NavigationPrompt(NavigationReason.CloseWorkspace, 2, 3)), offenders);
             Audit(new UnsavedWorkWindow(new NavigationPrompt(NavigationReason.ChangeParameter, 0, 3)), offenders);
             Audit(new LicensesWindow(), offenders);
@@ -99,6 +104,34 @@ public class ContrastAuditTests
         File.WriteAllText(reportFile, report.ToString());
 
         Assert.True(offenders.Count == 0, $"{theme}: {offenders.Count} unreadable text elements {report}");
+    }
+
+    /// <summary>
+    /// A plain window that hosts the two row cards, framed the way the popup frames them. Kept off the
+    /// screen; the audit renders the content, not the window.
+    /// </summary>
+    private static Window HoverCardWindow(WorkspaceViewModel vm)
+    {
+        var cards = new StackPanel { Margin = new Thickness(0) };
+        foreach (object item in new object[] { vm.VisibleParameters.First(), vm.AllFiles.First() })
+        {
+            cards.Children.Add(new ContentPresenter
+            {
+                Content = item,
+                ContentTemplate = (DataTemplate)Application.Current.FindResource(new DataTemplateKey(item.GetType())),
+            });
+        }
+
+        Brush foreground = (Brush)Application.Current.FindResource("ForegroundBrush");
+        Brush chrome = (Brush)Application.Current.FindResource("PanelBackgroundBrush");
+        System.Windows.Documents.TextElement.SetForeground(cards, foreground);
+
+        return new Window
+        {
+            Content = new Border { Background = chrome, Padding = new Thickness(10, 8, 10, 8), Child = cards },
+            ShowInTaskbar = false,
+            SizeToContent = SizeToContent.WidthAndHeight,
+        };
     }
 
     private static void Audit(Window window, List<Offender> offenders)

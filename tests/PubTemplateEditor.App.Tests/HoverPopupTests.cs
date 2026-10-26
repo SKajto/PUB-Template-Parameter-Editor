@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Automation;
 using System.Windows.Data;
 using System.Windows.Media;
 using PubTemplateEditor.App.ViewModels;
@@ -86,21 +87,25 @@ public class HoverPopupTests
             var container = (ListViewItem)window.ParameterTable.ItemContainerGenerator.ContainerFromItem(row);
             Assert.True(container is not null, "the parameter row was not realized");
 
-            var popup = (ToolTip)container.ToolTip;
-            Assert.NotNull(popup);
-            Binding binding = BindingOperations.GetBinding(popup, ContentControl.ContentProperty)!;
-            Assert.NotNull(binding);
-            Assert.Equal(nameof(ParameterRowItem.RowTooltip), binding.Path.Path);
+            // The row object is what the row offers as its tooltip; the card is chosen by type.
+            Assert.Same(row, container.ToolTip);
+            DataTemplate card = (DataTemplate)Application.Current.FindResource(new DataTemplateKey(typeof(ParameterRowItem)));
+            Assert.NotNull(card);
 
-            string text = row.RowTooltip;
-            Assert.StartsWith("alpha", text, StringComparison.Ordinal);
-            Assert.Contains("Current value: HELLO", text, StringComparison.Ordinal);
-            Assert.Contains($"Description: {description}", text, StringComparison.Ordinal);
-            Assert.Contains("Access: internal", text, StringComparison.Ordinal);
-            Assert.Contains("one.dta", text, StringComparison.Ordinal);
+            List<string> texts = CardTexts(card, row);
+            Assert.Contains("alpha", texts);
+            Assert.Contains("HELLO", texts);
+            Assert.Contains(description, texts);
+            Assert.Contains("internal", texts);
+            Assert.Contains("Current value", texts);
+            Assert.Contains("Description", texts);
+            Assert.Contains("one.dta \u00b7 declaration #" + row.DeclarationId, texts);
+            Assert.DoesNotContain("Staged in this session", string.Join("|", texts), StringComparison.Ordinal);
 
-            // Nothing staged: the popup must not invent a staged line.
-            Assert.DoesNotContain("Staged", text, StringComparison.Ordinal);
+            // Assistive technology gets the same facts as one plain sentence.
+            string help = AutomationProperties.GetHelpText(container);
+            Assert.Contains("Current value: HELLO", help, StringComparison.Ordinal);
+            Assert.Contains("Description: " + description, help, StringComparison.Ordinal);
 
             vm.NavigationGuard = _ => NavigationDecision.KeepEditing;
             window.Close();
@@ -150,26 +155,33 @@ public class HoverPopupTests
 
             TemplateItem one = vm.AllFiles.Single(f => f.FileName == "one.dta");
             TemplateItem two = vm.AllFiles.Single(f => f.FileName == "two.dta");
+            DataTemplate card = (DataTemplate)(DataTemplate)Application.Current.FindResource(new DataTemplateKey(typeof(TemplateItem)));
+            Assert.NotNull(card);
 
             var container = (ListBoxItem)window.TemplateRows.ItemContainerGenerator.ContainerFromItem(one);
-            var popup = (ToolTip)container.ToolTip;
-            Assert.Equal(nameof(TemplateItem.RowTooltip),
-                BindingOperations.GetBinding(popup, ContentControl.ContentProperty)!.Path.Path);
+            Assert.Same(one, container.ToolTip);
 
-            string text = one.RowTooltip;
-            Assert.StartsWith("one.dta", text, StringComparison.Ordinal);
-            Assert.Contains("2 parameter(s)", text, StringComparison.Ordinal);
-            Assert.Contains("1 staged change(s), not saved", text, StringComparison.Ordinal);
-            Assert.Contains(Path.Combine(templates, "one.dta"), text, StringComparison.Ordinal);
+            List<string> texts = CardTexts(card, one);
+            Assert.Contains("one.dta", texts);
+            Assert.Contains("2 parameter(s)", texts);
+            Assert.Contains("1 staged change(s), not saved", texts);
+            Assert.Contains(Path.Combine(templates, "one.dta"), texts);
 
-            // A file with nothing staged does not claim staged changes; the count is per file.
-            Assert.DoesNotContain("staged change", two.RowTooltip, StringComparison.Ordinal);
-            Assert.Contains("1 parameter(s)", two.RowTooltip, StringComparison.Ordinal);
+            // A file with nothing staged does not claim staged changes; the count stays per file.
+            Assert.DoesNotContain("staged change", string.Join("|", CardTexts(card, two)), StringComparison.Ordinal);
+            Assert.Contains("1 parameter(s)", CardTexts(card, two));
+            Assert.Equal("none staged", two.StagedChangesText);
 
-            // The heading of the parameter panel repeats the same summary for the active template.
+            Assert.Contains("1 staged change", AutomationProperties.GetHelpText(container), StringComparison.Ordinal);
+
+            // The heading of the parameter panel carries the same card for the active template.
+            // The heading offers the active file as its tooltip; the card for it is chosen by type when
+            // the popup opens, exactly like the rows in the file list.
             var heading = (ToolTip)window.ActiveTemplateLabel.ToolTip;
-            Assert.Equal("ActiveFile.RowTooltip",
-                BindingOperations.GetBinding(heading, ContentControl.ContentProperty)!.Path.Path);
+            Assert.NotNull(heading);
+            Binding headingContent = BindingOperations.GetBinding(heading, ContentControl.ContentProperty)!;
+            Assert.Equal("ActiveFile", headingContent.Path.Path);
+            Assert.NotNull(Application.Current.FindResource(new DataTemplateKey(typeof(TemplateItem))));
 
             vm.NavigationGuard = _ => NavigationDecision.KeepEditing;
             window.Close();
@@ -192,30 +204,70 @@ public class HoverPopupTests
     }
 
     [Fact]
-    public void TheRowPopupStyleWrapsAndStaysInsideTheScreen()
+    public void TheRowPopupIsARoundedCardWithRoomInside()
     {
         _host.Do(() =>
         {
             var shellModel = new WorkspaceViewModel(new SettingsService(TempDir("settings")), new EditorSettings());
             var window = new ShellWindow(shellModel);
 
-            // The style lives in the merged application dictionary, not in the window's own resources.
-            Style style = (Style)Application.Current.Resources["RowToolTipStyle"];
-            Assert.NotNull(style);
-            Assert.NotNull(style);
+            // Every popup - hint or card - gets one rounded, shadowed frame from the theme dictionary.
+            Style tipStyle = (Style)Application.Current.FindResource(typeof(ToolTip));
 
-            double maxWidth = (double)style.Setters.Cast<Setter>()
+            double maxWidth = (double)tipStyle.Setters.Cast<Setter>()
                 .First(s => s.Property == FrameworkElement.MaxWidthProperty).Value;
-            Assert.True(maxWidth is >= 360 and <= 640, $"the row popup is {maxWidth} px wide");
+            Assert.True(maxWidth is >= 400 and <= 700, $"the popup is only {maxWidth} px wide");
 
-            var contentTemplate = (DataTemplate)style.Setters.Cast<Setter>()
-                .First(s => s.Property == ContentControl.ContentTemplateProperty).Value;
-            var text = (TextBlock)contentTemplate.LoadContent();
-            Assert.Equal(TextWrapping.Wrap, text.TextWrapping);
+            var padding = (Thickness)tipStyle.Setters.Cast<Setter>()
+                .First(s => s.Property == Control.PaddingProperty).Value;
+            Assert.True(padding.Left >= 8 && padding.Bottom >= 6, "the popup has no inner space");
+
+            var edge = (Thickness)tipStyle.Setters.Cast<Setter>()
+                .First(s => s.Property == Control.BorderThicknessProperty).Value;
+            Assert.True(edge.Left == 1, "the popup has no edge");
+            Assert.True((bool)tipStyle.Setters.Cast<Setter>()
+                .First(s => s.Property == ToolTip.HasDropShadowProperty).Value, "the popup has no shadow");
+
+            foreach (Type itemType in new[] { typeof(ParameterRowItem), typeof(TemplateItem) })
+            {
+                var card = (FrameworkElement)((DataTemplate)Application.Current.FindResource(new DataTemplateKey(itemType))).LoadContent();
+                Assert.True(card is StackPanel, itemType.Name + " card has no content panel");
+                Assert.True(card.MinWidth >= 240, itemType.Name + " card collapses to the width of a cell");
+            }
 
             shellModel.NavigationGuard = _ => NavigationDecision.KeepEditing;
             window.Close();
         });
+    }
+
+    /// <summary>
+    /// Lays out a card template over real row data and returns every text it draws. This is how the
+    /// popup is checked without a mouse: the content, the labels and the card shape all have to come
+    /// from the same row the pointer rests on.
+    /// </summary>
+    private static List<string> CardTexts(DataTemplate card, object data)
+    {
+        var host = new ContentPresenter { Content = data, ContentTemplate = card };
+        host.Measure(new Size(460, 800));
+        host.Arrange(new Rect(0, 0, 460, 800));
+        host.UpdateLayout();
+
+        var texts = new List<string>();
+        void Walk(DependencyObject node)
+        {
+            if (node is TextBlock t && !string.IsNullOrWhiteSpace(t.Text))
+            {
+                texts.Add(t.Text);
+            }
+
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(node); i++)
+            {
+                Walk(VisualTreeHelper.GetChild(node, i));
+            }
+        }
+
+        Walk(host);
+        return texts;
     }
 
     [Fact]
@@ -241,6 +293,17 @@ public class HoverPopupTests
             (double bulkX, double bulkY) = Place(window.BulkActionButton, root);
             (double tableX, double tableY) = Place(window.ParameterTable, root);
 
+            // One line means one height: an input that is taller than the buttons beside it (or a combo
+            // box a third shorter) breaks the line even when the centres line up.
+            double[] heights =
+            [
+                window.SearchControl.ActualHeight,
+                window.AccessFilterControl.ActualHeight,
+                window.CompareActionButton.ActualHeight,
+                window.BulkActionButton.ActualHeight,
+            ];
+            Assert.True(heights.Max() - heights.Min() <= 1,
+                "the tools line mixes controls of different heights: " + string.Join("/", heights.Select(h => h.ToString("0.#"))));
             Assert.True(Math.Abs(searchY - accessY) < 4, "the access filter is not in line with the search box");
             Assert.True(Math.Abs(searchY - compareY) < 6, "the parameter tools are not in line with the search box");
             Assert.True(searchX < accessX, "the search box must sit left of the access filter");

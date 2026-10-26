@@ -117,9 +117,16 @@ public sealed class SaveFlowTests : IDisposable
         {
             Assert.True(vm.LastSaveOutcome == "Written", $"expected a written result, got '{vm.LastSaveOutcome}': {vm.ActionError} {vm.SaveOutcomeSummary}");
             Assert.Equal(0, vm.StagedChangeCount);
-            Assert.False(vm.IsReviewOpen);
-            Assert.Contains("Saved 1 field(s) in 1 template(s)", vm.ActionNotice ?? string.Empty, StringComparison.Ordinal);
             Assert.False(vm.IsSaving);
+
+            // The panel stays open after an attempt: the result card is the proof, and closing the panel
+            // would hide it. The card names the files and says where the replaced copy went.
+            Assert.True(vm.IsReviewOpen, "the review stays open so the result can be read");
+            Assert.True(vm.SaveOutcomeIsOk, "the result card does not read as a success");
+            Assert.Equal("Saved 1 field(s) in 1 template file(s)", vm.SaveOutcomeTitle);
+            Assert.Contains("t1.dta:", vm.SaveOutcomeSummary, StringComparison.Ordinal);
+            Assert.Contains("backups", vm.BackupDirectoryHint, StringComparison.Ordinal);
+            Assert.Contains("Saved 1 field(s) in 1 template(s)", vm.ActionNotice ?? string.Empty, StringComparison.Ordinal);
 
             // The editor re-read the file it wrote, so its baseline matches the new bytes.
             Assert.Equal(CurrentHash(path), vm.ActiveFile!.Record!.BaselineFingerprint);
@@ -218,6 +225,46 @@ public sealed class SaveFlowTests : IDisposable
         Task save = Task.CompletedTask;
         _host.Do(() => { save = vm.SaveReviewCommand.ExecuteAsync(null); });
         await save;
+    }
+
+    [Fact]
+    public async Task SavingWhileTheFormHoldsUnappliedTyping()
+    {
+        string templates = Sub("templates");
+        string path = WriteTemplate(templates, "t1.dta", TemplateXml(Variable("alpha", "OLD"), Variable("beta", "OLD_B")));
+        string state = Sub("state");
+        WorkspaceViewModel vm = await ReadAllAsync(templates, state);
+
+        var prompts = new List<NavigationReason>();
+        _host.Do(() =>
+        {
+            vm.SelectedParameter = vm.VisibleParameters.Single(r => r.Name == "alpha");
+            vm.DetailDefaultValue = "A_NEW";
+            vm.ApplyEditsCommand.Execute(null);
+            vm.DetailDescription = "TYPED_NOT_APPLIED";
+            vm.NavigationGuard = p =>
+            {
+                prompts.Add(p.Reason);
+                return NavigationDecision.ApplyForms;
+            };
+            vm.OpenReviewCommand.Execute(null);
+            Assert.True(vm.CanSaveReview);
+        });
+
+        await SaveOnlyAsync(vm);
+
+        string saved = File.ReadAllText(path);
+        _host.Do(() =>
+        {
+            // Starting a save must not stop to ask a navigation question: the typed description is not
+            // part of the staged set, so it stays in the form and the staged default value is written.
+            Assert.True(prompts.Count == 0, "the save asked a navigation question: " + string.Join(",", prompts));
+            Assert.Contains("value=\"A_NEW\"", saved, StringComparison.Ordinal);
+            Assert.DoesNotContain("TYPED_NOT_APPLIED", saved, StringComparison.Ordinal);
+            Assert.False(vm.HasStagedChanges);
+            Assert.Equal("Saved 1 field(s) in 1 template file(s)", vm.SaveOutcomeTitle);
+            Assert.Equal("TYPED_NOT_APPLIED", vm.DetailDescription);
+        });
     }
 
     [Fact]

@@ -673,6 +673,79 @@ Executed commands and results
   A manual save through the fresh exe remains the owner's check; backups and the recovery journal are
   written under `%LOCALAPPDATA%\PubTemplateEditor`.
 
+### 2026-10-26 - One control height, card popups, themed window frame, and two save-path faults
+
+Owner feedback: the access dropdown is a third shorter than the buttons in its row; the search box is
+ taller than the rest; hover popups should be formatted (cards), not plain text; the main window frame
+ should follow the light/dark setting; and saving still did not appear to work - a popup appeared on
+"Save to templates", choosing "Apply the form changes and continue" closed it and nothing happened, and
+the popup never came back.
+
+Uniform control height
+- `Button`, `TextBox` and `ComboBox` in `Themes/Controls.xaml` now share `MinHeight 33` (measured: the
+  row was search 37 / combo 31 / buttons 31; now all four render at 33), TextBox vertical padding went
+  4 -> 3 so the text has room without the box growing. `HoverPopupTests` asserts the four controls on the
+  tools line differ by at most 1 px, which is what "in line" means beyond matching centres.
+
+Card popups instead of a text blob
+- The implicit `ToolTip` style became the card frame (rounded 6, 1 px edge, drop shadow, padding 10/8,
+  MaxWidth 560). Two `DataTemplate`s keyed by their data type (`ParameterRowItem`, `TemplateItem`) are
+  the card contents: title line with a staged badge, rule, labelled rows (Current value / Description /
+  Access, or Parameters / Staged / Size) in a two-column grid, rule, status/path footer. New view-model
+  text: `ParameterRowItem.StagedNote`, `.LocationText`, `TemplateItem.ParameterCountText`,
+  `.StagedChangesText`.
+- Rows hand over the row object itself (`Setter Property="ToolTip" Value="{Binding}"`); the card is
+  chosen by type when the popup opens. `AutomationProperties.HelpText` carries the same facts as one
+  plain sentence, so a screen reader is not walked through a card layout. `RowTooltip` stays as that
+  sentence.
+- What WPF does not allow, recorded: there is no `ToolTipService.Style` in WPF (that is WinUI), and a
+  binding inside a `ToolTip` element placed in a `Setter.Value` is not kept - the `Content` came back
+  null while the `ContentTemplate` survived. Type-keyed templates (`DataTemplateKey`) avoid both.
+- `ContrastAuditTests` now renders both cards against real rows in both themes (they are not in the
+  shell's visual tree until a pointer hovers a row): `offenders=0` for Light and Dark.
+
+Themed window frame
+- New `Infrastructure/WindowFrameTheme.cs` asks the desktop window manager for the frame through
+  `dwmapi.dll` (`DWMWA_USE_IMMERSIVE_DARK_MODE` 20, with the 19 fallback, and the Windows 11 caption,
+  text and border colour attributes). Built-in API only, no package; an unsupported attribute simply
+  returns an error and the window keeps the system frame.
+- `ThemeManager` now records `LastApplied` (a "follow Windows" choice resolved) and raises `Applied`, so
+  the caption follows a theme switch while the window is open. `MainWindow`, `LicensesWindow` and
+  `UnsavedWorkWindow` call `WindowFrameTheme.Attach(this)`, which paints on `SourceInitialized` and
+  unsubscribes on `Closed`.
+
+Two real faults found while chasing "saving does not work"
+1. Unapplied typing was lost. After a successful write the saved templates are re-read, which rebuilds
+   the parameter rows and refills the details form - so anything typed but not applied vanished. The
+   reload now captures the form's unapplied values first and restores them afterwards
+   (`CaptureUnappliedFormEdits` / `RestoreUnappliedFormEdits`), covered by
+   `SaveFlowTests.SavingWhileTheFormHoldsUnappliedTyping`.
+2. "Apply the form changes and continue" could abort an action in silence. `ConfirmNavigation` ran
+   `ApplyEditorForm()` and returned `!HasUnappliedFormEdits`; when the typing could not be staged, the
+   action simply did not happen and only a notice elsewhere explained it. `ApplyEditorForm` now returns
+   whether the form ended up fully staged, the failure branch states what is held back
+   (`UnappliedFieldReport`, e.g. "default value of 'alpha': <reason>"), and the details panel shows that
+   line in the error colour. Test: `TheFormNamesTheValueItIsHoldingBack`.
+- Saving itself was already implemented and is covered (patcher, save service with fingerprint/backup/
+  journal/verify-after-write, per-file batch behaviour). What was missing was the visible result: the
+  review panel now keeps a result card (green for written, red for rejected/partly written) with the
+  per-file sentences and the backup folder path, it reports attempts that never reached a file
+  ("Nothing was written" + why), and it stays open after an attempt instead of closing and hiding the
+  proof.
+
+Executed commands and results
+- `dotnet test` -> Core 86, Integration 33, App/WPF 80 = 199 tests, 0 failed; `dotnet build -c Debug`
+  0 warnings, 0 errors.
+- `dotnet publish src/PubTemplateEditor.App -c Release -p:PublishProfile=PortableWin_x64` ->
+  `src/PubTemplateEditor.App/bin/Release/net10.0-windows/win-x64/publish/PubTemplateEditor.exe`,
+  131,216,435 bytes, rebuilt at 16:33, starts and stays alive, title `[PUB Template Parameter Editor]`.
+- Contrast audit including the two card popups: `contrast-light.txt`, `contrast-dark.txt` `offenders=0`.
+- Unverified by machine, and it needs your eyes: whether the caption/border actually look right in dark
+  mode on this desktop (the frame is painted by Windows, the test host never shows a window), whether a
+  hovered card appears where you expect it, and the save flow on your real templates. If a save still
+  does nothing, the result card in the review panel now names the file and the reason - report that
+  sentence and it can be traced exactly.
+
 ## Deferred scope
 
 Linux UI, additional architectures, parameter creation/deletion/renaming, presets, recursive folders, in-app PUB generation, browser hosting and custom installer/updater services are outside this initial Windows release. Keep the domain core independent without building a second UI.

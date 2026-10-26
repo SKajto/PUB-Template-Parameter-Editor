@@ -87,16 +87,48 @@ public sealed partial class WorkspaceViewModel
     /// </summary>
     public string SaveUnavailableReason => SaveGate().Why;
 
-    /// <summary>Per-file result of the last save attempt, shown under the review table.</summary>
+    /// <summary>Per-file result of the last save attempt, shown as a card in the review panel.</summary>
     public string SaveOutcomeSummary { get; private set; } = string.Empty;
 
-    public bool HasSaveOutcome => SaveOutcomeSummary.Length > 0;
+    public bool HasSaveOutcome => LastSaveOutcome.Length > 0;
 
     /// <summary>
-    /// "Written" when every file of the last save was confirmed, "Rejected" when none of them was,
-    /// "Partly written" for a mixed batch and "" before any save was attempted.
+    /// "Written" when every file of the last attempt was confirmed, "Rejected" when none of them was,
+    /// "Partly written" for a mixed batch, "Nothing written" when the attempt never reached a file, and
+    /// "" before any save was attempted.
     /// </summary>
     public string LastSaveOutcome { get; private set; } = string.Empty;
+
+    /// <summary>Drives the colour of the result card: success and problem cannot share one look.</summary>
+    public bool SaveOutcomeIsOk => LastSaveOutcome == "Written";
+
+    public bool SaveOutcomeIsProblem => LastSaveOutcome is "Rejected" or "Partly written" or "Nothing written";
+
+    public string SaveOutcomeTitle => LastSaveOutcome switch
+    {
+        "Written" => $"Saved {lastFieldsWritten} field(s) in {lastFilesWritten} template file(s)",
+        "Partly written" => $"Partly saved: {lastFieldsWritten} field(s) in {lastFilesWritten} file(s), the rest were not written",
+        "Rejected" => "Nothing was written",
+        "Nothing written" => "Nothing was written",
+        _ => string.Empty,
+    };
+
+    private int lastFieldsWritten;
+    private int lastFilesWritten;
+
+    /// <summary>Where the copy that was replaced is kept, shown with the result of an attempt.</summary>
+    public string BackupDirectoryHint =>
+        $"Replaced copies are kept in: {_saver.BackupDirectory}";
+
+    /// <summary>Records an attempt that never reached a file, so the panel always says what happened.</summary>
+    private void ReportUnwritten(string reason)
+    {
+        SaveOutcomeSummary = reason;
+        LastSaveOutcome = "Nothing written";
+        lastFieldsWritten = 0;
+        lastFilesWritten = 0;
+        RaiseReviewSaveState();
+    }
 
     public int SelectedReviewCount => ReviewRows.Count(r => r.IsSelected);
 
@@ -202,6 +234,9 @@ public sealed partial class WorkspaceViewModel
                  {
                      nameof(ReviewRows), nameof(ReviewGroups), nameof(SelectedReviewCount),
                      nameof(ReviewSummary), nameof(CanSaveReview), nameof(SaveUnavailableReason),
+                     nameof(HasSaveOutcome), nameof(LastSaveOutcome), nameof(SaveOutcomeSummary),
+                     nameof(SaveOutcomeTitle), nameof(SaveOutcomeIsOk), nameof(SaveOutcomeIsProblem),
+                     nameof(IsSaving),
                  })
         {
             Raise(name);
@@ -251,6 +286,7 @@ public sealed partial class WorkspaceViewModel
         if (chosen.Count == 0)
         {
             ActionNotice = "Tick at least one change to save.";
+            ReportUnwritten("Tick at least one change in the list, then save again.");
             return;
         }
 
@@ -276,7 +312,9 @@ public sealed partial class WorkspaceViewModel
 
         if (work.Count == 0)
         {
-            ActionError = unusable.Count > 0 ? string.Join(" ", unusable) : "Nothing left to save.";
+            string why = unusable.Count > 0 ? string.Join(" ", unusable) : "Nothing left to save.";
+            ActionError = why;
+            ReportUnwritten(why);
             return;
         }
 
@@ -331,6 +369,9 @@ public sealed partial class WorkspaceViewModel
             }
         }
 
+        lastFieldsWritten = fields;
+        lastFilesWritten = writtenPaths.Count;
+
         // The files that changed are read again so the editor's baseline matches what it just wrote;
         // until that happens a second save of the same row would look like an outside edit.
         await ReloadWrittenTemplatesAsync(writtenPaths, token);
@@ -346,6 +387,9 @@ public sealed partial class WorkspaceViewModel
         };
         Raise(nameof(HasSaveOutcome));
         Raise(nameof(LastSaveOutcome));
+        Raise(nameof(SaveOutcomeTitle));
+        Raise(nameof(SaveOutcomeIsOk));
+        Raise(nameof(SaveOutcomeIsProblem));
         RebuildReviewRows();
         RefreshAfterDraftChange();
 
@@ -361,10 +405,9 @@ public sealed partial class WorkspaceViewModel
             ActionError = string.Join(" ", problems);
         }
 
-        if (ReviewRows.Count == 0)
-        {
-            CloseReview();
-        }
+        // The panel deliberately stays open after an attempt: the result card, the backup folder and any
+        // file that was not written are the proof the user needs, and closing the panel throws it away.
+        // Esc or Close ends the review; new staging reopens it with fresh rows.
     }
 
     /// <summary>
@@ -373,6 +416,10 @@ public sealed partial class WorkspaceViewModel
     /// </summary>
     private async Task ReloadWrittenTemplatesAsync(IReadOnlyList<string> paths, CancellationToken token)
     {
+        // Re-reading replaces the parameter rows and refills the details form, so typing that was never
+        // applied has to be put back afterwards - losing it would be losing the user's work.
+        IReadOnlyDictionary<FieldKind, string>? typing = CaptureUnappliedFormEdits();
+
         foreach (string path in paths)
         {
             TemplateItem? item = AllFiles.FirstOrDefault(f => f.FilePath == path);
@@ -393,6 +440,7 @@ public sealed partial class WorkspaceViewModel
         }
 
         RefreshCounters();
+        RestoreUnappliedFormEdits(typing);
     }
 
     private void DiscardSelectedReview()

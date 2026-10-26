@@ -7,6 +7,15 @@ namespace PubTemplateEditor.App;
 /// <summary>Swaps the merged theme dictionary. All views bind through DynamicResource.</summary>
 public static class ThemeManager
 {
+    /// <summary>
+    /// Raised after a theme dictionary is in place. The window frame is drawn by the desktop window
+    /// manager rather than by WPF, so anything that owns a HWND has to be told to follow the theme too.
+    /// </summary>
+    public static event Action<ThemeChoice>? Applied;
+
+    /// <summary>The theme actually in effect - a "follow Windows" choice is already resolved here.</summary>
+    public static ThemeChoice LastApplied { get; private set; } = ThemeChoice.Light;
+
     public static void Apply(Application app, ThemeChoice theme)
     {
         ApplyResolved(app, Resolve(app, theme));
@@ -36,5 +45,8 @@ public static class ThemeManager
         {
             dicts.Add(replacement);
         }
+
+        LastApplied = theme;
+        Applied?.Invoke(theme);
     }
 }

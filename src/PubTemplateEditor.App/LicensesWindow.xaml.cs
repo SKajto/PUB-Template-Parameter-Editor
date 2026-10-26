@@ -29,6 +29,7 @@ public partial class LicensesWindow : Window
     public LicensesWindow()
     {
         InitializeComponent();
+        WindowFrameTheme.Attach(this); // caption follows the interface theme, not only the client area
 
         LicenseText.Text = EmbeddedNotices.Read(EmbeddedNotices.License);
         NoticeText.Text = EmbeddedNotices.Read(EmbeddedNotices.CopyrightNotice);

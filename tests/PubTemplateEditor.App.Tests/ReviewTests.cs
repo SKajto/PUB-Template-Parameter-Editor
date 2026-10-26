@@ -538,7 +538,7 @@ public class ReviewTests
         WorkspaceViewModel vm = await ReadAllAsync(settings, templates);
         var raised = new List<string>();
 
-        _host.Do(() => vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName));
+        _host.Do(() => vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName ?? string.Empty));
 
         _host.Do(() =>
         {

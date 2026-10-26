@@ -96,6 +96,7 @@ public sealed class TemplateItem : ViewModelBase
         Raise(nameof(StagedEditCount));
         Raise(nameof(IsDraft));
         Raise(nameof(StatusDisplay));
+        Raise(nameof(StagedChangesText));
         Raise(nameof(RowTooltip));
     }
 
@@ -155,6 +156,7 @@ public sealed class TemplateItem : ViewModelBase
             Raise(nameof(Record));
             Raise(nameof(IsLoaded));
             Raise(nameof(DeclarationCount));
+            Raise(nameof(ParameterCountText));
             Raise(nameof(RowTooltip));
         }
     }
@@ -162,6 +164,21 @@ public sealed class TemplateItem : ViewModelBase
     public bool IsLoaded => _record?.ReadState == TemplateReadState.Loaded;
 
     public int DeclarationCount => _record?.Declarations.Count ?? 0;
+
+    /// <summary>
+    /// How many parameters this file holds, said honestly: listing does not parse, so a file that has
+    /// never been read is not "0 parameters", it is unread.
+    /// </summary>
+    public string ParameterCountText => IsLoaded
+        ? $"{DeclarationCount} parameter(s)"
+        : HasError
+            ? "not readable"
+            : "not read yet";
+
+    /// <summary>Staged changes of this file, as the hover card words it.</summary>
+    public string StagedChangesText => StagedEditCount > 0
+        ? $"{StagedEditCount} staged change(s), not saved"
+        : "none staged";
 
     private static string FormatSize(long bytes)
     {

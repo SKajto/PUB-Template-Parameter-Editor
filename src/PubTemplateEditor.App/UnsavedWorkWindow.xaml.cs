@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using PubTemplateEditor.App.Infrastructure;
 using PubTemplateEditor.App.ViewModels;
 
 namespace PubTemplateEditor.App;
@@ -28,6 +29,7 @@ public partial class UnsavedWorkWindow : Window
     public UnsavedWorkWindow(NavigationPrompt prompt)
     {
         InitializeComponent();
+        WindowFrameTheme.Attach(this); // a dialog has to match the window it belongs to, in dark mode especially
         Prompt = prompt;
 
         MessageText.Text = Describe(prompt);

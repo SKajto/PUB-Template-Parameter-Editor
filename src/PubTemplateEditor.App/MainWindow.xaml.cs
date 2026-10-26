@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using PubTemplateEditor.App.Infrastructure;
 using System.Windows.Input;
 using PubTemplateEditor.App.ViewModels;
 
@@ -31,6 +32,8 @@ public partial class MainWindow : Window
     public TextBlock FooterCountLabel => FooterCountText;
     public TextBlock FooterOperationLabel => FooterOperationText;
     public Button VersionLabel => VersionButton;
+    public TextBlock UnappliedFieldReportLabel => UnappliedFieldReportText;
+
     public TextBlock DetailNameLabel => DetailNameText;
     public TextBlock DetailXmlTypeLabel => DetailXmlTypeText;
     public TextBox DetailValueEditor => DetailValueBox;
@@ -103,6 +106,10 @@ public partial class MainWindow : Window
         workspace.NavigationGuard = ShowUnsavedWorkPrompt;
 
         RestoreColumnWidths();
+    
+        // The caption is drawn by the desktop window manager, so it has to be told to follow the
+        // interface theme, and to keep following it when the theme is switched later.
+        WindowFrameTheme.Attach(this);
     }
 
     // ------------------------------------------------------- parameter table columns

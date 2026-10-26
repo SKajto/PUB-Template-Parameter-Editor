@@ -4,6 +4,10 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Media;
 using PubTemplateEditor.App;
+using ShellWindow = PubTemplateEditor.App.MainWindow;
+using PubTemplateEditor.Core.Editing;
+using PubTemplateEditor.App.ViewModels;
+using PubTemplateEditor.App.Infrastructure;
 using PubTemplateEditor.Infrastructure;
 using Xunit;
 
@@ -92,6 +96,65 @@ public class ThemeTests
             // Leave the shell in its default palette for other tests.
             ThemeManager.Apply(_host.App, ThemeChoice.Light);
         });
+    }
+
+    /// <summary>
+    /// The window frame - caption, border and title text - is drawn by the desktop window manager, so
+    /// the application has to ask for it. Without a visible window what can be proven is that the frame
+    /// would be painted with the theme that is actually in effect (a 'follow Windows' choice included),
+    /// that its colours come from that palette, and that attaching to a window without a handle yet is
+    /// harmless. Whether the caption looks right stays a human check.
+    /// </summary>
+    [Fact]
+    public void TheWindowFrameFollowsTheThemeThatIsInEffect()
+    {
+        _host.Do(() =>
+        {
+            ThemeManager.Apply(_host.App, ThemeChoice.Dark);
+            Assert.Equal(ThemeChoice.Dark, ThemeManager.LastApplied);
+            Assert.True(WindowFrameTheme.EffectiveIsDark(), "the frame would still be painted light in dark mode");
+
+            var dark = WindowFrameTheme.ThemeColours();
+            Color panel = (Color)_host.App.Resources["PanelBackgroundColor"];
+            Color ink = (Color)_host.App.Resources["ForegroundColor"];
+            Assert.Equal(panel, dark.Caption);
+            Assert.True(dark.Caption.B < 0x60, "the caption colour is not a dark surface: " + dark.Caption);
+            Assert.True(ink.B > 0x60, "the title text would not read on a dark caption: " + ink);
+            Assert.True(dark.Border.B < 0xE0, "the frame border would vanish against a light desktop: " + dark.Border);
+
+            ThemeManager.Apply(_host.App, ThemeChoice.Light);
+            Assert.False(WindowFrameTheme.EffectiveIsDark(), "the frame stayed dark after switching to light");
+            Color lightCaption = WindowFrameTheme.ThemeColours().Caption;
+            Assert.True(lightCaption.B > 0xA0, "the caption colour is not a light surface: " + lightCaption);
+
+            // A 'follow Windows' choice is resolved before the frame is painted, so caption and client
+            // area cannot end up on different themes.
+            ThemeChoice system = ThemeManager.Resolve(_host.App, ThemeChoice.System);
+            ThemeManager.Apply(_host.App, ThemeChoice.System);
+            Assert.Equal(system, ThemeManager.LastApplied);
+            Assert.Equal(system == ThemeChoice.Dark, WindowFrameTheme.EffectiveIsDark());
+
+            // Attaching an unshown window must not throw and must not try to paint: it has no handle yet.
+            string settings = UniqueDir("frame-settings");
+            var shellModel = new WorkspaceViewModel(new SettingsService(settings), new EditorSettings());
+            var window = new ShellWindow(shellModel);
+            WindowFrameTheme.Attach(window);
+            WindowFrameTheme.Apply(window, dark: true, WindowFrameTheme.ThemeColours());
+
+            shellModel.NavigationGuard = _ => NavigationDecision.KeepEditing;
+            window.Close();
+            DeleteDir(settings);
+
+            ThemeManager.Apply(_host.App, ThemeChoice.Light);
+        });
+    }
+
+    private static string UniqueDir(string kind)
+    {
+        string path = System.IO.Path.Combine(System.IO.Path.GetTempPath(),
+            $"pubte-frame-{kind}-{System.Guid.NewGuid():N}");
+        System.IO.Directory.CreateDirectory(path);
+        return path;
     }
 
     [Fact]

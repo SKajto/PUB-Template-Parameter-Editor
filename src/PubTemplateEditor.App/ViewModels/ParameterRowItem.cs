@@ -95,6 +95,15 @@ public sealed class ParameterRowItem : ViewModelBase
             Declaration.Access.CapabilityReason,
         }.Where(notEmpty => !string.IsNullOrWhiteSpace(notEmpty)));
 
+    /// <summary>One-line note the card shows when some fields are staged rather than stored.</summary>
+    public string StagedNote =>
+        StagedEditCount > 0
+            ? $"Staged in this session, not saved yet: {DraftedFieldsSummary}"
+            : string.Empty;
+
+    /// <summary>Where this parameter came from, so a popup never leaves the user guessing.</summary>
+    public string LocationText => $"{File.FileName} · declaration #{DeclarationId}";
+
     /// <summary>Re-raises the draft-derived bindings after staging, discarding or re-reading.</summary>
     public void RefreshDraftState()
     {
@@ -111,6 +120,7 @@ public sealed class ParameterRowItem : ViewModelBase
                      nameof(HasDrafts),
                      nameof(StagedEditCount),
                      nameof(DraftedFieldsSummary),
+                     nameof(StagedNote),
                      nameof(RowTooltip),
                  })
         {

@@ -203,11 +203,11 @@
                                 <!-- The row tooltip is the file's summary: its name, how many parameters it
                                      holds and how many staged changes it carries. The cells show only a
                                      fragment, and the bare path would not be enough to choose a file by. -->
-                                <Setter Property="ToolTip">
-                                <Setter.Value>
-                                    <ToolTip Style="{StaticResource RowToolTipStyle}" Content="{Binding RowTooltip}"/>
-                                </Setter.Value>
-                            </Setter>
+                                <Setter Property="ToolTip" Value="{Binding}"/>
+                                <!-- The row card itself is keyed by type in the theme dictionary, and
+                                     assistive technology gets the same facts as one plain sentence. -->
+                                <Setter Property="AutomationProperties.HelpText" Value="{Binding RowTooltip}"/>
+                    <Setter Property="AutomationProperties.HelpText" Value="{Binding RowTooltip}"/>
                             </Style>
                         </ListBox.ItemContainerStyle>
                         <ListBox.ItemTemplate>
@@ -266,7 +266,8 @@
                             <TextBlock Text="ACTIVE TEMPLATE" Style="{StaticResource EyebrowStyle}"/>
                             <TextBlock x:Name="ActiveTemplateText" Text="{Binding ActiveTemplateName}" Style="{StaticResource SectionTitleStyle}">
     <TextBlock.ToolTip>
-        <ToolTip Style="{StaticResource RowToolTipStyle}" Content="{Binding ActiveFile.RowTooltip}"/>
+        <!-- The file card is resolved by type from the active template, the same card the file list uses. -->
+        <ToolTip Content="{Binding ActiveFile}"/>
     </TextBlock.ToolTip>
 </TextBlock>
                         </StackPanel>
@@ -355,11 +356,11 @@
                             <Style TargetType="ListViewItem" BasedOn="{StaticResource {x:Type ListViewItem}}">
                                 <!-- Whole-parameter popup on the row: the columns truncate, and picking the
                                      right parameter should not require resizing every column first. -->
-                                <Setter Property="ToolTip">
-                                <Setter.Value>
-                                    <ToolTip Style="{StaticResource RowToolTipStyle}" Content="{Binding RowTooltip}"/>
-                                </Setter.Value>
-                            </Setter>
+                                <Setter Property="ToolTip" Value="{Binding}"/>
+                                <!-- The row card itself is keyed by type in the theme dictionary, and
+                                     assistive technology gets the same facts as one plain sentence. -->
+                                <Setter Property="AutomationProperties.HelpText" Value="{Binding RowTooltip}"/>
+                    <Setter Property="AutomationProperties.HelpText" Value="{Binding RowTooltip}"/>
                             </Style>
                         </ListView.ItemContainerStyle>
                         <ListView.View>
@@ -477,9 +478,48 @@
                                                        MaxWidth="420" VerticalAlignment="Center"
                                                        Style="{StaticResource FieldNoteStyle}"/>
                                         </StackPanel>
-                                        <TextBlock Text="{Binding SaveOutcomeSummary}" TextWrapping="Wrap"
-                                                   Margin="24,4,0,0" Style="{StaticResource FieldNoteStyle}"
-                                                   Visibility="{Binding HasSaveOutcome, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                        <!-- The result of the last attempt belongs in the panel the user is
+                                             looking at, not in a notice behind this overlay: a save that
+                                             failed or changed one file of three has to be readable here. -->
+                                        <Border Margin="0,8,0,0" Padding="10,8" CornerRadius="6" BorderThickness="1"
+                                                Visibility="{Binding HasSaveOutcome, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Background" Value="{DynamicResource Panel2BackgroundBrush}"/>
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource StrongBorderBrush}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding SaveOutcomeIsOk}" Value="True">
+                                                            <Setter Property="Background" Value="{DynamicResource OkNoticeBackgroundBrush}"/>
+                                                            <Setter Property="BorderBrush" Value="{DynamicResource OkBrush}"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding SaveOutcomeIsProblem}" Value="True">
+                                                            <Setter Property="Background" Value="{DynamicResource ErrorNoticeBackgroundBrush}"/>
+                                                            <Setter Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <StackPanel>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Path Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"
+                                                          Data="{StaticResource IconCheck}" Stretch="Uniform" StrokeThickness="1.7"
+                                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                                          Stroke="{DynamicResource OkForegroundBrush}"
+                                                          Visibility="{Binding SaveOutcomeIsOk, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                    <Path Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"
+                                                          Data="{StaticResource IconWarning}" Stretch="Uniform" StrokeThickness="1.7"
+                                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                                          Stroke="{DynamicResource ErrorForegroundBrush}"
+                                                          Visibility="{Binding SaveOutcomeIsProblem, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                    <TextBlock x:Name="ReviewOutcomeTitle" Text="{Binding SaveOutcomeTitle}"
+                                                               FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                                <TextBlock x:Name="ReviewOutcomeDetail" Text="{Binding SaveOutcomeSummary}"
+                                                           TextWrapping="Wrap" Margin="0,4,0,0" FontSize="12"/>
+                                                <TextBlock Text="{Binding BackupDirectoryHint}" Margin="0,4,0,0" FontSize="11"
+                                                           Foreground="{DynamicResource MutedForegroundBrush}" TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                        </Border>
                                     </StackPanel>
                                         <Button x:Name="ReviewSaveButton" Grid.Column="1" Content="Save to templates" VerticalAlignment="Center"
                                                 infra:Iconics.Icon="{StaticResource IconSave}"
@@ -932,6 +972,11 @@
                                 </WrapPanel>
                                 <TextBlock x:Name="FormSummaryText" Text="{Binding FormSummary}" TextWrapping="Wrap"
                                            Style="{StaticResource FieldNoteStyle}"/>
+                                <!-- When the form holds a value that cannot be staged, the reason belongs
+                                     next to the field it happened to, not only in a notice elsewhere. -->
+                                <TextBlock x:Name="UnappliedFieldReportText" Text="{Binding UnappliedFieldReport}"
+                                           TextWrapping="Wrap" Foreground="{DynamicResource ErrorForegroundBrush}"
+                                           Visibility="{Binding HasUnappliedFieldReport, Converter={StaticResource BoolToVisibilityConverter}}"/>
                             </StackPanel>
                         </Border>
 
