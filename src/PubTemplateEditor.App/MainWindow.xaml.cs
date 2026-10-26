@@ -49,10 +49,17 @@ public partial class MainWindow : Window
     public Button BulkActionButton => BulkButton;
     public Button DiscardAllActionButton => DiscardAllButton;
     public Border DetailActionsPanel => DetailActionsCard;
+    public Panel ParameterActionStrip => ParameterActionsPanel;
+    public Button ReadParametersActionButton => ReadParametersButton;
+    public Button ChooseFolderActionButton => ChooseFolderButton;
+    public Button ReviewSaveActionButton => ReviewSaveButton;
+    public Button BulkConfirmActionButton => BulkConfirmButton;
     public Border ExplorerStagedBadge => StagedBadge;
     public ListView ReviewList => ReviewListView;
     public TextBlock ReviewSummaryLabel => ReviewSummaryText;
-    public Button ReviewOpenButton => OpenReviewButton;
+    // The single review entry, in the top bar beside the staged-count badge. It is deliberately not
+    // repeated next to a parameter: the review always covers the whole session, never only the selection.
+    public Button ReviewOpenButton => TopReviewButton;
     public TextBlock StagedTrayLabel => StagedTrayText;
 
     private LicensesWindow? _licensesWindow;

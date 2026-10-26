@@ -1,6 +1,7 @@
 <Window x:Class="PubTemplateEditor.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:infra="clr-namespace:PubTemplateEditor.App.Infrastructure"
         Title="PUB Template Parameter Editor"
         Width="1240" Height="780" MinWidth="900" MinHeight="520"
         WindowStartupLocation="CenterScreen"
@@ -64,11 +65,13 @@
                                        Foreground="{DynamicResource MutedForegroundBrush}"/>
                         </StackPanel>
                     </Border>
-                    <Button Content="Review and save" Command="{Binding OpenReviewCommand}"
+                    <Button x:Name="TopReviewButton" Content="Review and save" Command="{Binding OpenReviewCommand}"
+                            infra:Iconics.Icon="{StaticResource IconListChecks}"
                             Style="{StaticResource AccentButtonStyle}" Margin="10,0,0,0"
                             ToolTip="List every staged change before anything is written (Ctrl+S)"
                             AutomationProperties.Name="Review staged changes"/>
                     <Button x:Name="DiscardAllButton" Content="Discard all" Command="{Binding DiscardAllStagedCommand}" Margin="8,0,0,0"
+                            infra:Iconics.Icon="{StaticResource IconTrash}"
                             ToolTip="Forget the staged proposals and the unapplied typing of this session; no template file is written"
                             AutomationProperties.Name="Discard all staged changes"/>
                 </StackPanel>
@@ -100,7 +103,8 @@
                     <TextBlock Text="{Binding FolderName}" MaxWidth="200" TextTrimming="CharacterEllipsis"
                                ToolTip="{Binding FolderPath}" VerticalAlignment="Center" Margin="0,0,8,0"
                                AutomationProperties.Name="Active folder"/>
-                    <Button Content="Choose folder" Command="{Binding OpenFolderCommand}"
+                    <Button x:Name="ChooseFolderButton" Content="Choose folder" Command="{Binding OpenFolderCommand}"
+                            infra:Iconics.Icon="{StaticResource IconFolderOpen}"
                             Style="{StaticResource AccentButtonStyle}"
                             ToolTip="Choose the folder containing .dta templates (Ctrl+O)"/>
                 </StackPanel>
@@ -142,7 +146,8 @@
                                      Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}"/>
                         <TextBlock x:Name="ScopeText" Text="{Binding ScopeDescription}" Style="{StaticResource FieldNoteStyle}"
                                    Margin="0,0,0,6"/>
-                        <Button Content="Read parameters" Command="{Binding ReadParametersCommand}"
+                        <Button x:Name="ReadParametersButton" Content="Read parameters" Command="{Binding ReadParametersCommand}"
+                                infra:Iconics.Icon="{StaticResource IconReload}"
                                 Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch"
                                 ToolTip="Parse declarations of the selected templates (F5)"/>
                     </StackPanel>
@@ -212,6 +217,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
@@ -241,10 +247,28 @@
                                   AutomationProperties.Name="Filter by access"/>
                     </Grid>
 
-                    <TextBlock x:Name="SummaryText" Grid.Row="1" Margin="12,8,12,0" Style="{StaticResource FieldNoteStyle}"
+                    <!-- Parameter actions belong to the list they act on: the target is the parameter
+                         highlighted in the table below. Compare and bulk apply sit here, as in the
+                         reference layout, and are disabled while nothing is selected. The review entry
+                         stays in the top bar next to the staged-count badge, because it always covers the
+                         whole session rather than the selected parameter. -->
+                    <WrapPanel x:Name="ParameterActionsPanel" Grid.Row="1" Margin="12,10,12,0">
+                        <Button x:Name="CompareButton" Content="Compare" Margin="0,0,8,0"
+                                infra:Iconics.Icon="{StaticResource IconCompare}"
+                                Command="{Binding CompareCommand}" ToolTipService.ShowOnDisabled="True"
+                                ToolTip="Show this parameter across every read template"
+                                AutomationProperties.Name="Compare this parameter with the other templates"/>
+                        <Button x:Name="BulkButton" Content="Apply value to templates" Margin="0,0,8,0"
+                                infra:Iconics.Icon="{StaticResource IconBrush}"
+                                Command="{Binding OpenBulkCommand}" ToolTipService.ShowOnDisabled="True"
+                                ToolTip="Stage one default value across several templates"
+                                AutomationProperties.Name="Apply one default value to many templates"/>
+                    </WrapPanel>
+
+                    <TextBlock x:Name="SummaryText" Grid.Row="2" Margin="12,8,12,0" Style="{StaticResource FieldNoteStyle}"
                                Text="{Binding ActiveParameterSummary}"/>
 
-                    <StackPanel Grid.Row="2" Margin="12,8,12,0">
+                    <StackPanel Grid.Row="3" Margin="12,8,12,0">
                         <Border Style="{StaticResource ErrorNoticeStyle}"
                                 Visibility="{Binding HasActionError, Converter={StaticResource BoolToVisibilityConverter}}">
                             <TextBlock x:Name="ActionErrorText" Text="{Binding ActionError}" TextWrapping="Wrap"
@@ -271,7 +295,7 @@
                         </Border>
                     </StackPanel>
 
-                    <ListView Grid.Row="3" x:Name="ParameterList" Margin="12,10,12,12"
+                    <ListView Grid.Row="4" x:Name="ParameterList" Margin="12,10,12,12"
                               ItemsSource="{Binding VisibleParameters}"
                               SelectedItem="{Binding SelectedParameter}"
                               IsEnabled="{Binding HasActiveFile}"
@@ -315,19 +339,19 @@
                     </ListView>
 
                     <!-- empty states over the table area; never intercept mouse input -->
-                    <TextBlock Grid.Row="3" IsHitTestVisible="False" Margin="24" MaxWidth="460" TextWrapping="Wrap"
+                    <TextBlock Grid.Row="4" IsHitTestVisible="False" Margin="24" MaxWidth="460" TextWrapping="Wrap"
                                HorizontalAlignment="Center" VerticalAlignment="Center"
                                Style="{StaticResource FieldNoteStyle}"
                                Visibility="{Binding ShowEmptyNoActiveFile, Converter={StaticResource BoolToVisibilityConverter}}"
                                Text="Choose a template in the explorer. Focusing it does not add it to the read selection."/>
-                    <TextBlock Grid.Row="3" IsHitTestVisible="False" Margin="24" MaxWidth="460" TextWrapping="Wrap"
+                    <TextBlock Grid.Row="4" IsHitTestVisible="False" Margin="24" MaxWidth="460" TextWrapping="Wrap"
                                HorizontalAlignment="Center" VerticalAlignment="Center"
                                Style="{StaticResource FieldNoteStyle}"
                                Visibility="{Binding ShowEmptyNotRead, Converter={StaticResource BoolToVisibilityConverter}}">
                         <Run Text="Parameters not read yet."/><LineBreak/>
                         <Run Text="Select templates for reading or use the default visible-file scope, then press Read parameters."/>
                     </TextBlock>
-                    <TextBlock Grid.Row="3" IsHitTestVisible="False" Margin="24" MaxWidth="460" TextWrapping="Wrap"
+                    <TextBlock Grid.Row="4" IsHitTestVisible="False" Margin="24" MaxWidth="460" TextWrapping="Wrap"
                                HorizontalAlignment="Center" VerticalAlignment="Center"
                                Style="{StaticResource FieldNoteStyle}"
                                Visibility="{Binding ShowEmptyNoMatches, Converter={StaticResource BoolToVisibilityConverter}}"
@@ -338,7 +362,7 @@
                              Every staged change of the session, per field, with a tick box each. The
                              primary action stays disabled until the write step exists, and says so
                              instead of pretending to save. -->
-                        <Border Grid.Row="0" Grid.RowSpan="4" Margin="10" Panel.ZIndex="11"
+                        <Border Grid.Row="0" Grid.RowSpan="5" Margin="10" Panel.ZIndex="11"
                                 Background="{DynamicResource PanelBackgroundBrush}"
                                 BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1"
                                 Visibility="{Binding IsReviewOpen, Converter={StaticResource BoolToVisibilityConverter}}">
@@ -361,10 +385,12 @@
                                                 Command="{Binding SelectNoneReviewCommand}"
                                                 AutomationProperties.Name="Deselect every staged change"/>
                                         <Button Content="Discard selected" Style="{StaticResource LinkButtonStyle}" Margin="0,0,8,0"
+                                                infra:Iconics.Icon="{StaticResource IconTrash}"
                                                 Command="{Binding DiscardSelectedReviewCommand}"
                                                 ToolTip="Forget the ticked proposals; no template file is written"
                                                 AutomationProperties.Name="Discard the ticked staged changes"/>
                                         <Button Content="Close" Style="{StaticResource LinkButtonStyle}"
+                                                infra:Iconics.Icon="{StaticResource IconClose}"
                                                 Command="{Binding CloseReviewCommand}"
                                                 AutomationProperties.Name="Close the save review"/>
                                     </StackPanel>
@@ -395,7 +421,8 @@
                                                    Margin="24,4,0,0" Style="{StaticResource FieldNoteStyle}"
                                                    Visibility="{Binding HasSaveOutcome, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                     </StackPanel>
-                                        <Button Grid.Column="1" Content="Save to templates" VerticalAlignment="Center"
+                                        <Button x:Name="ReviewSaveButton" Grid.Column="1" Content="Save to templates" VerticalAlignment="Center"
+                                                infra:Iconics.Icon="{StaticResource IconSave}"
                                                 Style="{StaticResource AccentButtonStyle}"
                                                 Command="{Binding SaveReviewCommand}" IsEnabled="{Binding CanSaveReview}"
                                                 ToolTip="{Binding SaveUnavailableReason}" ToolTipService.ShowOnDisabled="True"
@@ -470,7 +497,7 @@
                             </DockPanel>
                         </Border>
 
-                        <Border Grid.Row="0" Grid.RowSpan="4" Margin="10" Panel.ZIndex="10"
+                        <Border Grid.Row="0" Grid.RowSpan="5" Margin="10" Panel.ZIndex="10"
                                 Background="{DynamicResource PanelBackgroundBrush}"
                                 BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1"
                                 Visibility="{Binding IsCompareOpen, Converter={StaticResource BoolToVisibilityConverter}}">
@@ -489,6 +516,7 @@
                                           IsChecked="{Binding CompareSelectedOnly}"
                                           VerticalAlignment="Center" Margin="0,0,10,0"/>
                                 <Button Grid.Column="2" Content="Close" Style="{StaticResource LinkButtonStyle}"
+                                        infra:Iconics.Icon="{StaticResource IconClose}"
                                         Command="{Binding CloseCompareCommand}"
                                         AutomationProperties.Name="Close compare panel"/>
                             </Grid>
@@ -556,7 +584,7 @@
                     </Border>
 
                     <!-- ===== bulk panel: one default value, staged for many templates after review ===== -->
-                    <Border Grid.Row="0" Grid.RowSpan="4" Margin="10" Panel.ZIndex="10"
+                    <Border Grid.Row="0" Grid.RowSpan="5" Margin="10" Panel.ZIndex="10"
                             Background="{DynamicResource PanelBackgroundBrush}"
                             BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1"
                             Visibility="{Binding IsBulkOpen, Converter={StaticResource BoolToVisibilityConverter}}">
@@ -588,9 +616,12 @@
                                 <TextBlock x:Name="BulkSummaryText" Grid.Column="0" Text="{Binding BulkSummary}"
                                            Style="{StaticResource FieldNoteStyle}" VerticalAlignment="Center"/>
                                 <Button Grid.Column="1" Content="Cancel" Style="{StaticResource LinkButtonStyle}"
+                                        infra:Iconics.Icon="{StaticResource IconClose}"
                                         Command="{Binding CloseBulkCommand}" Margin="0,0,8,0"
                                         AutomationProperties.Name="Cancel bulk value"/>
-                                <Button Grid.Column="2" Content="Apply value to selected templates"
+                                <Button x:Name="BulkConfirmButton" Grid.Column="2" Content="Apply value to selected templates"
+                                        infra:Iconics.Icon="{StaticResource IconBrush}"
+                                        Style="{StaticResource AccentButtonStyle}"
                                         Command="{Binding ConfirmBulkCommand}"
                                         AutomationProperties.Name="Stage this value in the selected templates"/>
                             </Grid>
@@ -755,30 +786,19 @@
                                 </StackPanel>
                                 <WrapPanel Margin="0,0,0,4">
                                     <Button x:Name="ApplyEditsButton" Content="Apply edits" Margin="0,0,6,0"
+                                            infra:Iconics.Icon="{StaticResource IconCheck}"
                                             Command="{Binding ApplyEditsCommand}"
                                             AutomationProperties.Name="Stage the form changes for this parameter"/>
                                     <Button x:Name="RevertFormButton" Content="Undo unapplied typing" Margin="0,0,6,0"
+                                            infra:Iconics.Icon="{StaticResource IconUndo}"
                                             Style="{StaticResource LinkButtonStyle}"
                                             Command="{Binding RevertFormCommand}"
                                             AutomationProperties.Name="Reload the form with the session values"/>
                                     <Button x:Name="DiscardDraftsButton" Content="Discard staged for this parameter"
+                                            infra:Iconics.Icon="{StaticResource IconTrash}"
                                             Style="{StaticResource LinkButtonStyle}" Margin="0,0,6,0"
                                             Command="{Binding DiscardDraftsForParameterCommand}"
                                             AutomationProperties.Name="Discard the staged changes of this parameter"/>
-                                    <Button x:Name="OpenReviewButton" Content="Review all staged changes"
-                                            Style="{StaticResource LinkButtonStyle}"
-                                            Command="{Binding OpenReviewCommand}"
-                                            AutomationProperties.Name="Open the save review for every staged change"/>
-                                </WrapPanel>
-                                <WrapPanel>
-                                    <Button x:Name="CompareButton" Content="Compare with other templates"
-                                            Margin="0,0,6,0" Style="{StaticResource LinkButtonStyle}"
-                                            Command="{Binding CompareCommand}"
-                                            AutomationProperties.Name="Compare this parameter with the other templates"/>
-                                    <Button x:Name="BulkButton" Content="Apply value to templates"
-                                            Style="{StaticResource LinkButtonStyle}"
-                                            Command="{Binding OpenBulkCommand}"
-                                            AutomationProperties.Name="Apply one default value to many templates"/>
                                 </WrapPanel>
                                 <TextBlock x:Name="FormSummaryText" Text="{Binding FormSummary}" TextWrapping="Wrap"
                                            Style="{StaticResource FieldNoteStyle}"/>

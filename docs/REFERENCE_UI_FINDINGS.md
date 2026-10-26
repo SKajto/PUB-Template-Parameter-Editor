@@ -93,7 +93,8 @@ labels and workflow guarantees a user of the tool expects.
   semantics live in `PubTemplateEditor.Core/Search/ParameterSearchMatcher.cs` and
   are covered by Core tests independent of any UI.
 - Upstream recovery notices for interrupted saves are a startup feature; the
-  recovery journal belongs to S4 here and is not present yet.
+  recovery journal itself is implemented in S4 (`TemplateSaveService`), the
+  startup notice over it is still open.
 
 ## Open verification gates for this UI
 
@@ -102,3 +103,40 @@ labels and workflow guarantees a user of the tool expects.
   Human visual review of those snapshots is still required.
 - Interactive GUI behaviour (mouse/keyboard on a real desktop session) is
   separately recorded in PLAN.md; software-rendered snapshots do not prove it.
+
+## Parameter tools and the button layer (2026-10-26)
+
+The reference puts a `parameter-actions` row between its main toolbar and the
+parameter table, holding "Compare" and "Apply value to templates" (`.reference/
+desktop_src_App.tsx`, `<div className="parameter-actions">`). Both act on the
+parameter selected in the table, which is why they hang on that panel rather than
+on the details form. The same placement is used here: `ParameterActionsPanel` is
+the row directly under the active-template/search/access toolbar and above the
+notices and the table.
+
+Differences that follow from how this project works:
+
+- There is no per-parameter review button. The review always lists the staged
+  changes of the whole session, so it appears exactly once - in the top bar next
+  to the staged-change count - and through Ctrl+S. `ButtonChromeTests.
+  TheSaveReviewHasASingleSessionWideEntryPoint` fails if a second entry point
+  appears anywhere in the shell.
+- Form actions ("Apply edits", "Undo unapplied typing", "Discard staged for this
+  parameter") stay with the details form they apply to.
+
+Button styling follows **Microsoft Fluent UI** rather than Material or Tailwind:
+it is the convention a Windows desktop user expects, it matches the stock WPF
+control set, and it needs no toolkit package. Concretely: a command button is a
+16 px glyph at the left of a real text label, minimum 31 px target height, 6 px
+corner radius, subtle hover fill, a separate pressed fill and an accent focus
+ring; the accent variant keeps its own hover/pressed shades
+(`AccentHoverBrush`, `AccentPressedBrush` in both theme dictionaries). Link-style
+actions are Fluent subtle buttons, where the glyph is optional so plain text
+links do not gain a hollow gap.
+
+The glyph is supplied by the `Iconics.Icon` attached property
+(`Infrastructure/Iconics.cs`), read by the button templates in
+`Themes/Controls.xaml`, so a command button stays one line of XAML. The geometries
+remain the project's own hand-drawn paths; no icon set was copied or vendored.
+Interaction fills are read from `Iconics.HoverBrush` / `Iconics.PressedBrush`
+because a control template trigger cannot be overridden by a `BasedOn` style.

@@ -17,6 +17,8 @@
     <Color x:Key="AccentSoftColor">#E8EEFB</Color>
     <!-- Text drawn on top of the accent fill; the contrast audit enforces readability. -->
     <Color x:Key="OnAccentColor">#FFFFFF</Color>
+    <Color x:Key="AccentHoverColor">#2A52AE</Color>
+    <Color x:Key="AccentPressedColor">#23448F</Color>
     <Color x:Key="SelectionColor">#DCE7FA</Color>
     <Color x:Key="RowHoverColor">#F7F9FC</Color>
     <Color x:Key="DirtyColor">#B45309</Color>
@@ -40,6 +42,8 @@
     <SolidColorBrush x:Key="AccentBrush" Color="{DynamicResource AccentColor}"/>
     <SolidColorBrush x:Key="AccentSoftBrush" Color="{DynamicResource AccentSoftColor}"/>
     <SolidColorBrush x:Key="OnAccentBrush" Color="{DynamicResource OnAccentColor}"/>
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="{DynamicResource AccentHoverColor}"/>
+    <SolidColorBrush x:Key="AccentPressedBrush" Color="{DynamicResource AccentPressedColor}"/>
     <SolidColorBrush x:Key="SelectionBrush" Color="{DynamicResource SelectionColor}"/>
     <SolidColorBrush x:Key="RowHoverBackgroundBrush" Color="{DynamicResource RowHoverColor}"/>
     <SolidColorBrush x:Key="SelectedRowBackgroundBrush" Color="{DynamicResource SelectionColor}"/>
