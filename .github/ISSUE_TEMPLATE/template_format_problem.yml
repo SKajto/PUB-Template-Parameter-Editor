@@ -1,0 +1,75 @@
+name: Template or format problem
+description: A .dta file cannot be read, or a declaration is shown wrongly
+labels: ["format", "needs-reproduction"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The editor reads what it understands and marks the rest read-only with a reason. A file it
+        refuses is usually a real finding, so please give the reason the program printed.
+        What is verified so far is written up in
+        [docs/SAMPLE_FINDINGS.md](../../blob/main/docs/SAMPLE_FINDINGS.md).
+
+  - type: textarea
+    id: message
+    attributes:
+      label: What the editor said
+      description: |
+        The exact text, e.g. "not readable", an unsupported-construct explanation, or an empty
+        declaration list. Copy it, do not paraphrase it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: shape
+    attributes:
+      label: How the file is shaped
+      description: |
+        Do **not** attach your template. Describe the structure instead: is the `.dta` a ZIP
+        container or plain XML, what is the entry name of the template part, which element and
+        attribute carries the declaration, which properties does it have, and what is unusual about
+        the one that is wrong (empty `default`, missing `access`, an expression instead of a value,
+        a nested `feature`, an entity reference, an unusual encoding or BOM).
+      placeholder: |
+        Container has 241 entries; template part is template.xml.
+        The declaration that shows no value:
+        <variable><feature tag="definition">
+          <property name="name" value="SomeName"/>
+          <property name="default"><expression type="constant">…</expression></property>
+        …
+    validations:
+      required: true
+
+  - type: textarea
+    id: counts
+    attributes:
+      label: How many are affected
+      description: One parameter, one template, or every template in the folder? Does the count in the header change?
+    validations:
+      required: true
+
+  - type: input
+    id: origin
+    attributes:
+      label: Where the file came from
+      description: Which PUB product and version produced it, and whether it was edited by anything else since.
+      placeholder: "PUB … version …; opened once in the editor, then in PUB, then back in the editor"
+    validations:
+      required: true
+
+  - type: textarea
+    id: synthetic
+    attributes:
+      label: A file you can actually share
+      required: false
+      description: |
+        A hand-made file with the same shape (a few declarations, made-up names, no real project
+        data) is worth more than a real one. You can paste the XML here instead of attaching it.
+
+  - type: textarea
+    id: version
+    attributes:
+      label: Version and system
+      description: From the About/Licenses view - application version, .NET runtime line, OS line.
+    validations:
+      required: true

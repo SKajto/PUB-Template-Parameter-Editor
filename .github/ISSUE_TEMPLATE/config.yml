@@ -1,0 +1,16 @@
+# Issue forms are the templates in this folder; a blank issue is kept for anything they
+# cannot express (a question, a documentation fix, an announcement).
+blank_issues_enabled: true
+
+contact_links:
+  - name: Report a security problem
+    url: https://github.com/SKajto/PUB-Template-Parameter-Editor/security/advisories/new
+    about: Privately, through a draft advisory. See SECURITY.md for what to include.
+
+  - name: Behaviour, licence and contribution rules
+    url: https://github.com/SKajto/PUB-Template-Parameter-Editor/blob/main/CONTRIBUTING.md
+    about: What the project is for, which constraints are deliberate, and how a change gets taken.
+
+  - name: Conduct
+    url: https://github.com/SKajto/PUB-Template-Parameter-Editor/blob/main/CODE_OF_CONDUCT.md
+    about: Ground rules and how to raise a conduct concern.

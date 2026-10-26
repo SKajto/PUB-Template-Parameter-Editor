@@ -928,6 +928,144 @@ Open gates after this step
 - Native PUB round trip on a file this editor wrote, and the interactive desktop checks (dark-mode
   frame, hover cards, save on the owner's templates).
 
+### 2026-10-26 - SignPath terms checked against the repository, and the executable renamed to the product name
+
+SignPath configuration verified, not guessed
+- The conditions page was fetched and read in full (`https://signpath.org/terms`, saved as
+  `.tools/signpath_terms.html` for the record). Its project-facing requirements were turned into a
+  compliance table in `docs/GITHUB_STORE_RELEASE.md` and into the policy page the conditions ask for.
+- The earlier "SignPath preparation" step was **wrong in substance** and is gone: it wrote a
+  `sign-path-signature-config.json` in this repository and referenced variables named
+  `SIGNPATH_SIGNATION_POLICY_ID`. SignPath's real integration is the action
+  `signpath/github-action-submit-signing-request` (tags resolved from the GitHub tags API:
+  `v3`/`v3.0` -> `f6d04783b4569d051e0c80105fe66e82819d0092`), whose verified inputs are
+  `api-token`, `organization-id`, `project-slug`, `signing-policy-slug`,
+  `artifact-configuration-slug`, `github-artifact-id`, `wait-for-completion`,
+  `output-artifact-directory` - it takes **slugs**, and it consumes the *GitHub artifact id* of the
+  unsigned build. The file-metadata restrictions live in SignPath's artifact configuration, not in a
+  repository file. Their usage shape was cross-checked against SignPath's own demo workflow
+  (`SignPath/demo-github-actions/.github/workflows/build-and-sign.yml`): upload unsigned artifact ->
+  submit signing request -> upload signed artifact.
+- `release.yml` now has the real `sign-portable-exe` job: it needs `package`, runs on
+  `ubuntu-latest`, uses the protected environment `signing-signpath` (which is where the Approver
+  role is enforced: a maintainer must approve the run before the token is available, and SignPath
+  itself waits for an approval per request), permission `actions: read` so the action can fetch that
+  artifact, is off unless `SIGNPATH_ENABLED=true`, fails loudly listing each missing variable or
+  secret, waits up to an hour for the request, then records unsigned/signed SHA-256, the release
+  version, the commit and the SignPath request URL in `SIGNING.txt` and uploads
+  `signed-portable-<version>`. It never touches the MSIX, and the note it writes says explicitly
+  that the Store is not the signer here.
+- Artifact metadata, which their configuration enforces, is produced and verified on our side: the
+  release publish passes `-p:Version/-p:AssemblyVersion/-p:FileVersion/-p:InformationalVersion` and
+  `-p:IncludeSourceRevisionInInformationalVersion=false` (a `0.1.0+dd3455f…` informational version
+  was not what a "same product version in each build" check should compare), and a step reads
+  `VersionInfo` back and requires product name `PUB Template Parameter Editor` with
+  ProductVersion == FileVersion == the release version. Locally that now reports
+  `name=PUB Template Parameter Editor productVersion=0.1.0 fileVersion=0.1.0 desc=PUB Template Parameter Editor`.
+- Added `docs/CODE_SIGNING_POLICY.md` with the wording their conditions ask the project home page to
+  expose: the sentence "Free code signing provided by SignPath.io, certificate by SignPath
+  Foundation", the Author/Review/Approve role table with links, the privacy sentence ("This program
+  will not transfer any information to other networked systems unless specifically requested by the
+  user or the person installing or operating it"), system-change announcement, uninstallation, and
+  the build-provenance/metadata rules. README gained the matching **Code signing policy** section
+  that links to it. Added `.github/CODEOWNERS` so the review responsibility their roles require is
+  declared, with build/packaging/CI files called out as part of the signed binary's source.
+- Two claims of mine that the terms do not support were corrected: a Store price is not forbidden by
+  them (GPL allows charging; what they forbid is commercial *dual licensing* of components), and
+  there is a "verifiable reputation" expectation for executables people run because of the
+  signature - a new repository can simply be declined, with no arbitration. Both are written into
+  the docs instead of being glossed over.
+- Two gates the conditions create that no workflow can close by itself: the project must already be
+  **released in the form to be signed** (no GitHub Release yet), and MFA plus branch protection must
+  be enabled by the owner. `StoreRelease.settings.json` no longer keeps a placeholder for the source
+  URL (`sourceRepositoryUrl` is the real public repository now); the four identity values stay
+  `REPLACE_*` until Partner Center supplies them, and `PackagingConfigurationTests` asserts exactly
+  that split. To let a signed portable release exist before those identity values arrive, the
+  release workflow gained the `includeStorePackage` choice; a tag push still insists on it.
+
+Executable named after the product (owner instruction)
+- `AssemblyName` is now `PUB_Template_Parameter_Editor`, so the downloaded file,
+  Task Manager, the MSIX payload and the process name all say the product name. Underscores were
+  chosen over spaces deliberately: the name appears in MSBuild output paths, in `makeappx` content
+  paths, in PowerShell steps and in the SignPath artifact configuration, where a space invites
+  quoting bugs. A spaced name is a one-line change if the owner prefers it.
+- Everything that had to follow the rename did: the three window `Icon` pack URIs (they name the
+  *assembly*, so `/PUB_Template_Parameter_Editor;component/Assets/app.ico`), the two tests that
+  assert those URIs and resolve them at runtime, `packaging/AppxManifest.template.xml`
+  `Executable=`, `packaging/build-msix.ps1` payload and required-file checks, the draft package file
+  name, the CI steps, and the project's own docs (`docs/WINDOWS_PUBLISH.md`, release/signing/policy
+  docs, README). `EmbeddedNotices` derives the assembly name at runtime, so the offline licence
+  resources needed no change. The user-data folder stays `%LOCALAPPDATA%\PubTemplateEditor`, because
+  renaming it would orphan the settings and the backups that are already there.
+- New guard test `TheManifestNamesTheExecutableThatTheProjectActuallyBuilds`: manifest `Executable`
+  must equal `<AssemblyName>` + `.exe`, which is the pairing a rename silently breaks and which
+  would otherwise show up as a package that installs and never starts.
+- Verified locally after the rename: full suite with samples Core 86 + Integration 44 + App/WPF 83 =
+  **213** and, with `examples/` moved away, 86 + 28 + 83 = **197**, 0 failed, 0 warnings; portable
+  publish produced `PUB_Template_Parameter_Editor.exe` (131,261,563 bytes) which starts and holds
+  `[PUB Template Parameter Editor]` with a 32x32 associated icon; `build-msix.ps1 -Version 0.0.0
+  -Mode Draft` packed `PUB_Template_Parameter_Editor_0.0.0_win-x64.msix`, SHA-256 `F12A7D05...BE78`.
+- `AGENTS.md` and `REQUIREMENTS.md` (GEN-04) still name the old executable; those are the owner's
+  instruction documents and were left untouched deliberately - this section is the record that the
+  owner's later instruction supersedes that one word.
+
+Open gates after this step
+- Owner: enable MFA and branch protection, create the `signing-signpath` environment with a required
+  reviewer, register the project with SignPath, then set the four variables and `SIGNPATH_ENABLED`.
+- A GitHub Release carrying the executable, source archive and notices (their "already released" and
+  "documented" conditions), which needs a version decision from the owner.
+- Whether SignPath accepts a brand-new repository at all - their reputation judgement, not a
+  checkbox.
+
+### 2026-10-26 - Community standards, and the commits now carry the owner's identity
+
+Community Standards files (the repository's Community page asked for them)
+- `CODE_OF_CONDUCT.md` - Contributor Covenant 2.1, taken verbatim from the official site
+  (`contributor-covenant.org/version/2/1/code_of_conduct/code_of_conduct.md`) so nothing is
+  paraphrased from memory; the single `[INSERT CONTACT METHOD]` placeholder is replaced with the
+  private contact routes this repository really has (Security-tab draft advisory, the owner's GitHub
+  profile), plus a project section naming who the "community leaders" are, a note that a project
+  signed through SignPath Foundation is also bound by their conditions and code of conduct, and the
+  distinction that the covenant document is CC BY-SA 4.0 while the software is GPL-3.0-only.
+- `CONTRIBUTING.md` - the constraints that actually bite here: zero third-party production packages
+  and how to justify one, the Core/Infrastructure/App boundaries, "nothing writes outside the review
+  step", template files as untrusted data, no `.dta` in the repository, how to run the tests
+  including the sample-free run, the two WPF runtime-only failure modes a change needs a test for,
+  and that build/CI files are part of the signed source. Contributions are confirmed under
+  GPL-3.0-only.
+- `SECURITY.md` - supported versions and a threat model written from what this program really does
+  (`DtdProcessing.Prohibit`, `XmlResolver = null`, values treated as text, no network capability,
+  fingerprint-checked writes with backups and a journal, the container read in memory rather than
+  extracted), private reporting through the Security tab, what to include, an explicit "no real
+  templates, a synthetic one is worth more", and an honest "one maintainer, no SLA, no bounty".
+- `.github/ISSUE_TEMPLATE/` - `bug_report.yml`, `template_format_problem.yml` (the case this project
+  actually needs: a file the editor refuses, asked for as *shape*, never as an attachment),
+  `feature_request.yml` with the deferred-scope list and the design boundaries spelled out, and
+  `config.yml` with private-security and guidance contact links.
+- `.github/PULL_REQUEST_TEMPLATE.md` - behaviour-first description, a verification list that
+  includes the sample-free run and the contrast audit, a mandatory "what could not be verified
+  here", the constraint checklist (no new package, project boundaries, no `.dta`, licence/SPDX,
+  manifest and executable agreement), and a call-out of the workflow/packaging/global.json files as
+  the closest review targets.
+- `CommunityStandardsTests` (Integration) keeps this honest: the files exist and say something
+  specific to this project (the security policy must mention `DtdProcessing` and the no-attachment
+  rule, the PR template must mention the unverified list and `.github/workflows`), **no community
+  file contains an unfilled placeholder**, every issue form is a real form, the two file-related
+  forms tell the reporter not to attach a template, and every page the README links to exists.
+
+Commit identity
+- The history was authored as `Suad <suad@localhost>` (23 commits), `PUB Template Editor
+  <dev@localhost>` (2) and GitHub's own initial commit as `SKajto
+  <43079991+SKajto@users.noreply.github.com>` (1). The account's canonical private identity was read
+  from the GitHub users API (id 43079991), which is the same address the initial commit already
+  carries, so rewriting to it makes GitHub attribute every commit to the owner instead of showing an
+  unmatched name.
+- Repository-local `user.name`/`user.email` are set to that identity in `.git/config` (not a tracked
+  file), so new commits are right from the start; the existing history is rewritten with
+  `git filter-branch --env-filter` over `main`, then `refs/original` is deleted, the reflog expired
+  and `git gc --prune=now` run, and the branch is updated with `git push --force-with-lease` - a
+  forced update of a branch that existed for two hours and that nobody else can have based on yet.
+
 ## Deferred scope
 
 Linux UI, additional architectures, parameter creation/deletion/renaming, presets, recursive folders, in-app PUB generation, browser hosting and custom installer/updater services are outside this initial Windows release. Keep the domain core independent without building a second UI.

@@ -1,0 +1,57 @@
+name: Feature request
+description: Something the editor should do
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Some things are deliberately out of scope for the first release: creating, renaming or
+        deleting parameters, recursive folder scanning, presets, generating PUB templates,
+        a Linux UI, an in-app update service and a custom installer. Asking for them is still
+        welcome - it tells the maintainer what to weigh - but expect them to be scheduled, not
+        accepted.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you are trying to do
+      description: The task and where the editor gets in the way of it.
+      placeholder: |
+        I keep the same access value across a group of templates and set it by hand every time.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like instead
+      description: Concrete behaviour, in the terms the program already uses (stage, review, save).
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do today instead
+      required: false
+
+  - type: checkboxes
+    id: boundaries
+    attributes:
+      label: Boundaries this has to respect
+      description: Check what your idea still keeps true.
+      options:
+        - label: nothing is written without an explicit review step
+        - label: unrelated bytes of a template file stay untouched
+        - label: no new third-party package in the shipped application
+        - label: no network access, no service, no elevation
+        - label: works with no .NET runtime installed by the user
+
+  - type: textarea
+    id: contribution
+    attributes:
+      label: Would you send a pull request?
+      required: false
+      description: |
+        If yes, read [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md) first - project boundaries and
+        the testing expectations decide whether a change can be taken.

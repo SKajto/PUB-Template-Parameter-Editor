@@ -1,0 +1,95 @@
+name: Bug report
+description: Something the editor does not do as described
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please check whether the [open issues](../issues) already cover it, and use
+        **Template or format problem** instead if a specific `.dta` file cannot be read or shows
+        something wrong in its declarations.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what the editor showed or did, and what you expected instead.
+      placeholder: |
+        Opened a folder, selected a template, changed the default value of two parameters,
+        opened Review Save, ticked both rows and pressed Save.
+        The result card named one file as written and said the other was rejected.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: As exact as you can stand to be. Does it happen every time?
+      placeholder: |
+        1. Choose folder …
+        2. Read parameters of all templates
+        3. Search for "budget", select the row, change the value
+        4. Ctrl+S, select the row, Save
+    validations:
+      required: true
+
+  - type: textarea
+    id: version
+    attributes:
+      label: Version and system
+      description: |
+        From the About/Licenses view: application version, ".NET …" runtime line and the operating
+        system line. Say whether you ran the Store package or the portable executable.
+      placeholder: |
+        PUB Template Parameter Editor 0.1.0, .NET 10.0.x (x64 process on Windows 11 …), portable exe
+    validations:
+      required: true
+
+  - type: dropdown
+    id: channel
+    attributes:
+      label: How are you running it?
+      options:
+        - Microsoft Store (MSIX)
+        - Portable single-file executable
+        - Built from source
+        - Not sure
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: writes
+    attributes:
+      label: Was a file written?
+      description: This decides whether backups and the recovery journal matter.
+      options:
+        - label: I never pressed Save (loading, comparing, editing, bulk staging only)
+        - label: I pressed Save and the result card said the file was written
+        - label: I pressed Save and something failed or was rejected
+        - label: My template files changed in a way I did not expect
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Anything the editor already told you
+      description: |
+        Copy the exact sentence from the notice or result card - it names the file and the reason,
+        and that sentence is usually enough to trace the whole path. If a save was involved, the
+        last lines of `%LOCALAPPDATA%\PubTemplateEditor\recovery-journal.jsonl` help, **with your
+        paths and values removed**.
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Screenshots or theme
+      required: false
+      description: A screenshot of the affected area (light or dark theme) if the problem is visual.
+
+  - type: markdown
+    attributes:
+      value: |
+        **Please do not attach your real templates.** They are your business data. If the shape of a
+        file is what matters, describe the element or attribute, or attach a small hand-made file
+        that reproduces it. Report anything that looks like data loss or a security problem through
+        [SECURITY.md](../../blob/main/SECURITY.md) instead of a public issue.
