@@ -841,6 +841,93 @@ Open gates after this step
 - Whether the dark-mode caption/border and the hover cards look right on the desktop, and the native
   PUB round trip (open a saved file in PUB) - both need a human and the product.
 
+### 2026-10-26 - Published to GitHub, and the free-plan CI ran the whole pipeline green
+
+Publishing
+- Remote `origin = https://github.com/SKajto/PUB-Template-Parameter-Editor` (anonymous
+  `git ls-remote` works, so the repository is public; the GitHub API reports
+  `license: GPL-3.0`, `default_branch: main`, `private: false`). It was not empty: it held one
+  GitHub-created commit `9fe2612 Initial commit` containing only a LICENSE file.
+- Local branch renamed `master` -> `main` to match the existing default branch.
+- `git rebase --onto origin/main <root>` was tried and abandoned: the rename-heavy early commits
+  produced dozens of add/add-vs-deleted conflicts against an unrelated history. Instead
+  `git merge -s ours --allow-unrelated-histories origin/main` keeps their commit as an ancestor with
+  an unchanged tree (`git diff HEAD^1 HEAD` is empty). Push was a plain fast-forward:
+  `9fe2612..e3bb95f`, no force needed.
+- **Licence text fixed on the way.** Comparing our `LICENSE` with the one GitHub created showed the
+  same GPLv3 text reflowed into long paragraphs plus one drifted trailing link
+  (`/philosophy/why-not-lgpl.html` instead of `/licenses/why-not-lgpl.html`). A shipped licence has
+  to be the document, so `LICENSE` is now the canonical FSF text byte for byte (blob `f288702d`,
+  identical to the remote's) - which is also why the merge needed no conflict resolution. All tests
+  still pass with it, and the app's offline licence view now shows the verbatim text.
+
+CI on the free plan - what the first runs proved and broke
+- Run 1 (`40366122547`) failed in *Integration tests*: the native evidence theories had no rows
+  without `examples/*.dta`, and `ATemplateWithoutTheSamplesIsNotCountedAsPassed` asserted that the
+  samples must exist - a leftover of the old assumption that they ship with the repository. Fixed by
+  giving the evidence theories a row that always exists (a container written by
+  `TestSamples.WriteSyntheticContainer`) plus one row per native template where the machine has them,
+  by turning the reader test into a theory instead of a silent `return`, and by replacing the guard
+  with `TheEvidenceSetIsNeverEmptyAndNeverSilentlySmaller`. Explorer tests stopped borrowing their
+  numbers from a real template: they write their own one- and three-declaration fixtures, and in the
+  process they now assert the documented search rules (names case-sensitive and anchored, so
+  `budget` finds nothing while `Budget` finds one row and a name-region attempt never falls through
+  to the description; descriptions match anywhere, case-insensitively).
+  `Directory.GetFiles(...).Select(Path.GetFileName)` also produced a CI-only CS8619 nullability
+  warning, fixed with an explicit lambda.
+- Run 2 (`40369621812`) got much further - build, all three test projects, hygiene checks, the new
+  "no template content may be published" check and the portable publish all passed - and failed in
+  *Draft MSIX*: `makeappx C00CE015`, `StoreLogo` is not a valid `uap:VisualElements` attribute in the
+  manifest schema the tool validates, even though the image it pointed at exists and is committed.
+  The Store logo is declared once, as `Properties/Logo`, where the schema expects it. Reproduced
+  locally in one command (`build-msix.ps1 -Version 0.0.0 -Mode Draft`) and fixed there first.
+- Run 3 (`40370781924`) **green**: `windows-latest`, 1 m 46 s, every step successful - checkout and
+  `setup-dotnet` at the pinned SHAs, SDK taken from `global.json`, restore, build, Core tests,
+  Integration tests, WPF shell tests on the STA host, licensing/hygiene, the template-content guard,
+  portable single-file EXE, "no loose symbols", draft MSIX, hashes, artifact upload
+  (`ci-outputs-40370781924`, 118,450,977 bytes). That closes the gate "do the pinned actions, the
+  runner image and `packaging/build-msix.ps1` work on the real host" - for the CI/Draft path.
+- Both CI-caused faults were invisible locally until the samples were moved out of the working tree;
+  the suite is now verified both ways on this machine: with samples (Core 86 + Integration 43 +
+  App 83 = 212) and with `examples/` relocated to imitate a fresh clone (86 + 27 + 83 = 196), each
+  time 0 failed and 0 warnings. That "run the tests without the samples" step is now the standing
+  pre-push check, because a fresh clone is what CI sees.
+
+SignPath preparation (not signing yet)
+- `release.yml` gained `signpath-preparation`, off unless the repository variable `SIGNPATH_ENABLED`
+  is `true`. When on it requires `SIGNPATH_ORGANIZATION_ID`, `SIGNPATH_SIGNATION_POLICY_ID` and the
+  environment secret `SIGNPATH_API_TOKEN` (environment `signing-signpath`), writes
+  `artifacts-signpath/sign-path-signature-config.json` naming `PubTemplateEditor.exe` and its source
+  URL, and then exits 1 with the remaining instructions. It does not reference SignPath's action,
+  because their tag->SHA mapping has not been resolved and verified here; an unpinned third-party
+  action would break the immutability rule this repository applies everywhere.
+- Owner steps for the free Foundation route (terms: https://signpath.org/terms): register the project
+  with SignPath so they can confirm it is genuinely open source and non-commercial, using this public
+  repository as its identity; then create the environment, add the two variables and the token, pin
+  their action SHA after verifying it the way the other pins were verified, and only then set
+  `SIGNPATH_ENABLED=true`. Only the downloadable EXE needs it: the Store signs the MSIX itself after
+  certification, and nothing built here may be called Store-signed.
+
+Executed commands and results
+- `git remote add origin https://github.com/SKajto/PUB-Template-Parameter-Editor.git`,
+  `git fetch origin`, `git merge -s ours --allow-unrelated-histories origin/main`,
+  `git branch -m master main`, `git push -u origin main`, later pushes `93cd844`, `59cec47`.
+- `dotnet test` per project, with and without `examples/` present (numbers above).
+- `powershell -File packaging/build-msix.ps1 -Version 0.0.0 -Mode Draft` ->
+  `artifacts/packaging/out/PubTemplateEditor_0.0.0_win-x64.msix` 60,982,104 bytes,
+  SHA-256 `C9DB95E0...523C`.
+- Run status read over the public GitHub REST API (`/actions/runs`, `/jobs`, `/check-runs/{id}/annotations`)
+  because no `gh` CLI is installed here; annotations carry step failures but not test detail, which is
+  why the sample-absent state is now reproduced locally instead.
+
+Open gates after this step
+- The `release-packaging` environment does not exist yet, and `packaging/StoreRelease.settings.json`
+  still holds `REPLACE_*` placeholders, so the first tag or manual run of `Release packaging` is
+  expected to stop at the REL-04 step - by design, not a regression. No tag has been pushed.
+- SignPath registration, then the pinned signer action.
+- Native PUB round trip on a file this editor wrote, and the interactive desktop checks (dark-mode
+  frame, hover cards, save on the owner's templates).
+
 ## Deferred scope
 
 Linux UI, additional architectures, parameter creation/deletion/renaming, presets, recursive folders, in-app PUB generation, browser hosting and custom installer/updater services are outside this initial Windows release. Keep the domain core independent without building a second UI.

@@ -12,6 +12,20 @@ Store installation still depends on device configuration. Verify managed-device 
 
 ## Build and packaging implementation
 
+Two constraints that only the packaging tool itself teaches, both hit while wiring CI:
+
+- `makeappx` validates the manifest against the schema of the Windows SDK on the runner. An attribute
+  that looks plausible and whose image exists is still rejected: `StoreLogo` is not valid on
+  `uap:VisualElements` (error `C00CE015`). The Store logo belongs in `Properties/Logo`; the tile
+  attributes on `uap:VisualElements`/`uap:DefaultTile` are the only place the schema accepts them.
+  A draft MSIX build is therefore part of CI, not an optional extra.
+- `MaxVersionTested` in the template comes from `packaging/StoreRelease.settings.json` and must never
+  exceed the SDK whose schema the runner's packaging tool validates.
+
+Before pushing, run the test suite once with `examples/` moved out of the working tree. A fresh clone
+and CI never see the native samples, and a suite that is only green on the maintainer's disk hides
+exactly the tests that matter most.
+
 1. Use a documented Windows GitHub Actions runner image with the selected .NET 10 SDK and Windows SDK packaging tools. Record actual versions. Create and verify the packaging configuration for the new solution.
 2. Build/test the WPF application and portable core. Produce a self-contained win-x64 payload without requiring runtime installation by customers. No Electron/browser runtime is introduced.
 3. Implement MSIX using a Windows Application Packaging Project or Windows SDK MakeAppx pipeline, whichever is verified against the actual solution. Include schema-valid identity, executable/entry point/runtime behavior, required desktop capabilities, minimum OS, visual assets, offline license/notices and correctly scoped resources.
