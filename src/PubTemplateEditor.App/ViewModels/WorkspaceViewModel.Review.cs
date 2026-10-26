@@ -42,32 +42,50 @@ public sealed partial class WorkspaceViewModel
     /// <summary>A save in flight blocks a second one; the command and this flag are the same gate.</summary>
     public bool IsSaving => _isSaving;
 
-    public bool CanSaveReview => !_isSaving && !IsBusy && ReviewRows.Any(r => r.IsSelected && !r.IsNoOp);
-
-    public string SaveUnavailableReason
+    /// <summary>
+    /// The one rule that decides whether a save may start. <see cref="CanSaveReview"/> and
+    /// <see cref="SaveUnavailableReason"/> read the same evaluation, so the button and the sentence under
+    /// it can never disagree - and every change to the staged set raises both, so neither goes stale.
+    /// </summary>
+    private (bool CanSave, string Why) SaveGate()
     {
-        get
+        if (_isSaving)
         {
-            if (_isSaving)
-            {
-                return "A save is already running. Wait for it to finish.";
-            }
-
-            if (ReviewRows.Any(r => r.IsSelected && !r.IsNoOp) && !IsBusy)
-            {
-                return "Only the ticked changes are written. A template is replaced only after the new bytes "
-                     + "were read back and checked field by field, and the copy that was there before is kept "
-                     + "in the app's backup folder.";
-            }
-
-            if (!ReviewRows.Any(r => !r.IsNoOp))
-            {
-                return "Every staged change already holds the value that is in the file, so there is nothing to write.";
-            }
-
-            return "Tick at least one change in the list to enable saving.";
+            return (false, "A save is already running. Wait for it to finish.");
         }
+
+        if (IsBusy)
+        {
+            return (false, "Templates are being read; saving waits until that finishes.");
+        }
+
+        if (ReviewRows.Count == 0)
+        {
+            return (false, "Nothing is staged. Edit a value, apply it, and the change appears here.");
+        }
+
+        if (!ReviewRows.Any(r => !r.IsNoOp))
+        {
+            return (false, "Every staged change already holds the value that is in the file, so there is nothing to write.");
+        }
+
+        if (!ReviewRows.Any(r => r.IsSelected))
+        {
+            return (false, "Tick at least one change in the list to enable saving.");
+        }
+
+        return (true, "Only the ticked changes are written. A template is replaced only after the new bytes "
+                    + "were read back and checked field by field, and the copy that was there before is kept "
+                    + "in the app's backup folder.");
     }
+
+    public bool CanSaveReview => SaveGate().CanSave;
+
+    /// <summary>
+    /// Why saving is or is not offered right now. Shown under the review list and as the save button's
+    /// tooltip, including while the button is disabled.
+    /// </summary>
+    public string SaveUnavailableReason => SaveGate().Why;
 
     /// <summary>Per-file result of the last save attempt, shown under the review table.</summary>
     public string SaveOutcomeSummary { get; private set; } = string.Empty;
@@ -110,7 +128,7 @@ public sealed partial class WorkspaceViewModel
         RebuildReviewRows();
         _isReviewOpen = true;
         Raise(nameof(IsReviewOpen));
-        Raise(nameof(ReviewSummary));
+        RaiseReviewSaveState();
     }
 
     private void CloseReview()
@@ -156,8 +174,7 @@ public sealed partial class WorkspaceViewModel
                     _reviewDeselected.Add(row.Key);
                 }
 
-                Raise(nameof(SelectedReviewCount));
-                Raise(nameof(ReviewSummary));
+                RaiseReviewSaveState();
             };
             ReviewRows.Add(row);
         }
@@ -170,8 +187,26 @@ public sealed partial class WorkspaceViewModel
         }
 
         _reviewDeselected.RemoveWhere(key => ReviewRows.All(r => r.Key != key));
-        Raise(nameof(SelectedReviewCount));
-        Raise(nameof(ReviewSummary));
+        RaiseReviewSaveState();
+    }
+
+    /// <summary>
+    /// The review footer ("can I save, and if not why") is plain bindings, not command state, so every
+    /// staging, ticking or grouping change has to raise it. Command requery alone would leave the sentence
+    /// at whatever it was when the panel was first built - which is how an open review could claim there
+    /// was nothing to write while real changes were listed above it.
+    /// </summary>
+    private void RaiseReviewSaveState()
+    {
+        foreach (string name in new[]
+                 {
+                     nameof(ReviewRows), nameof(ReviewGroups), nameof(SelectedReviewCount),
+                     nameof(ReviewSummary), nameof(CanSaveReview), nameof(SaveUnavailableReason),
+                 })
+        {
+            Raise(name);
+        }
+
         CommandManager.InvalidateRequerySuggested();
     }
 
@@ -191,8 +226,7 @@ public sealed partial class WorkspaceViewModel
             row.IsSelected = value;
         }
 
-        Raise(nameof(SelectedReviewCount));
-        Raise(nameof(ReviewSummary));
+        RaiseReviewSaveState();
     }
 
     /// <summary>
@@ -247,7 +281,7 @@ public sealed partial class WorkspaceViewModel
         }
 
         _isSaving = true;
-        RaiseAll();
+        RaiseReviewSaveState();
         ActionNotice = null;
         ActionError = null;
         SaveOutcomeSummary = string.Empty;
@@ -262,7 +296,7 @@ public sealed partial class WorkspaceViewModel
         catch (OperationCanceledException)
         {
             _isSaving = false;
-            RaiseAll();
+            RaiseReviewSaveState();
             ActionNotice = "The save was cancelled. Files already written stay written; the rest are untouched.";
             return;
         }
@@ -310,9 +344,10 @@ public sealed partial class WorkspaceViewModel
             (> 0, > 0) => "Partly written",
             _ => LastSaveOutcome,
         };
+        Raise(nameof(HasSaveOutcome));
+        Raise(nameof(LastSaveOutcome));
         RebuildReviewRows();
         RefreshAfterDraftChange();
-        RaiseAll();
 
         if (writtenPaths.Count > 0)
         {
@@ -329,21 +364,6 @@ public sealed partial class WorkspaceViewModel
         if (ReviewRows.Count == 0)
         {
             CloseReview();
-        }
-
-        void RaiseAll()
-        {
-            foreach (string name in new[]
-                     {
-                         nameof(IsSaving), nameof(CanSaveReview), nameof(SaveUnavailableReason),
-                         nameof(ReviewSummary), nameof(SelectedReviewCount), nameof(HasSaveOutcome),
-                         nameof(LastSaveOutcome),
-                     })
-            {
-                Raise(name);
-            }
-
-            CommandManager.InvalidateRequerySuggested();
         }
     }
 
@@ -396,5 +416,7 @@ public sealed partial class WorkspaceViewModel
         {
             ActionNotice = $"Discarded {removed} staged change(s) of this session. No template was written.";
         }
+
+        RaiseReviewSaveState();
     }
 }

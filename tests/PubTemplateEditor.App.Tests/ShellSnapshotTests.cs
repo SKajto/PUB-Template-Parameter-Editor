@@ -72,9 +72,25 @@ public class ShellSnapshotTests
             var explorer = Box(window.FilterControl);
             var table = Box(window.ParameterTable);
             var search = Box(window.SearchControl);
+            var access = Box(window.AccessFilterControl);
+            var compare = Box(window.CompareActionButton);
+            var bulk = Box(window.BulkActionButton);
             Assert.True(explorer.w > 100 && explorer.h > 10, "explorer filter box has no space");
             Assert.True(explorer.x < table.x, "explorer must sit left of the parameter table");
-            Assert.True(search.x < table.x + table.w && search.x > table.x, "search box belongs to the table header");
+
+            // The tools for reading the list and the tools for acting on the selected row share one line
+            // above the table: search and access filter on the left, parameter tools at the right end.
+            // Compare centres, not top edges: an input box and a button are not the same height.
+            static double MiddleY((double x, double y, double w, double h) b) => b.y + b.h / 2;
+
+            Assert.True(search.y < table.y, "the tools line must sit above the table");
+            Assert.True(Math.Abs(MiddleY(search) - MiddleY(access)) < 4, "search and access filter are not on one line");
+            Assert.True(Math.Abs(MiddleY(compare) - MiddleY(bulk)) < 4, "the parameter tools wrapped apart");
+            Assert.True(Math.Abs(MiddleY(search) - MiddleY(compare)) < 6, "the parameter tools are not on the tools line");
+            Assert.True(search.x < access.x && access.x < compare.x && compare.x < bulk.x,
+                "search and access filter must be left of Compare / Apply value to templates");
+            Assert.True(Math.Abs(search.x - table.x) < 20, "the search box does not start with the table it filters");
+            Assert.True(bulk.x + bulk.w > table.x + table.w - 40, "the parameter tools are not at the right end of the line");
             Assert.True(table.w > 380 && table.h > 200, "parameter table is too small");
 
             var render = new RenderTargetBitmap(

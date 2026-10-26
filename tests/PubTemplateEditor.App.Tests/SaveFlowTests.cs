@@ -232,9 +232,10 @@ public sealed class SaveFlowTests : IDisposable
         _host.Do(() =>
         {
             Assert.False(vm.SaveReviewCommand.CanExecute(null));
-            Assert.True(vm.SaveUnavailableReason.Contains("nothing to write", StringComparison.Ordinal)
-                        || vm.SaveUnavailableReason.Contains("Tick at least", StringComparison.Ordinal),
-                $"the reason explains itself: {vm.SaveUnavailableReason}");
+            // Nothing has been staged yet, so the honest sentence is "nothing is staged" - not a claim
+            // that staged values already match the file, which is what an empty list used to read as.
+            Assert.Contains("Nothing is staged", vm.SaveUnavailableReason, StringComparison.Ordinal);
+            Assert.DoesNotContain("nothing to write", vm.SaveUnavailableReason, StringComparison.Ordinal);
         });
 
         Stage(vm, "alpha", "OLD"); // the stored value again: not a change at all

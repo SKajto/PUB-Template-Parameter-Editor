@@ -195,10 +195,21 @@
                     <ListBox x:Name="TemplateList" Margin="6,8,6,4" Padding="0"
                              ItemsSource="{Binding VisibleFiles}" SelectedItem="{Binding ActiveFile}"
                              SelectionMode="Single" BorderThickness="0" Background="Transparent"
-                             ItemContainerStyle="{StaticResource TemplateRowStyle}"
                              ScrollViewer.VerticalScrollBarVisibility="Auto"
                              HorizontalContentAlignment="Stretch"
                              AutomationProperties.Name="Template files; select the active template">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem" BasedOn="{StaticResource TemplateRowStyle}">
+                                <!-- The row tooltip is the file's summary: its name, how many parameters it
+                                     holds and how many staged changes it carries. The cells show only a
+                                     fragment, and the bare path would not be enough to choose a file by. -->
+                                <Setter Property="ToolTip">
+                                <Setter.Value>
+                                    <ToolTip Style="{StaticResource RowToolTipStyle}" Content="{Binding RowTooltip}"/>
+                                </Setter.Value>
+                            </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Grid Margin="6,6">
@@ -211,8 +222,7 @@
                                               VerticalAlignment="Center"
                                               AutomationProperties.Name="{Binding FileName, StringFormat={}Select {0} for reading}"/>
                                     <StackPanel Grid.Column="1" Margin="9,0,0,0">
-                                        <TextBlock Text="{Binding FileName}" TextTrimming="CharacterEllipsis"
-                                                   ToolTip="{Binding FilePath}">
+                                        <TextBlock Text="{Binding FileName}" TextTrimming="CharacterEllipsis">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock">
                                                     <Setter Property="FontWeight" Value="Normal"/>
@@ -224,8 +234,7 @@
                                                 </Style>
                                             </TextBlock.Style>
                                         </TextBlock>
-                                        <TextBlock Style="{StaticResource FieldNoteStyle}" Margin="0,1,0,0"
-                                                   ToolTip="{Binding Status}">
+                                        <TextBlock Style="{StaticResource FieldNoteStyle}" Margin="0,1,0,0">
                                             <Run Text="{Binding SizeText, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding StatusDisplay, Mode=OneWay}"/>
                                         </TextBlock>
                                     </StackPanel>
@@ -249,18 +258,33 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
+                    <!-- Reading the list and acting on it are separate lines: search and the access filter
+                         on the left, the parameter tools at the right end of the same line. The active
+                         template keeps its own heading, because everything below belongs to it. -->
                     <Grid Grid.Row="0" Margin="12,10,12,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="220"/>
-                            <ColumnDefinition Width="130"/>
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0">
+                        <StackPanel>
                             <TextBlock Text="ACTIVE TEMPLATE" Style="{StaticResource EyebrowStyle}"/>
-                            <TextBlock x:Name="ActiveTemplateText" Text="{Binding ActiveTemplateName}" Style="{StaticResource SectionTitleStyle}"
-                                       ToolTip="{Binding ActiveFile.FilePath}"/>
+                            <TextBlock x:Name="ActiveTemplateText" Text="{Binding ActiveTemplateName}" Style="{StaticResource SectionTitleStyle}">
+    <TextBlock.ToolTip>
+        <ToolTip Style="{StaticResource RowToolTipStyle}" Content="{Binding ActiveFile.RowTooltip}"/>
+    </TextBlock.ToolTip>
+</TextBlock>
                         </StackPanel>
-                        <Grid Grid.Column="1" VerticalAlignment="Center" Margin="10,0,0,0">
+                    </Grid>
+
+                    <!-- Parameter actions belong to the list they act on: the target is the parameter
+                         highlighted in the table below. Compare and bulk apply share the line with the
+                         search box and the access filter, at its right end. The review entry stays in the
+                         top bar next to the staged-count badge, because it always covers the whole session
+                         rather than the selected parameter. -->
+                    <Grid x:Name="ParameterToolsRow" Grid.Row="1" Margin="12,10,12,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" MinWidth="150"/>
+                            <ColumnDefinition Width="132"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Grid Grid.Column="0" VerticalAlignment="Center">
                             <TextBox x:Name="ParameterSearchBox"
                                      Text="{Binding ParameterQuery, UpdateSourceTrigger=PropertyChanged, Delay=150}"
                                      IsEnabled="{Binding HasActiveFile}"
@@ -268,30 +292,28 @@
                             <TextBlock Text="Search name or description…" Style="{StaticResource PlaceholderStyle}"
                                        Visibility="{Binding ParameterQuery, Converter={StaticResource EmptyStringToVisibilityConverter}}"/>
                         </Grid>
-                        <ComboBox Grid.Column="2" VerticalAlignment="Center" Margin="8,0,0,0"
+
+                        <ComboBox x:Name="AccessFilterBox" Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center"
                                   ItemsSource="{Binding AccessFilterLabels}"
                                   SelectedIndex="{Binding AccessFilterIndex}"
                                   IsEnabled="{Binding HasActiveFile}"
+                                  ToolTip="Show only the parameters whose access is internal or external"
                                   AutomationProperties.Name="Filter by access"/>
-                    </Grid>
 
-                    <!-- Parameter actions belong to the list they act on: the target is the parameter
-                         highlighted in the table below. Compare and bulk apply sit here, as in the
-                         reference layout, and are disabled while nothing is selected. The review entry
-                         stays in the top bar next to the staged-count badge, because it always covers the
-                         whole session rather than the selected parameter. -->
-                    <WrapPanel x:Name="ParameterActionsPanel" Grid.Row="1" Margin="12,10,12,0">
-                        <Button x:Name="CompareButton" Content="Compare" Margin="0,0,8,0"
-                                infra:Iconics.Icon="{StaticResource IconCompare}"
-                                Command="{Binding CompareCommand}" ToolTipService.ShowOnDisabled="True"
-                                ToolTip="Show this parameter across every read template"
-                                AutomationProperties.Name="Compare this parameter with the other templates"/>
-                        <Button x:Name="BulkButton" Content="Apply value to templates" Margin="0,0,8,0"
-                                infra:Iconics.Icon="{StaticResource IconBrush}"
-                                Command="{Binding OpenBulkCommand}" ToolTipService.ShowOnDisabled="True"
-                                ToolTip="Stage one default value across several templates"
-                                AutomationProperties.Name="Apply one default value to many templates"/>
-                    </WrapPanel>
+                        <WrapPanel x:Name="ParameterActionsPanel" Grid.Column="2" Margin="10,0,0,0"
+                                   HorizontalAlignment="Right">
+                            <Button x:Name="CompareButton" Content="Compare" Margin="0,0,8,0"
+                                    infra:Iconics.Icon="{StaticResource IconCompare}"
+                                    Command="{Binding CompareCommand}" ToolTipService.ShowOnDisabled="True"
+                                    ToolTip="Show this parameter across every read template"
+                                    AutomationProperties.Name="Compare this parameter with the other templates"/>
+                            <Button x:Name="BulkButton" Content="Apply value to templates" Margin="0,0,0,0"
+                                    infra:Iconics.Icon="{StaticResource IconBrush}"
+                                    Command="{Binding OpenBulkCommand}" ToolTipService.ShowOnDisabled="True"
+                                    ToolTip="Stage one default value across several templates"
+                                    AutomationProperties.Name="Apply one default value to many templates"/>
+                        </WrapPanel>
+                    </Grid>
 
                     <TextBlock x:Name="SummaryText" Grid.Row="2" Margin="12,8,12,0" Style="{StaticResource FieldNoteStyle}"
                                Text="{Binding ActiveParameterSummary}"/>
@@ -329,15 +351,25 @@
                               IsEnabled="{Binding HasActiveFile}"
                               SelectionMode="Single"
                               ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem" BasedOn="{StaticResource {x:Type ListViewItem}}">
+                                <!-- Whole-parameter popup on the row: the columns truncate, and picking the
+                                     right parameter should not require resizing every column first. -->
+                                <Setter Property="ToolTip">
+                                <Setter.Value>
+                                    <ToolTip Style="{StaticResource RowToolTipStyle}" Content="{Binding RowTooltip}"/>
+                                </Setter.Value>
+                            </Setter>
+                            </Style>
+                        </ListView.ItemContainerStyle>
                         <ListView.View>
                             <GridView>
-                <GridViewColumn Width="260">
+                                <GridViewColumn Width="260">
                                     <GridViewColumnHeader Content="Name"/>
                                     <GridViewColumn.CellTemplate>
                                         <DataTemplate>
                                             <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"
-                                                           ToolTip="{Binding Name}"/>
+                                                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/>
                                                 <Border Style="{StaticResource BadgeBorderStyle}"
                                                         Visibility="{Binding HasDrafts, Converter={StaticResource BoolToVisibilityConverter}}"
                                                         ToolTip="{Binding DraftedFieldsSummary}">

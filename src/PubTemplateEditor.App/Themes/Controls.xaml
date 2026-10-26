@@ -846,6 +846,19 @@
         </Setter>
     </Style>
 
+    <Style x:Key="RowToolTipStyle" TargetType="{x:Type ToolTip}" BasedOn="{StaticResource {x:Type ToolTip}}">
+        <!-- A row tooltip carries several lines (name, current value, description, staged count), so it
+             gets more room than a one-line hint and wraps instead of running past the window. -->
+        <Setter Property="MaxWidth" Value="520"/>
+        <Setter Property="ContentTemplate">
+            <Setter.Value>
+                <DataTemplate>
+                    <TextBlock Text="{Binding}" TextWrapping="Wrap"/>
+                </DataTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- ============================ line icons and toolbar buttons ============================
          Path data is hand-drawn on a 24x24 grid in the style of open-source line icon sets
          (round caps, 1.7 stroke); no third-party icon asset is copied. See NOTICE. -->

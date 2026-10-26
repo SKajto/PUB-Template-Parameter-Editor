@@ -96,6 +96,34 @@ public sealed class TemplateItem : ViewModelBase
         Raise(nameof(StagedEditCount));
         Raise(nameof(IsDraft));
         Raise(nameof(StatusDisplay));
+        Raise(nameof(RowTooltip));
+    }
+
+    /// <summary>
+    /// Hover text for the file list: which file this is, how many parameters it holds, and how many
+    /// staged changes it carries. Listing does not parse, so an unread file says so instead of claiming
+    /// zero parameters, which would read as an empty template.
+    /// </summary>
+    public string RowTooltip
+    {
+        get
+        {
+            var lines = new List<string> { FileName };
+            lines.Add(IsLoaded
+                ? $"{DeclarationCount} parameter(s)"
+                : HasError
+                    ? $"not readable: {Status}"
+                    : "not read yet");
+
+            if (StagedEditCount > 0)
+            {
+                lines.Add($"{StagedEditCount} staged change(s), not saved");
+            }
+
+            lines.Add($"{SizeText} · {Status}");
+            lines.Add(FilePath);
+            return string.Join(Environment.NewLine, lines);
+        }
     }
 
     public string Status
@@ -107,6 +135,7 @@ public sealed class TemplateItem : ViewModelBase
             {
                 Raise(nameof(StatusDisplay));
                 Raise(nameof(HasError));
+                Raise(nameof(RowTooltip));
             }
         }
     }
@@ -126,6 +155,7 @@ public sealed class TemplateItem : ViewModelBase
             Raise(nameof(Record));
             Raise(nameof(IsLoaded));
             Raise(nameof(DeclarationCount));
+            Raise(nameof(RowTooltip));
         }
     }
 

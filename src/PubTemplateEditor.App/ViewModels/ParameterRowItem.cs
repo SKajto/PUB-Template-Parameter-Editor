@@ -111,9 +111,42 @@ public sealed class ParameterRowItem : ViewModelBase
                      nameof(HasDrafts),
                      nameof(StagedEditCount),
                      nameof(DraftedFieldsSummary),
+                     nameof(RowTooltip),
                  })
         {
             Raise(property);
+        }
+    }
+
+    /// <summary>
+    /// What the parameter really holds, shown while the pointer rests on a row. The table cells are
+    /// truncated to fit, so a reviewer needs the name, the description and the value without widening
+    /// every column, and needs to see which of them are staged rather than stored.
+    /// </summary>
+    public string RowTooltip
+    {
+        get
+        {
+            var lines = new List<string>
+            {
+                Name.Length == 0 ? "(parameter without a name)" : Name,
+                $"Current value: {DefaultFullValue}",
+                $"Description: {DescriptionFullValue}",
+                $"Access: {AccessLabel}",
+            };
+
+            if (StagedEditCount > 0)
+            {
+                lines.Add($"Staged in this session, not saved: {DraftedFieldsSummary}");
+            }
+
+            if (HasReadOnlyShape)
+            {
+                lines.Add($"Kept read-only: {ReadOnlyShapeReasons}");
+            }
+
+            lines.Add($"{File.FileName} · declaration #{DeclarationId}");
+            return string.Join(Environment.NewLine, lines);
         }
     }
 

@@ -613,6 +613,66 @@ Executed commands and results
   `TryOpenDroppedPath`. Screenshots in `artifacts/screenshots/` were regenerated; the whole-row marking,
   the chooser placement and the recent-folders combo still need human eyes.
 
+### 2026-10-26 - Tools on one line, hover popups, and the misleading "nothing to write" sentence
+
+Owner feedback: search field and the access dropdown belong on the same line as Compare / Apply value to
+templates (them left, buttons right); hovering a parameter should pop name, description and current
+value; hovering a template file should pop the file name with its parameter count and staged-change
+count; and the review footer claimed "Every staged change already holds the value that is in the file, so
+there is nothing to write" even though the session held real changes - is saving supported at all?
+
+Diagnosis of the review message (saving itself was never the gap)
+- The write path exists and is tested: source-preserving patcher (`60f34b1`), `TemplateSaveService`
+  with preflight/fingerprint/backup/journal/verify-after-write (`687d35a`), and the review Save button
+  wired to it (`b365128`). Ten integration tests plus seven shell save-flow tests cover writing,
+  per-file batch behaviour, conflicts and recovery.
+- What was wrong was the footer sentence. `CanSaveReview` and `SaveUnavailableReason` were never raised
+  after staging (only inside a running save), and `ReviewRows` was rebuilt only while the review panel
+  was open. The text therefore kept the value it had when the panel was first built - with an empty row
+  list, and the old branch order read an empty list as "every staged change already matches". The save
+  button itself often still worked because command requery was invalidated.
+- Fix: one `SaveGate()` evaluation backs both the flag and the sentence (so button and text cannot
+  disagree), staged rows are rebuilt on every draft change whether or not the panel is open, and
+  `RaiseReviewSaveState()` fires on open, close, rebuild, tick, select all/none, discard and save.
+  Empty list now says "Nothing is staged. Edit a value, apply it, and the change appears here."; the
+  "already holds the value" sentence appears only when every row really is a no-op; "Tick at least one
+  change" only when rows exist and none are ticked.
+- `SaveFlowTests.TheSaveActionStaysDisabledWhileNothingUsefulIsTicked` had encoded the old wrong text as
+  an expectation; it now asserts the honest sentence and forbids the old one.
+
+Layout and popups
+- Parameter panel line 1 is now `ParameterToolsRow`: search box (star column, min 150) on the left, the
+  access filter combo (132 px) next to it, and `ParameterActionsPanel` (Compare, Apply value to
+  templates) at the right end of the same line. The active template keeps its own heading line above.
+- Row popups: `ParameterRowItem.RowTooltip` (name, current value, description, access, staged fields,
+  read-only reasons, file) and `TemplateItem.RowTooltip` (file name, parameter count, staged-change
+  count, size/status, full path). An unread file says "not read yet" instead of "0 parameter(s)", and the
+  active-template heading repeats the same file summary. Both lists set the popup through their
+  `ItemContainerStyle`; WPF has no `ToolTipService.Style`, so the container style carries a per-container
+  `ToolTip` styled by the keyed `RowToolTipStyle` (MaxWidth 520, wrapping content template).
+
+Tests
+- New App tests: hover popups for parameter rows, staged-state wording in the popup, template row counts
+  and path, unread file, popup style wraps and is read from the merged application dictionary, tools line
+  geometry (search left of filter left of buttons, all on one line, above the table), and three review
+  state tests (empty list wording, save offer follows staging with `PropertyChanged` raised for both
+  properties, un-ticking everything takes the offer away and says why).
+- `ShellSnapshotTests` layout proof rewritten to the one-line tools row; it compares vertical centres,
+  because an input box and a button are not the same height.
+
+Executed commands and results
+- `dotnet test` -> Core 86, Integration 33, App/WPF 77 = 196 tests, 0 failed; `dotnet build -c Debug`
+  0 warnings, 0 errors.
+- `dotnet publish src/PubTemplateEditor.App -c Release -p:PublishProfile=PortableWin_x64` ->
+  `src/PubTemplateEditor.App/bin/Release/net10.0-windows/win-x64/publish/PubTemplateEditor.exe`,
+  131,204,147 bytes, rebuilt because the previously published exe dated from 2026-10-25 23:37.
+- That published exe starts and stays alive, title `[PUB Template Parameter Editor]`.
+- Contrast audit unchanged: `contrast-light.txt`, `contrast-dark.txt` both `offenders=0`.
+- Still unverified by machine: an actual mouse hover (popups are asserted at the binding, style and
+  geometry level, not by moving the pointer), the native PUB round trip, and the Store MSIX identity.
+  A manual save through the fresh exe remains the owner's check; backups and the recovery journal are
+  written under `%LOCALAPPDATA%\PubTemplateEditor`.
+
 ## Deferred scope
 
 Linux UI, additional architectures, parameter creation/deletion/renaming, presets, recursive folders, in-app PUB generation, browser hosting and custom installer/updater services are outside this initial Windows release. Keep the domain core independent without building a second UI.

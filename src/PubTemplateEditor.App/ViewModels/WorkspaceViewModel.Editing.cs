@@ -755,12 +755,15 @@ public sealed partial class WorkspaceViewModel
         RaiseAllEditorProperties();
         RebuildCompareRows();
         RebuildBulkTargets();
-        if (_isReviewOpen)
-        {
-            RebuildReviewRows();
-        }
+        // The review list mirrors the staged set at all times, not only while the panel is open. The
+        // save offer is read from those rows, and a list that was never rebuilt made the footer claim
+        // there was nothing to write while real changes were staged.
+        RebuildReviewRows();
 
         RefreshReviewAndActionStates();
+        // The review footer reads CanSaveReview / SaveUnavailableReason as ordinary bindings, so staging
+        // has to raise them even while the review panel is closed.
+        RaiseReviewSaveState();
         CommandManager.InvalidateRequerySuggested();
     }
 

@@ -73,6 +73,11 @@ public partial class MainWindow : Window
 
     public ComboBox RecentFoldersControl => RecentFoldersBox;
 
+    public ComboBox AccessFilterControl => AccessFilterBox;
+
+    /// <summary>One line holding search, access filter and the parameter tools.</summary>
+    public Grid ParameterTools => ParameterToolsRow;
+
     public Border DropHintPanel => DropHint;
 
     private LicensesWindow? _licensesWindow;

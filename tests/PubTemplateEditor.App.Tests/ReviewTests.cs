@@ -506,6 +506,96 @@ public class ReviewTests
         }
     }
 
+    /// <summary>
+    /// The sentence under the review list explains why saving is or is not offered. An empty list must not
+    /// read as "your staged changes already match the file": that is what it claimed while real changes
+    /// were listed above it, because the text was evaluated once and never raised again.
+    /// </summary>
+    [Fact]
+    public void AnEmptyReviewNeverClaimsTheStagedValuesAlreadyMatch()
+    {
+        string settings = TempDir("settings");
+        string templates = TempDir("templates");
+        Write(templates, "one.dta", TemplateXml(Variable("alpha", "OLD")));
+
+        _host.Do(() =>
+        {
+            var vm = new WorkspaceViewModel(new SettingsService(settings), new EditorSettings { LastFolder = templates });
+            Assert.Empty(vm.ReviewRows);
+            Assert.False(vm.CanSaveReview);
+            Assert.Contains("Nothing is staged", vm.SaveUnavailableReason, StringComparison.Ordinal);
+            Assert.DoesNotContain("nothing to write", vm.SaveUnavailableReason, StringComparison.Ordinal);
+        });
+    }
+
+    [Fact]
+    public async Task TheSaveOfferFollowsTheStagedChangesInsteadOfGoingStale()
+    {
+        string settings = TempDir("settings");
+        string templates = TempDir("templates");
+        Write(templates, "one.dta", TemplateXml(Variable("alpha", "OLD")));
+
+        WorkspaceViewModel vm = await ReadAllAsync(settings, templates);
+        var raised = new List<string>();
+
+        _host.Do(() => vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName));
+
+        _host.Do(() =>
+        {
+            Assert.Contains("Nothing is staged", vm.SaveUnavailableReason, StringComparison.Ordinal);
+            Assert.False(vm.CanSaveReview);
+        });
+
+        Stage(vm, "one.dta", "alpha", FieldKind.DefaultValue, "NEW");
+
+        _host.Do(() =>
+        {
+            Assert.True(vm.CanSaveReview, "a real staged change does not offer saving");
+            Assert.DoesNotContain("nothing to write", vm.SaveUnavailableReason, StringComparison.Ordinal);
+            Assert.Contains("Only the ticked changes are written", vm.SaveUnavailableReason, StringComparison.Ordinal);
+            Assert.True(vm.SaveReviewCommand.CanExecute(null), "the save command stayed disabled");
+        });
+
+        _host.Do(() =>
+        {
+            raised.Clear();
+            vm.OpenReviewCommand.Execute(null);
+
+            // The review footer binds plain properties, so opening has to raise them; without this the
+            // panel shows whatever the text was when it was first built.
+            Assert.Contains(nameof(WorkspaceViewModel.CanSaveReview), raised);
+            Assert.Contains(nameof(WorkspaceViewModel.SaveUnavailableReason), raised);
+            Assert.DoesNotContain("Nothing is staged", vm.SaveUnavailableReason, StringComparison.Ordinal);
+        });
+    }
+
+    [Fact]
+    public async Task UnTickingEveryChangeTakesTheSaveOfferAwayAndSaysWhy()
+    {
+        string settings = TempDir("settings");
+        string templates = TempDir("templates");
+        Write(templates, "one.dta", TemplateXml(Variable("alpha", "OLD")));
+
+        WorkspaceViewModel vm = await ReadAllAsync(settings, templates);
+        Stage(vm, "one.dta", "alpha", FieldKind.DefaultValue, "NEW");
+
+        _host.Do(() =>
+        {
+            vm.OpenReviewCommand.Execute(null);
+            Assert.True(vm.CanSaveReview);
+
+            vm.SelectNoneReviewCommand.Execute(null);
+            Assert.False(vm.CanSaveReview);
+            Assert.False(vm.SaveReviewCommand.CanExecute(null));
+            Assert.Contains("Tick at least one", vm.SaveUnavailableReason, StringComparison.Ordinal);
+
+            vm.SelectAllReviewCommand.Execute(null);
+            Assert.True(vm.CanSaveReview);
+            Assert.True(vm.SaveReviewCommand.CanExecute(null));
+            Assert.Contains("Only the ticked changes are written", vm.SaveUnavailableReason, StringComparison.Ordinal);
+        });
+    }
+
     private static string RepoRoot()
     {
         DirectoryInfo? dir = new(AppContext.BaseDirectory);
