@@ -41,8 +41,10 @@ public class ExplorerTests
     {
         string settingsDir = TempDir("settings");
         string templates = TempDir("templates");
-        SampleCopy("example.dta", templates);
-        SampleCopy("requirements_specification_yps.dta", templates);
+        // Content of this project's own making, so the numbers below are the test's contract and not a
+        // fact about somebody's template: one declaration in the first file, three in the second.
+        TestSamples.WriteSingleDeclarationContainer(templates, "alpha.dta");
+        TestSamples.WriteSyntheticContainer(templates, "beta.dta");
 
         WorkspaceViewModel vm = null!;
         Task read = Task.CompletedTask;
@@ -56,21 +58,22 @@ public class ExplorerTests
         _host.Do(() =>
         {
             // The first listed file becomes the focused template without changing scope.
-            Assert.Equal("example.dta", vm.ActiveFile!.FileName);
+            Assert.Equal("alpha.dta", vm.ActiveFile!.FileName);
             Assert.All(vm.AllFiles, f => Assert.True(f.IsSelectedForRead));
-            Assert.Equal(1, vm.TotalParameterCount); // example.dta declares exactly one variable
+            Assert.Equal(1, vm.TotalParameterCount); // alpha.dta declares exactly one variable
             Assert.Equal(1, vm.MatchedParameterCount);
             Assert.False(vm.ShowEmptyNotRead);
 
             // FILE-05: focusing another template never touches read selection.
-            var other = vm.AllFiles.Single(f => f.FileName == "requirements_specification_yps.dta");
+            var other = vm.AllFiles.Single(f => f.FileName == "beta.dta");
             vm.SelectActiveFile(other);
-            Assert.Equal("requirements_specification_yps.dta", vm.ActiveFile.FileName);
+            Assert.Equal("beta.dta", vm.ActiveFile.FileName);
             Assert.True(other.IsActive);
-            Assert.False(vm.AllFiles.Single(f => f.FileName == "example.dta").IsActive);
+            Assert.False(vm.AllFiles.Single(f => f.FileName == "alpha.dta").IsActive);
             Assert.Equal(2, vm.SelectedReadCount);
-            Assert.Equal(234, vm.TotalParameterCount);
-            Assert.Contains("234 matched of 234 parameters", vm.ActiveParameterSummary);
+            // The table shows the focused template, not the sum of everything that was read.
+            Assert.Equal(3, vm.TotalParameterCount);
+            Assert.Contains("3 matched of 3 parameters", vm.ActiveParameterSummary);
         });
     }
 
@@ -79,7 +82,9 @@ public class ExplorerTests
     {
         string settingsDir = TempDir("settings");
         string templates = TempDir("templates");
-        SampleCopy("requirements_specification_yps.dta", templates);
+        // Three declarations with known names and access values: ProjectName and EmptyDefault are
+        // external, Budget is internal. Every count asserted below follows from that fixture.
+        TestSamples.WriteSyntheticContainer(templates, "parameters.dta");
 
         WorkspaceViewModel vm = null!;
         Task read = Task.CompletedTask;
@@ -92,17 +97,28 @@ public class ExplorerTests
 
         _host.Do(() =>
         {
-            Assert.Equal(234, vm.MatchedParameterCount);
+            Assert.Equal(3, vm.MatchedParameterCount);
 
-            // Native declarations are predominantly underscore-prefixed; '*' spans the rest.
-            vm.ParameterQuery = "_*";
-            int underscorePrefixed = vm.MatchedParameterCount;
-            Assert.InRange(underscorePrefixed, 1, 233);
-            Assert.All(vm.VisibleParameters, p => Assert.StartsWith("_", p.Name, StringComparison.Ordinal));
+            // Names are matched case-sensitively and anchored at the start, which is the rule the
+            // reference editor uses; the exact start of a name finds its row.
+            vm.ParameterQuery = "Budget";
+            Assert.Equal(1, vm.MatchedParameterCount);
+            Assert.Single(vm.VisibleParameters);
+            Assert.Equal("Budget", vm.VisibleParameters[0].Name);
 
-            // Description matching stays case-insensitive.
-            vm.ParameterQuery = "server";
-            Assert.True(vm.MatchedParameterCount > 0);
+            // The same word in another case is still a name-region attempt: it does not fall through
+            // to the description, which case-insensitively would have matched "Budget in EUR".
+            vm.ParameterQuery = "budget";
+            Assert.Equal(0, vm.MatchedParameterCount);
+            Assert.True(vm.ShowEmptyNoMatches);
+
+            // Descriptions match anywhere in the text, case-insensitively.
+            vm.ParameterQuery = "name of the project";
+            Assert.Equal(1, vm.MatchedParameterCount);
+            vm.ParameterQuery = "Project";
+            Assert.Equal(1, vm.MatchedParameterCount);
+            vm.ParameterQuery = "PROJECT";
+            Assert.Equal(0, vm.MatchedParameterCount); // names keep their case
 
             vm.ParameterQuery = "no-such-parameter-at-all";
             Assert.Equal(0, vm.MatchedParameterCount);
@@ -110,7 +126,7 @@ public class ExplorerTests
             Assert.False(vm.ShowEmptyNotRead);
 
             vm.ParameterQuery = null;
-            Assert.Equal(234, vm.MatchedParameterCount);
+            Assert.Equal(3, vm.MatchedParameterCount);
 
             // Access filter (the access property, not the XML type property).
             int internalOnly = vm.AllParameters.Count(p =>
@@ -119,11 +135,13 @@ public class ExplorerTests
             Assert.Equal(internalOnly, vm.MatchedParameterCount);
             Assert.All(vm.VisibleParameters, p => Assert.Equal("internal", p.AccessLabel, ignoreCase: true));
 
+            Assert.Equal(1, internalOnly); // Budget
+
             vm.SelectedAccessFilter = AccessFilterChoice.External;
-            Assert.Equal(234 - internalOnly, vm.MatchedParameterCount);
+            Assert.Equal(3 - internalOnly, vm.MatchedParameterCount);
 
             vm.SelectedAccessFilter = AccessFilterChoice.All;
-            Assert.Equal(234, vm.MatchedParameterCount);
+            Assert.Equal(3, vm.MatchedParameterCount);
         });
     }
 
@@ -240,7 +258,7 @@ public class ExplorerTests
     {
         string settingsDir = TempDir("settings");
         string templates = TempDir("templates");
-        SampleCopy("example.dta", templates);
+        TestSamples.WriteSingleDeclarationContainer(templates, "example.dta");
 
         WorkspaceViewModel vm = null!;
         Task read = Task.CompletedTask;

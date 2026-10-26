@@ -133,8 +133,10 @@ public class RowSelectionAndPolishTests
     public async Task ChoosingARowInTheListGoesPastTheUnsavedWorkGuard()
     {
         string templates = TempDir("templates");
-        CopySample("example.dta", templates);
-        CopySample("requirements_specification_yps.dta", templates);
+        // Two templates, one declaration each: the test is about the guard on a folder switch, and a
+        // single parameter row is what makes "the selected parameter" unambiguous.
+        TestSamples.WriteSingleDeclarationContainer(templates, "example.dta");
+        TestSamples.WriteSingleDeclarationContainer(templates, "second-template.dta");
 
         WorkspaceViewModel vm = null!;
         Task read = Task.CompletedTask;
@@ -459,7 +461,7 @@ public class RowSelectionAndPolishTests
     public async Task UndoTakesBackTheLastStagedChangeAndLeavesTheEarlierOne()
     {
         string templates = TempDir("templates");
-        string sample = CopySample("example.dta", templates);
+        string sample = TestSamples.WriteSingleDeclarationContainer(templates, "example.dta");
         string before = File.ReadAllText(sample);
 
         WorkspaceViewModel vm = null!;
@@ -504,7 +506,7 @@ public class RowSelectionAndPolishTests
     public async Task EscapeClosesThePanelThatIsOnTopOneStepAtATime()
     {
         string templates = TempDir("templates");
-        CopySample("example.dta", templates);
+        TestSamples.WriteSingleDeclarationContainer(templates, "example.dta");
 
         WorkspaceViewModel vm = null!;
         Task read = Task.CompletedTask;

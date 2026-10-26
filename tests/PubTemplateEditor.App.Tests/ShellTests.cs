@@ -43,7 +43,7 @@ public class ShellTests : IDisposable
         string[] effective = names.Length == 0
             ? TestSamples.HasNative("example.dta")
                 ? Directory.GetFiles(TestSamples.SamplesDirectory, "*.dta")
-                    .Select(Path.GetFileName)!.ToArray()
+                    .Select(static p => Path.GetFileName(p)!).ToArray()
                 : new[] { "example.dta", "requirements_specification_yps.dta", "solution_configuration_specification.dta" }
             : names;
 
@@ -148,7 +148,13 @@ public class ShellTests : IDisposable
     public void FilterNarrowsTheExplorerWithoutChangingReadSelection()
     {
         string settingsDir = NewTempDir("settings");
-        string dir = SampleFolder();
+        // Named explicitly: five template files, whichever bytes stand behind those names.
+        string dir = SampleFolder(
+            "example.dta",
+            "requirements_specification_yps.dta",
+            "solution_configuration_specification.dta",
+            "configuration_specification_yps_landscape.dta",
+            "requirements_specification_yps_landscape.dta");
 
         _host.Do(() =>
         {

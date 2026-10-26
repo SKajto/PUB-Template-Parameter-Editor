@@ -63,6 +63,27 @@ public static class TestSamples
         """;
 
     /// <summary>
+    /// A container with exactly one declaration. Shell tests that need "the single parameter row" use
+    /// this instead of a native sample: the number of parameters in a real template is nobody's
+    /// contract, while the behaviour under test is.
+    /// </summary>
+    public const string SingleDeclarationXml = """
+        <?xml version="1.0" encoding="UTF-8"?><template><dataset><variables>
+        <variable><feature tag="definition">
+        <property name="name" value="OnlyParameter"></property>
+        <property name="description"><expression type="constant">The one declaration</expression></property>
+        <property name="type" value="user"></property>
+        <property name="access" value="external"></property>
+        <property name="default" value="Original value"></property>
+        <property name="central variable" value=""></property>
+        </feature></variable>
+        </variables></dataset></template>
+        """;
+
+    public static string WriteSingleDeclarationContainer(string directory, string fileName = "single.dta") =>
+        WriteSyntheticContainer(directory, fileName, SingleDeclarationXml);
+
+    /// <summary>
     /// Writes a .dta-shaped ZIP: the template XML plus a schema folder with a non-XML mapping
     /// entry, which is what the container round trip has to carry unchanged.
     /// </summary>

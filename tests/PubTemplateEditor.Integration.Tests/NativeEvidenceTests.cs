@@ -1,6 +1,7 @@
 using PubTemplateEditor.Core.Format;
 using PubTemplateEditor.Core.Model;
 using PubTemplateEditor.Infrastructure;
+using PubTemplateEditor.TestSupport;
 
 namespace PubTemplateEditor.Integration.Tests;
 
@@ -27,13 +28,45 @@ public class NativeEvidenceTests
         return null;
     }
 
+    /// <summary>Row marker for a container written by this project: it is present in every checkout.</summary>
+    private const string SyntheticRow = "<synthetic>";
+
+    /// <summary>
+    /// Runs the body against the real template, or against a synthetic container written for this row
+    /// and deleted afterwards. Neither case ever writes to a template the user owns.
+    /// </summary>
+    private static void WithTemplate(string row, Action<string> body)
+    {
+        if (row != SyntheticRow)
+        {
+            body(row);
+            return;
+        }
+
+        string dir = Path.Combine(Path.GetTempPath(), "pubte-evidence-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            body(TestSamples.WriteSyntheticContainer(dir, "synthetic-template.dta"));
+        }
+        finally
+        {
+            try { Directory.Delete(dir, recursive: true); } catch (IOException) { }
+        }
+    }
+
     public static TheoryData<string, int, int, int> NativeSamples()
     {
         var data = new TheoryData<string, int, int, int>();
+
+        // Our own container in the documented shape always runs, in this checkout or in CI: the native
+        // .dta files are user content and are not part of the repository, so they can never be the
+        // only evidence a suite carries.
+        data.Add(SyntheticRow, 3, 1, 2);
+
         string? dir = FindSamplesDir();
         if (dir is null)
         {
-            return data; // no rows => theory trivially passes; recorded as 'not executed' in PLAN
+            return data; // the native rows below are extra evidence on the machine that has the files
         }
 
         data.Add(Path.Combine(dir, "requirements_specification_yps.dta"), 234, 162, 72);
@@ -46,7 +79,10 @@ public class NativeEvidenceTests
 
     [Theory]
     [MemberData(nameof(NativeSamples))]
-    public void NativeDtaFilesParseToVerifiedCounts(string path, int total, int internalCount, int externalCount)
+    public void DtaTemplatesParseToTheVerifiedCounts(string row, int total, int internalCount, int externalCount) =>
+        WithTemplate(row, path => ParsesToVerifiedCounts(path, total, internalCount, externalCount));
+
+    private void ParsesToVerifiedCounts(string path, int total, int internalCount, int externalCount)
     {
         byte[] bytes = File.ReadAllBytes(path);
         Assert.Equal(TemplateFormat.DtaZipContainer, TemplateFormatDetector.Detect(bytes.AsSpan(0, 64)));
@@ -76,25 +112,36 @@ public class NativeEvidenceTests
         Assert.DoesNotContain(parsed.Warnings, w => w.Contains("Duplicate"));
     }
 
-    [Fact]
-    public void ReaderServiceLoadsNativeSampleReadOnlyAndWithFingerprint()
+    public static TheoryData<string, int, string, string> ReaderRows()
     {
+        var data = new TheoryData<string, int, string, string>();
+        data.Add(SyntheticRow, 3, "ProjectName", "Sample project");
+
         string? dir = FindSamplesDir();
-        if (dir is null)
+        if (dir is not null)
         {
-            return;
+            data.Add(Path.Combine(dir, "example.dta"), 1, "paramUserText", "HELLO");
         }
 
-        string path = Path.Combine(dir, "example.dta");
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(ReaderRows))]
+    public void ReaderServiceLoadsATemplateReadOnlyAndWithFingerprint(string row, int declarations, string name, string value) =>
+        WithTemplate(row, path => LoadsReadOnly(path, declarations, name, value));
+
+    private void LoadsReadOnly(string path, int declarations, string name, string value)
+    {
         byte[] before = File.ReadAllBytes(path);
 
         var record = new TemplateReaderService().Load(path, CancellationToken.None);
 
         Assert.Equal(TemplateReadState.Loaded, record.ReadState);
         Assert.Equal(TemplateFormat.DtaZipContainer, record.Format);
-        Assert.Single(record.Declarations);
-        Assert.Equal("paramUserText", record.Declarations[0].ExactName);
-        Assert.Equal("HELLO", record.Declarations[0].DefaultValue.LogicalValue);
+        Assert.Equal(declarations, record.Declarations.Count);
+        Assert.Equal(name, record.Declarations[0].ExactName);
+        Assert.Equal(value, record.Declarations[0].DefaultValue.LogicalValue);
         Assert.Equal(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(before)), record.BaselineFingerprint);
         Assert.Equal(before, File.ReadAllBytes(path)); // reads never write
     }
