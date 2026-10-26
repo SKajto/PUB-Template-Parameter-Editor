@@ -16,6 +16,15 @@ public sealed class EditorSettings
 {
     public string? Theme { get; set; }
     public string? LastFolder { get; set; }
+
+    /// <summary>
+    /// Folders the user opened before, most recent first. A remembered path is only a shortcut: it may
+    /// have been moved or deleted, and opening it then reports the ordinary "folder could not be opened".
+    /// </summary>
+    public List<string> RecentFolders { get; set; } = [];
+
+    /// <summary>Parameter table column widths in device-independent pixels, by column position.</summary>
+    public List<double> ParameterColumnWidths { get; set; } = [];
 }
 
 /// <summary>

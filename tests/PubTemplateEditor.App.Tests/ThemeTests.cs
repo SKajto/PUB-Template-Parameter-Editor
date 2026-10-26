@@ -103,10 +103,17 @@ public class ThemeTests
         string dir = Path.Combine(RepoRoot(), "src", "PubTemplateEditor.App");
         var staticPattern = new Regex(@"\{StaticResource\s+([^}]+)\}", RegexOptions.Compiled);
         var keyPattern = new Regex(@"x:Key=""([A-Za-z0-9_.]+)""", RegexOptions.Compiled);
+        var sameFileOrder = new List<(string File, string Key, int Use, int Definition)>();
 
         foreach (string file in Directory.GetFiles(dir, "*.xaml", SearchOption.AllDirectories))
         {
             string text = File.ReadAllText(file);
+            var localDefs = new List<(string Key, int At)>();
+            foreach (Match m in keyPattern.Matches(text))
+            {
+                localDefs.Add((m.Groups[1].Value, m.Index));
+            }
+
             foreach (Match m in staticPattern.Matches(text))
             {
                 string key = m.Groups[1].Value.Trim();
@@ -115,6 +122,16 @@ public class ThemeTests
                     continue; // implicit theme keys such as {x:Type Button}
                 }
                 used.Add(key);
+
+                // Inside one ResourceDictionary a StaticResource is resolved as it is parsed, so a style
+                // may only reference a key that is already defined above it. A forward reference does not
+                // fail the build: it crashes the application when the template is first applied.
+                int definition = localDefs
+                    .Where(d => d.Key == key)
+                    .Select(d => d.At)
+                    .DefaultIfEmpty(-1)
+                    .Min();
+                sameFileOrder.Add((file, key, m.Index, definition));
             }
 
             if (Path.GetFileName(file) is "Light.xaml" or "Dark.xaml" or "Controls.xaml" or "App.xaml")
@@ -124,6 +141,18 @@ public class ThemeTests
                     defined.Add(m.Groups[1].Value);
                 }
             }
+        }
+
+        foreach ((string file, string key, int use, int definition) in sameFileOrder)
+        {
+            if (definition < 0)
+            {
+                continue; // defined in another dictionary; the missing-key check below covers that case
+            }
+
+            Assert.True(definition < use,
+                $"{Path.GetFileName(file)} uses {{StaticResource {key}}} at offset {use}, "
+              + $"before its definition at offset {definition}; move the definition above the usage");
         }
 
         var missing = used.Except(defined).ToArray();

@@ -1,5 +1,9 @@
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using PubTemplateEditor.App.ViewModels;
 
 namespace PubTemplateEditor.App;
@@ -62,6 +66,15 @@ public partial class MainWindow : Window
     public Button ReviewOpenButton => TopReviewButton;
     public TextBlock StagedTrayLabel => StagedTrayText;
 
+    /// <summary>The template list: rows are selected as a whole, no option button involved.</summary>
+    public ListBox TemplateRows => TemplateList;
+
+    public Border TemplatesPanel => TemplatesPanelBorder;
+
+    public ComboBox RecentFoldersControl => RecentFoldersBox;
+
+    public Border DropHintPanel => DropHint;
+
     private LicensesWindow? _licensesWindow;
 
     public MainWindow(WorkspaceViewModel workspace)
@@ -83,6 +96,134 @@ public partial class MainWindow : Window
 
         // The view model owns the decision logic; this window only renders the choices.
         workspace.NavigationGuard = ShowUnsavedWorkPrompt;
+
+        RestoreColumnWidths();
+    }
+
+    // ------------------------------------------------------- parameter table columns
+
+    /// <summary>
+    /// Applies the widths the user dragged the columns to last time. Column resizing is per column, so the
+    /// saved list is read by position; a stored list of a different shape is simply ignored.
+    /// </summary>
+    private void RestoreColumnWidths()
+    {
+        if (ParameterList.View is not GridView view)
+        {
+            return;
+        }
+
+        IReadOnlyList<double> saved = Workspace.SavedParameterColumnWidths;
+        for (int i = 0; i < view.Columns.Count && i < saved.Count; i++)
+        {
+            view.Columns[i].Width = saved[i];
+        }
+    }
+
+    private void SaveColumnWidths()
+    {
+        if (ParameterList.View is not GridView view)
+        {
+            return;
+        }
+
+        Workspace.SaveParameterColumnWidths(view.Columns.Select(c => c.Width).ToList());
+    }
+
+    // --------------------------------------------------------------- recent folders
+
+    private bool _recentSelectionGuard;
+
+    private void RecentFoldersBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_recentSelectionGuard)
+        {
+            return;
+        }
+
+        var box = (ComboBox)sender;
+        string? path = box.SelectedItem as string;
+
+        // Reset before opening: the same folder has to be selectable twice in a row, and a cancelled
+        // navigation must not leave the combo showing a folder that was never listed.
+        _recentSelectionGuard = true;
+        box.SelectedItem = null;
+        _recentSelectionGuard = false;
+
+        if (path is not null)
+        {
+            Workspace.OpenRecentFolderCommand.Execute(path);
+        }
+    }
+
+    // --------------------------------------------------------------- drag and drop
+
+    private void Window_DragOver(object sender, DragEventArgs e)
+    {
+        string? path = FirstDroppedPath(e.Data);
+        bool accepts = IsOpenablePath(path);
+        e.Effects = accepts ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+
+        DropHint.Visibility = accepts ? Visibility.Visible : Visibility.Collapsed;
+        DropHintText.Text = accepts
+            ? $"Drop to open '{FileNameOf(path!)}' and list its templates"
+            : string.Empty;
+    }
+
+    private void Window_DragLeave(object sender, DragEventArgs e)
+    {
+        DropHint.Visibility = Visibility.Collapsed;
+    }
+
+    private void Window_Drop(object sender, DragEventArgs e)
+    {
+        DropHint.Visibility = Visibility.Collapsed;
+        string? path = FirstDroppedPath(e.Data);
+        if (IsOpenablePath(path))
+        {
+            Workspace.TryOpenDroppedPath(path);
+        }
+    }
+
+    private static bool IsOpenablePath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        try
+        {
+            return Directory.Exists(path)
+                || (File.Exists(path) && string.Equals(Path.GetExtension(path), ".dta", StringComparison.OrdinalIgnoreCase));
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    private static string FileNameOf(string path)
+    {
+        string trimmed = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        string name = Path.GetFileName(trimmed);
+        return name.Length > 0 ? name : trimmed;
+    }
+
+    private static string? FirstDroppedPath(IDataObject data)
+    {
+        if (data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 } files)
+        {
+            return files[0];
+        }
+
+        if (data.GetData(DataFormats.UnicodeText) is string text && text.Trim().Length > 0)
+        {
+            return text.Trim();
+        }
+
+        return null;
     }
 
     /// <summary>Modal unsaved-work prompt; called on the UI thread from workspace commands.</summary>
@@ -132,6 +273,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        SaveColumnWidths();
         base.OnClosing(e);
     }
 }

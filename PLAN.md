@@ -550,6 +550,69 @@ Executed commands and results
   desktop pass over editing -> review -> save, and the native PUB round trip. Nothing here changes what
   is written; the patcher and save service are untouched by this presentation work.
 
+### 2026-10-26 - Whole-row template selection, resizable columns, one folder entry point, staged-change keys
+
+Owner feedback: selecting a template must mark the complete row and must not be an option button; the
+parameter table columns must be resizable; the folder name was shown twice (top-right next to
+"Choose folder" and again in the templates panel) - keep the panel one and move "Choose folder" into the
+panel that lists the .dta files. Then the polish round (shortcuts, undo, recent folders, drop-to-open).
+
+Changes
+- Template list became a `ListBox` (`TemplateList`) with `TemplateRowStyle`: the whole row is the
+  selection target, marked by a filled `SelectionBrush` row plus a 3 px accent bar and semi-bold name;
+  the read check box on the same row stays an independent decision (FILE-05). No option button is left
+  in that list. Keyboard arrow selection now works, and it goes through the same guard as clicking.
+- `WorkspaceViewModel.ActiveFile` gained a public setter that routes through `SelectActiveFile`, i.e.
+  through the unsaved-work guard. When navigation is refused the view model raises `PropertyChanged`
+  for `ActiveFile` so the list snaps its visual selection back to the template that is really shown.
+  Folder loading uses `SetActiveFileDirectly`, which deliberately bypasses the guard.
+- The restyled `GridViewColumnHeader` template had dropped WPF's `PART_HeaderGripper`, which is exactly
+  what makes `GridView` columns draggable - that is why the columns felt fixed. The handle is back
+  (10 px hit area over the separator line, accent line on hover/drag). `Cursor` had to be declared as
+  `{x:Static input:Cursors.SizeWE}`: the plain `Value="SizeWE"` form parsed to `Cursors.None`.
+  `ScrollViewer.HorizontalScrollBarVisibility` on the table became `Auto`, so widening columns past the
+  panel scrolls instead of clipping.
+- Column widths are stored per position in `settings.json` (`EditorSettings.ParameterColumnWidths`),
+  applied when the shell is constructed and saved on close; a set containing NaN/Infinity or a value
+  outside 40..8000 px is rejected rather than half applied.
+- Top bar: the folder name and the "Choose folder" button were removed (the top bar keeps identity,
+  staged-change controls and the theme switch). The panel that lists the templates now holds the folder
+  name, the count, "Choose folder", and a `Recent folders` combo.
+- Recent folders: `EditorSettings.RecentFolders`, `WorkspaceViewModel.RecentFolders` (most recent first,
+  capped at 8, de-duplicated case-insensitively), recorded when a folder lists successfully, restored on
+  start, reopened through `OpenRecentFolderCommand`. A folder that disappeared stays in the list and
+  reports "could not be opened" rather than silently dropping remembered user state.
+- Drag and drop: the window accepts a dropped folder, or a dropped `.dta` file and opens the folder that
+  contains it (`TryOpenDroppedPath`); anything else is refused with a message. A hover hint names the
+  folder that would be opened.
+- Keys and undo: `Ctrl+Enter` stages the open form, `Ctrl+Z` drops the most recently staged change,
+  `Esc` closes the topmost overlay (review, then bulk, then compare); the footer lists these keys.
+  `DraftStore` now stamps staging order (`MostRecent`, `RemoveMostRecent`) because the store is keyed by
+  file + declaration + field and has no order. Inside a value box `Ctrl+Z` stays with the text editor,
+  which is where a mistyped character has to be undone. Also removed a duplicated `InitReviewCommands()`
+  call in the constructor.
+- New tests: Core 3 (undo order across files/fields, re-staging a field makes it newest, discards clean
+  the undo history). App 12 - whole-row marking (container selected, accent bar visible, mark spans the
+  row width, no radio in the list, other rows unmarked), guard snap-back through the list, drag handle on
+  every column plus width-driven layout, widths restored after close/reopen, unusable width sets ignored,
+  folder named once and chooser inside the template panel, recent folder order/dedupe/persistence,
+  recent list cap and a disappeared folder, drop rules, undo through the shell (review rows plus file
+  bytes unchanged), Esc one step at a time, and the advertised keys match the actual bindings.
+  `EveryStaticResourceKeyUsedByTheShellIsDefined` now also enforces definition-before-use inside one
+  dictionary (proved by reintroducing the fault: it fails with the exact offset message).
+
+Executed commands and results
+- `dotnet test` -> Core 86, Integration 33, App/WPF 68 = 187 tests, 0 failed; `dotnet build -c Debug`
+  reports 0 warnings and 0 errors.
+- Contrast audit after the new row style, combo, drop hint and footer hints: `contrast-light.txt` and
+  `contrast-dark.txt` both `offenders=0`.
+- `src/PubTemplateEditor.App/bin/Debug/net10.0-windows/PubTemplateEditor.exe` starts and stays alive,
+  title `[PUB Template Parameter Editor]`.
+- Unverified on purpose: a real mouse drag of a column handle and a real Explorer drag-and-drop are not
+  automated - resizing is proven through the handle plus width-driven layout, dropping through
+  `TryOpenDroppedPath`. Screenshots in `artifacts/screenshots/` were regenerated; the whole-row marking,
+  the chooser placement and the recent-folders combo still need human eyes.
+
 ## Deferred scope
 
 Linux UI, additional architectures, parameter creation/deletion/renaming, presets, recursive folders, in-app PUB generation, browser hosting and custom installer/updater services are outside this initial Windows release. Keep the domain core independent without building a second UI.

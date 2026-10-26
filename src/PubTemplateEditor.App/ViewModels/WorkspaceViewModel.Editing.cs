@@ -56,6 +56,12 @@ public sealed partial class WorkspaceViewModel
     public RelayCommand CloseCompareCommand { get; private set; } = null!;
     public RelayCommand OpenBulkCommand { get; private set; } = null!;
     public RelayCommand CloseBulkCommand { get; private set; } = null!;
+
+    /// <summary>Ctrl+Z: drops the most recently staged change of this session.</summary>
+    public RelayCommand UndoLastStagedCommand { get; private set; } = null!;
+
+    /// <summary>Esc: closes whichever overlay panel is currently on top.</summary>
+    public RelayCommand CloseOverlayCommand { get; private set; } = null!;
     public RelayCommand ConfirmBulkCommand { get; private set; } = null!;
     public RelayCommand DiscardAllStagedCommand { get; private set; } = null!;
 
@@ -693,6 +699,43 @@ public sealed partial class WorkspaceViewModel
         RefreshAfterDraftChange();
     }
 
+    /// <summary>
+    /// Drops the change that was staged last, which is the one a user means by "undo" after editing.
+    /// Undo only removes a proposal from this session - it never writes, and it cannot undo a save that
+    /// already happened, because a completed save has left the session and is reported in the review.
+    /// </summary>
+    private void UndoLastStaged()
+    {
+        DraftChange? last = Drafts.MostRecent;
+        if (last is null)
+        {
+            ActionNotice = "Nothing to undo: this session has no staged change.";
+            return;
+        }
+
+        Drafts.Remove(last.Key);
+        RefreshAfterDraftChange();
+        ActionNotice = $"Undid the staged {TemplateFieldRules.DisplayName(last.Field)} of "
+                     + $"'{last.DeclarationName}'. Nothing was written to a template.";
+    }
+
+    /// <summary>Esc closes the panel that is on top, one step at a time.</summary>
+    private void CloseOpenOverlay()
+    {
+        if (IsReviewOpen)
+        {
+            CloseReview();
+        }
+        else if (IsBulkOpen)
+        {
+            CloseBulk();
+        }
+        else if (IsCompareOpen)
+        {
+            CloseCompare();
+        }
+    }
+
     // -------------------------------------------------------------------- refresh
 
     /// <summary>After staging or discarding: refresh rows, counters and the open panels.</summary>
@@ -751,5 +794,8 @@ public sealed partial class WorkspaceViewModel
             () => !IsBusy && IsBulkOpen && SelectedBulkTargetCount > 0 && _bulkValueDraft is not null);
         DiscardAllStagedCommand = new RelayCommand(DiscardAllStaged,
             () => !IsBusy && (HasStagedChanges || HasUnappliedFormEdits));
+        UndoLastStagedCommand = new RelayCommand(UndoLastStaged, () => !IsBusy && Drafts.HasAny);
+        CloseOverlayCommand = new RelayCommand(CloseOpenOverlay,
+            () => IsReviewOpen || IsBulkOpen || IsCompareOpen);
     }
 }

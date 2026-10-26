@@ -31,6 +31,11 @@ public sealed class DraftStore
 {
     private readonly Dictionary<ChangeKey, DraftChange> _drafts = [];
 
+    // The dictionary has no order, so staging keeps its own stamp: "undo the last change" has to mean
+    // the change the user made last, not whichever entry the hash map happens to yield first.
+    private readonly Dictionary<ChangeKey, int> _stagedAt = [];
+    private int _stamp;
+
     public IEnumerable<DraftChange> Changes => _drafts.Values;
 
     public int Count => _drafts.Count;
@@ -128,6 +133,7 @@ public sealed class DraftStore
         {
             if (_drafts.Remove(key))
             {
+                _stagedAt.Remove(key);
                 return new StageResult(field, StageStatus.ClearedAsNoOp,
                     $"{label} is back to the stored value; the staged change was removed.");
             }
@@ -143,6 +149,7 @@ public sealed class DraftStore
         {
             DeclarationName = declaration.DisplayName,
         };
+        _stagedAt[key] = ++_stamp;
 
         return new StageResult(field, StageStatus.Staged, null);
     }
@@ -176,6 +183,7 @@ public sealed class DraftStore
         foreach (ChangeKey key in keys)
         {
             _drafts.Remove(key);
+            _stagedAt.Remove(key);
         }
 
         return keys.Count;
@@ -189,6 +197,38 @@ public sealed class DraftStore
     public bool Remove(ChangeKey key)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key.FilePath);
+        _stagedAt.Remove(key);
+        return _drafts.Remove(key);
+    }
+
+    /// <summary>
+    /// The change that was staged last, regardless of which field or template it belongs to. Staging the
+    /// same field again counts as the newest action, because that is the edit the user just made.
+    /// </summary>
+    public DraftChange? MostRecent
+    {
+        get
+        {
+            if (_stagedAt.Count == 0)
+            {
+                return null;
+            }
+
+            ChangeKey key = _stagedAt.MaxBy(pair => pair.Value).Key;
+            return _drafts.TryGetValue(key, out DraftChange? change) ? change : null;
+        }
+    }
+
+    /// <summary>Drops exactly the most recently staged change. False when nothing is staged.</summary>
+    public bool RemoveMostRecent()
+    {
+        if (_stagedAt.Count == 0)
+        {
+            return false;
+        }
+
+        ChangeKey key = _stagedAt.MaxBy(pair => pair.Value).Key;
+        _stagedAt.Remove(key);
         return _drafts.Remove(key);
     }
 
@@ -198,10 +238,15 @@ public sealed class DraftStore
         foreach (ChangeKey key in keys)
         {
             _drafts.Remove(key);
+            _stagedAt.Remove(key);
         }
 
         return keys.Count;
     }
 
-    public void Clear() => _drafts.Clear();
+    public void Clear()
+    {
+        _drafts.Clear();
+        _stagedAt.Clear();
+    }
 }

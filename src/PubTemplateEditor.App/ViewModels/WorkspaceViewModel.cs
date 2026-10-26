@@ -70,10 +70,11 @@ public sealed partial class WorkspaceViewModel : ViewModelBase
         SelectVisibleCommand = new RelayCommand(() => SetAllChecked(true), () => VisibleFiles.Count > 0);
         ClearVisibleCommand = new RelayCommand(() => SetAllChecked(false), () => VisibleFiles.Count > 0);
         SelectActiveFileCommand = new RelayCommand(item => SelectActiveFile(item as TemplateItem));
+        OpenRecentFolderCommand = new RelayCommand(path => OpenRememberedFolder(path as string),
+            path => !IsBusy && path is not null);
         SetThemeCommand = new RelayCommand(value => ApplyTheme(ParseThemeChoice(value)));
         DismissNoticeCommand = new RelayCommand(() => ActionNotice = null);
         InitEditingCommands();
-        InitReviewCommands();
         InitReviewCommands();
         // Licences must stay reachable offline from inside the app (GPL distribution rule).
         // The view decides how to present them; the view model stays free of window types.
@@ -82,6 +83,16 @@ public sealed partial class WorkspaceViewModel : ViewModelBase
         RefreshThemeSelection();
 
         // FILE-01: restore remembered folder; a missing folder produces a clear message.
+        foreach (string folder in _loadedSettings.RecentFolders)
+        {
+            if (!string.IsNullOrWhiteSpace(folder) && !RecentFolders.Contains(folder, StringComparer.OrdinalIgnoreCase))
+            {
+                RecentFolders.Add(folder);
+            }
+        }
+
+        Raise(nameof(HasRecentFolders));
+
         if (!string.IsNullOrWhiteSpace(loadedSettings.LastFolder))
         {
             TrySetFolder(loadedSettings.LastFolder!);
@@ -98,6 +109,16 @@ public sealed partial class WorkspaceViewModel : ViewModelBase
     public ObservableCollection<ParameterRowItem> VisibleParameters { get; } = [];
 
     public RelayCommand OpenFolderCommand { get; }
+
+    /// <summary>Opens a folder from the remembered list; the parameter is the path itself.</summary>
+    public RelayCommand OpenRecentFolderCommand { get; }
+
+    /// <summary>Folders opened before, most recent first. See <see cref="EditorSettings.RecentFolders"/>.</summary>
+    public ObservableCollection<string> RecentFolders { get; } = [];
+
+    public const int RecentFolderLimit = 8;
+
+    public bool HasRecentFolders => RecentFolders.Count > 0;
     public RelayCommand FocusFilterCommand { get; }
     public RelayCommand FocusParameterSearchCommand { get; }
     public AsyncRelayCommand ReadParametersCommand { get; }
@@ -267,24 +288,29 @@ public sealed partial class WorkspaceViewModel : ViewModelBase
     public TemplateItem? ActiveFile
     {
         get => _activeFile;
-        private set
-        {
-            if (Set(ref _activeFile, value))
-            {
-                if (value is not null)
-                {
-                    foreach (var item in AllFiles)
-                    {
-                        item.IsActive = ReferenceEquals(item, value);
-                    }
-                }
+        // The file list writes through this property, so choosing a row in the list goes past the same
+        // unsaved-work guard as any other template change.
+        set => SelectActiveFile(value);
+    }
 
-                Raise(nameof(ActiveTemplateName));
-                Raise(nameof(HasActiveFile));
-                Raise(nameof(ActiveParameterSummary));
-                Raise(nameof(ShowEmptyNoActiveFile));
-                LoadParameters();
+    private void SetActiveFileDirectly(TemplateItem? value)
+    {
+        if (Set(ref _activeFile, value))
+        {
+            if (value is not null)
+            {
+                foreach (var item in AllFiles)
+                {
+                    item.IsActive = ReferenceEquals(item, value);
+                }
             }
+
+            Raise(nameof(ActiveFile));
+            Raise(nameof(ActiveTemplateName));
+            Raise(nameof(HasActiveFile));
+            Raise(nameof(ActiveParameterSummary));
+            Raise(nameof(ShowEmptyNoActiveFile));
+            LoadParameters();
         }
     }
 
@@ -301,10 +327,13 @@ public sealed partial class WorkspaceViewModel : ViewModelBase
 
         if (!ConfirmNavigation(NavigationReason.ChangeTemplate))
         {
+            // The list control has already marked the clicked row. Without a change notification the row
+            // would look selected while the workspace still shows the previous template.
+            Raise(nameof(ActiveFile));
             return;
         }
 
-        ActiveFile = item;
+        SetActiveFileDirectly(item);
         ParameterQuery = null;
         SelectedAccessFilter = AccessFilterChoice.All;
     }
@@ -454,7 +483,7 @@ public sealed partial class WorkspaceViewModel : ViewModelBase
             }
 
             FolderPath = path;
-            ActiveFile = AllFiles.FirstOrDefault();
+            SetActiveFileDirectly(AllFiles.FirstOrDefault());
             ApplyFileFilter();
             RefreshCounters();
 
@@ -467,12 +496,124 @@ public sealed partial class WorkspaceViewModel : ViewModelBase
 
             // Persist the working folder immediately (GEN/FILE-01).
             _loadedSettings.LastFolder = path;
+            RememberFolder(path);
             _settings.Save(_loadedSettings);
         }
         catch (Exception ex)
         {
             StatusMessage = $"Folder '{path}' could not be opened: {ex.Message}. Choose another folder.";
         }
+    }
+
+    /// <summary>
+    /// Keeps the folder list short and free of duplicates. A path is remembered after it listed
+    /// successfully, so the list does not fill up with mistyped folders.
+    /// </summary>
+    private void RememberFolder(string path)
+    {
+        for (int i = RecentFolders.Count - 1; i >= 0; i--)
+        {
+            if (string.Equals(RecentFolders[i], path, StringComparison.OrdinalIgnoreCase))
+            {
+                RecentFolders.RemoveAt(i);
+            }
+        }
+
+        RecentFolders.Insert(0, path);
+        while (RecentFolders.Count > RecentFolderLimit)
+        {
+            RecentFolders.RemoveAt(RecentFolders.Count - 1);
+        }
+
+        _loadedSettings.RecentFolders = RecentFolders.ToList();
+        Raise(nameof(HasRecentFolders));
+        Raise(nameof(RecentFolders));
+    }
+
+    private void OpenRememberedFolder(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        if (!ConfirmNavigation(NavigationReason.ChangeTemplate))
+        {
+            return;
+        }
+
+        // A folder that disappeared is reported by TrySetFolder; the entry stays, because the folder may
+        // come back (a drive, a sync folder) and silently dropping user state is worse than one message.
+        TrySetFolder(path!);
+    }
+
+    /// <summary>
+    /// Drag-and-drop entry point. A folder is opened directly; a template file opens the folder that
+    /// contains it, since the workspace is scoped by folder (FILE-04). Anything else is refused with a
+    /// message rather than guessed at.
+    /// </summary>
+    public bool TryOpenDroppedPath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        string folder;
+        try
+        {
+            if (Directory.Exists(path))
+            {
+                folder = path!;
+            }
+            else if (File.Exists(path) && string.Equals(Path.GetExtension(path), DtaExtension, StringComparison.OrdinalIgnoreCase))
+            {
+                folder = Path.GetDirectoryName(path) ?? string.Empty;
+            }
+            else
+            {
+                StatusMessage = "Only a template folder or a .dta template file can be dropped here.";
+                return false;
+            }
+        }
+        catch (Exception)
+        {
+            StatusMessage = "The dropped item could not be read as a folder path.";
+            return false;
+        }
+
+        if (string.Equals(folder, FolderPath, StringComparison.OrdinalIgnoreCase) && AllFiles.Count > 0)
+        {
+            StatusMessage = $"'{Path.GetFileName(folder.TrimEnd(Path.DirectorySeparatorChar))}' is already the open folder.";
+            return true;
+        }
+
+        if (!ConfirmNavigation(NavigationReason.ChangeTemplate))
+        {
+            return false;
+        }
+
+        TrySetFolder(folder);
+        return true;
+    }
+
+    private const string DtaExtension = ".dta";
+
+    /// <summary>Column widths the shell should restore, empty when nothing usable was stored.</summary>
+    public IReadOnlyList<double> SavedParameterColumnWidths =>
+        _loadedSettings.ParameterColumnWidths.Where(w => !double.IsNaN(w) && !double.IsInfinity(w) && w >= 40 && w <= 8000).ToList();
+
+    /// <summary>Stores the widths the user dragged the columns to; a partial or broken set is ignored.</summary>
+    public void SaveParameterColumnWidths(IReadOnlyList<double> widths)
+    {
+        if (widths is null || widths.Count == 0 ||
+            widths.Any(w => double.IsNaN(w) || double.IsInfinity(w) || w < 40 || w > 8000))
+        {
+            return;
+        }
+
+        _loadedSettings.ParameterColumnWidths = widths.ToList();
+        _settings.Save(_loadedSettings);
     }
 
     private void ApplyFileFilter()

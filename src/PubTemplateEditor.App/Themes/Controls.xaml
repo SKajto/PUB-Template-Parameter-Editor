@@ -1,6 +1,7 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:infra="clr-namespace:PubTemplateEditor.App.Infrastructure">
+                    xmlns:infra="clr-namespace:PubTemplateEditor.App.Infrastructure"
+                    xmlns:input="clr-namespace:System.Windows.Input;assembly=PresentationCore">
     <!-- Modern flat styling over built-in WPF controls. All colors via DynamicResource
          so the light/dark dictionaries can be swapped at runtime. -->
 
@@ -370,6 +371,36 @@
         </Setter>
     </Style>
 
+    <Style x:Key="ColumnGripperStyle" TargetType="{x:Type Thumb}">
+        <Setter Property="HorizontalAlignment" Value="Right"/>
+        <Setter Property="Width" Value="10"/>
+        <Setter Property="Margin" Value="0,-4,-10,-4"/>
+        <!-- The plain string form parses to Cursors.None here, so the cursor is
+                                     taken from the typed Cursors member directly. -->
+                        <Setter Property="Cursor" Value="{x:Static input:Cursors.SizeWE}"/>
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Thumb}">
+                    <Grid Background="Transparent">
+                        <Rectangle x:Name="GripperLine" Width="2" HorizontalAlignment="Center" RadiusX="1" RadiusY="1"
+                                   Fill="{DynamicResource StrongBorderBrush}" Opacity="0"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="GripperLine" Property="Opacity" Value="1"/>
+                            <Setter TargetName="GripperLine" Property="Fill" Value="{DynamicResource AccentBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsDragging" Value="True">
+                            <Setter TargetName="GripperLine" Property="Opacity" Value="1"/>
+                            <Setter TargetName="GripperLine" Property="Fill" Value="{DynamicResource AccentBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style TargetType="{x:Type GridViewColumnHeader}">
         <Setter Property="Foreground" Value="{DynamicResource MutedForegroundBrush}"/>
         <Setter Property="Background" Value="{DynamicResource WindowBackgroundBrush}"/>
@@ -383,8 +414,75 @@
                     <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="0,0,1,1" Padding="{TemplateBinding Padding}"
                             TextElement.Foreground="{TemplateBinding Foreground}">
-                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
+                        <Grid>
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
+                            <!-- The stock header template carries this drag handle; a restyled header
+                                 without it leaves the columns fixed, which is what GridViewColumn
+                                 resizing depends on. It sits over the separator line, widens its own
+                                 hit area, and only draws the line while the pointer is on it. -->
+                            <Thumb x:Name="PART_HeaderGripper" Style="{StaticResource ColumnGripperStyle}"/>
+                        </Grid>
                     </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="PART_HeaderGripper" Property="IsHitTestVisible" Value="False"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- A template file row: the row itself carries the selection (the complete row is marked), while
+         the check box stays a separate decision about which files to read. -->
+    <Style x:Key="TemplateRowStyle" TargetType="{x:Type ListBoxItem}">
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Margin" Value="0"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="AutomationProperties.Name" Value="{Binding FileName}"/>
+        <Setter Property="AutomationProperties.HelpText" Value="{Binding Status}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ListBoxItem}">
+                    <Border x:Name="Chrome" Background="{TemplateBinding Background}"
+                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="3"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Rectangle x:Name="AccentBar" Grid.Column="0" Fill="{DynamicResource AccentBrush}"
+                                       Visibility="Collapsed"/>
+                            <ContentPresenter Grid.Column="1" Margin="{TemplateBinding Padding}"
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource RowHoverBackgroundBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource SelectionBrush}"/>
+                            <Setter TargetName="AccentBar" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsSelected" Value="True"/>
+                                <Condition Property="IsMouseOver" Value="True"/>
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource SelectionBrush}"/>
+                        </MultiTrigger>
+                        <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            <Setter TargetName="Chrome" Property="BorderThickness" Value="0,1,0,1"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Chrome" Property="Opacity" Value="0.55"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

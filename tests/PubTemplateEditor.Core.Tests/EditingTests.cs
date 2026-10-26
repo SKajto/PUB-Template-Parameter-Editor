@@ -619,3 +619,98 @@ public class BulkPlanTests
         Assert.Equal(FileB, plan[0].FilePath);
     }
 }
+
+/// <summary>
+/// Undo has to follow the order the user staged in. The store is keyed by file + declaration + field,
+/// which carries no order at all, so the "last change" must come from staging history and must stay
+/// correct after discards clear parts of it away.
+/// </summary>
+public class DraftUndoTests
+{
+    private const string FileA = @"C:\templates\a.dta";
+    private const string FileB = @"C:\templates\b.dta";
+
+    private static TemplateRecord First() => EditingFixtures.Record(
+        FileA,
+        EditingFixtures.Template(
+            EditingFixtures.Variable("alpha", "HELLO", description: "First parameter"),
+            EditingFixtures.Variable("beta", "TWO")));
+
+    private static TemplateRecord Second() => EditingFixtures.Record(
+        FileB,
+        EditingFixtures.Template(EditingFixtures.Variable("alpha", "OTHER")));
+
+    [Fact]
+    public void TheLastChangeIsTheOneStagedLastAcrossFilesAndFields()
+    {
+        var store = new DraftStore();
+        var first = First();
+        var second = Second();
+
+        store.Stage(FileA, EditingFixtures.Decl(first, "alpha"), FieldKind.DefaultValue, "HELLO 2");
+        store.Stage(FileB, EditingFixtures.Decl(second, "alpha"), FieldKind.DefaultValue, "OTHER 2");
+        store.Stage(FileA, EditingFixtures.Decl(first, "beta"), FieldKind.Description, "Second parameter");
+
+        DraftChange? last = store.MostRecent;
+        Assert.NotNull(last);
+        Assert.Equal(FileA, last!.FilePath);
+        Assert.Equal(FieldKind.Description, last.Field);
+        Assert.Equal("beta", last.DeclarationName);
+
+        Assert.True(store.RemoveMostRecent());
+        Assert.Equal(2, store.Count);
+        Assert.Equal(FileB, store.MostRecent!.FilePath);
+
+        Assert.True(store.RemoveMostRecent());
+        Assert.True(store.RemoveMostRecent());
+        Assert.False(store.RemoveMostRecent());
+        Assert.Null(store.MostRecent);
+        Assert.False(store.HasAny);
+    }
+
+    [Fact]
+    public void EditingTheSameFieldAgainMakesItTheMostRecentChange()
+    {
+        var store = new DraftStore();
+        var template = First();
+
+        store.Stage(FileA, EditingFixtures.Decl(template, "beta"), FieldKind.DefaultValue, "TWO B");
+        store.Stage(FileA, EditingFixtures.Decl(template, "alpha"), FieldKind.DefaultValue, "HELLO A");
+        store.Stage(FileA, EditingFixtures.Decl(template, "beta"), FieldKind.DefaultValue, "TWO C");
+
+        DraftChange? last = store.MostRecent;
+        Assert.Equal("beta", last!.DeclarationName);
+        Assert.Equal("TWO C", last.ProposedValue);
+
+        Assert.True(store.RemoveMostRecent());
+        Assert.Equal(1, store.Count);
+        Assert.Equal("alpha", store.MostRecent!.DeclarationName);
+
+        // Undoing the same field twice in a row walks back through that field's own history: the value
+        // returns to the stored one and the entry leaves the store entirely.
+        Assert.True(store.RemoveMostRecent());
+        Assert.False(store.HasAny);
+    }
+
+    [Fact]
+    public void DiscardingRemovesAChangeFromTheUndoHistoryWithIt()
+    {
+        var store = new DraftStore();
+        var first = First();
+        var second = Second();
+
+        store.Stage(FileA, EditingFixtures.Decl(first, "alpha"), FieldKind.DefaultValue, "HELLO 2");
+        store.Stage(FileB, EditingFixtures.Decl(second, "alpha"), FieldKind.DefaultValue, "OTHER 2");
+
+        Assert.Equal(1, store.DiscardForFile(FileB));
+        Assert.Equal(FileA, store.MostRecent!.FilePath);
+
+        Assert.Equal(1, store.DiscardForDeclaration(FileA, EditingFixtures.Decl(first, "alpha").DeclarationId));
+        Assert.Null(store.MostRecent);
+        Assert.False(store.RemoveMostRecent());
+
+        store.Stage(FileA, EditingFixtures.Decl(first, "beta"), FieldKind.DefaultValue, "TWO B");
+        store.Clear();
+        Assert.Null(store.MostRecent);
+    }
+}

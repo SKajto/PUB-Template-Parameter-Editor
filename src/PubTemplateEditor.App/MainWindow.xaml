@@ -8,6 +8,8 @@
         Background="{DynamicResource WindowBackgroundBrush}"
         TextOptions.TextFormattingMode="Ideal"
         UseLayoutRounding="True"
+        AllowDrop="True"
+        DragOver="Window_DragOver" DragLeave="Window_DragLeave" Drop="Window_Drop"
         FontSize="{DynamicResource UiFontSize}">
     <Window.InputBindings>
         <KeyBinding Modifiers="Control" Key="O" Command="{Binding OpenFolderCommand}"/>
@@ -16,6 +18,12 @@
         <KeyBinding Modifiers="Control" Key="E" Command="{Binding FocusParameterSearchCommand}"/>
         <KeyBinding Modifiers="Control" Key="L" Command="{Binding OpenLicensesCommand}"/>
         <KeyBinding Modifiers="Control" Key="S" Command="{Binding OpenReviewCommand}"/>
+        <!-- Staging is the unit of work here, so the keys work on staged changes: Ctrl+Enter offers the
+             fields of the open form, Ctrl+Z takes back the change staged last. Inside a value box Ctrl+Z
+             stays with the text editor, which is where an accidental keystroke has to be undone. -->
+        <KeyBinding Modifiers="Control" Key="Enter" Command="{Binding ApplyEditsCommand}"/>
+        <KeyBinding Modifiers="Control" Key="Z" Command="{Binding UndoLastStagedCommand}"/>
+        <KeyBinding Key="Escape" Command="{Binding CloseOverlayCommand}"/>
     </Window.InputBindings>
 
     <!-- The theme text colour is inherited from here; see the note in Themes/Controls.xaml.
@@ -36,7 +44,6 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
@@ -70,6 +77,10 @@
                             Style="{StaticResource AccentButtonStyle}" Margin="10,0,0,0"
                             ToolTip="List every staged change before anything is written (Ctrl+S)"
                             AutomationProperties.Name="Review staged changes"/>
+                    <Button x:Name="UndoStagedButton" Content="Undo last" Command="{Binding UndoLastStagedCommand}"
+                            Margin="8,0,0,0" infra:Iconics.Icon="{StaticResource IconUndo}"
+                            ToolTip="Take back the change staged last (Ctrl+Z); a save that already happened is not undone"
+                            AutomationProperties.Name="Undo the last staged change"/>
                     <Button x:Name="DiscardAllButton" Content="Discard all" Command="{Binding DiscardAllStagedCommand}" Margin="8,0,0,0"
                             infra:Iconics.Icon="{StaticResource IconTrash}"
                             ToolTip="Forget the staged proposals and the unapplied typing of this session; no template file is written"
@@ -98,16 +109,6 @@
                         <Path Style="{StaticResource RadioIconStyle}" Data="{StaticResource IconMonitor}" Width="17" Height="17"/>
                     </RadioButton>
                 </StackPanel>
-
-                <StackPanel Grid.Column="5" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding FolderName}" MaxWidth="200" TextTrimming="CharacterEllipsis"
-                               ToolTip="{Binding FolderPath}" VerticalAlignment="Center" Margin="0,0,8,0"
-                               AutomationProperties.Name="Active folder"/>
-                    <Button x:Name="ChooseFolderButton" Content="Choose folder" Command="{Binding OpenFolderCommand}"
-                            infra:Iconics.Icon="{StaticResource IconFolderOpen}"
-                            Style="{StaticResource AccentButtonStyle}"
-                            ToolTip="Choose the folder containing .dta templates (Ctrl+O)"/>
-                </StackPanel>
             </Grid>
         </Border>
 
@@ -122,7 +123,7 @@
             </Grid.ColumnDefinitions>
 
             <!-- template explorer -->
-            <Border Grid.Column="0" Style="{StaticResource PanelBorderStyle}" BorderThickness="0,1,1,1">
+            <Border x:Name="TemplatesPanelBorder" Grid.Column="0" Style="{StaticResource PanelBorderStyle}" BorderThickness="0,1,1,1">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Margin="10,10,10,0">
                         <TextBlock Text="TEMPLATES" Style="{StaticResource EyebrowStyle}"/>
@@ -152,6 +153,26 @@
                                 ToolTip="Parse declarations of the selected templates (F5)"/>
                     </StackPanel>
 
+                    <!-- The folder is opened where its templates are listed, not in the window chrome:
+                         the name of the folder and the control that changes it belong to the same panel,
+                         and the folder name is shown only once. -->
+                    <Button x:Name="ChooseFolderButton" Content="Choose folder" Command="{Binding OpenFolderCommand}"
+                            DockPanel.Dock="Top" Margin="10,8,10,0" HorizontalAlignment="Stretch"
+                            infra:Iconics.Icon="{StaticResource IconFolderOpen}"
+                            ToolTip="Choose the folder containing .dta templates (Ctrl+O)"
+                            AutomationProperties.Name="Choose the folder of template files"/>
+
+                    <!-- A folder shortcut list, not a list of files: the workspace is scoped by folder, and
+                         remembering paths is the only way to reopen a deep folder without browsing again. -->
+                    <StackPanel DockPanel.Dock="Top" Margin="10,8,10,0"
+                                Visibility="{Binding HasRecentFolders, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="Recent folders" Style="{StaticResource EyebrowStyle}"/>
+                        <ComboBox x:Name="RecentFoldersBox" ItemsSource="{Binding RecentFolders}" SelectedIndex="-1"
+                                  ToolTip="Reopen a folder that was listed before"
+                                  SelectionChanged="RecentFoldersBox_SelectionChanged"
+                                  AutomationProperties.Name="Recent template folders"/>
+                    </StackPanel>
+
                     <StackPanel DockPanel.Dock="Top" Margin="10,8,10,0">
                         <TextBlock Text="Filter files" Style="{StaticResource EyebrowStyle}"/>
                         <Grid>
@@ -171,40 +192,47 @@
                                    Text="{Binding SelectedReadCount, StringFormat={}{0} selected for reading}"/>
                     </StackPanel>
 
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="4,8,4,4">
-                        <ItemsControl ItemsSource="{Binding VisibleFiles}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border BorderThickness="0,0,0,1" BorderBrush="{DynamicResource BorderBrush}"
-                                            Background="{DynamicResource PanelBackgroundBrush}">
-                                        <Grid Margin="4,5">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <CheckBox Grid.Column="0" IsChecked="{Binding IsSelectedForRead}"
-                                                      IsEnabled="{Binding IsListable}"
-                                                      VerticalAlignment="Center"
-                                                      AutomationProperties.Name="{Binding FileName, StringFormat={}Select {0} for reading}"/>
-                                            <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                                                <RadioButton GroupName="active-file" IsChecked="{Binding IsActive, Mode=OneWay}"
-                                                             Command="{Binding DataContext.SelectActiveFileCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                             CommandParameter="{Binding}"
-                                                             BorderThickness="0"
-                                                             AutomationProperties.Name="{Binding FileName, StringFormat={}Focus {0}}"
-                                                             Content="{Binding FileName}"
-                                                             ToolTip="{Binding FilePath}"/>
-                                                <TextBlock Style="{StaticResource FieldNoteStyle}" Margin="0,1,0,0"
-                                                           ToolTip="{Binding Status}">
-                                                    <Run Text="{Binding SizeText, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding StatusDisplay, Mode=OneWay}"/>
-                                                </TextBlock>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
+                    <ListBox x:Name="TemplateList" Margin="6,8,6,4" Padding="0"
+                             ItemsSource="{Binding VisibleFiles}" SelectedItem="{Binding ActiveFile}"
+                             SelectionMode="Single" BorderThickness="0" Background="Transparent"
+                             ItemContainerStyle="{StaticResource TemplateRowStyle}"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             HorizontalContentAlignment="Stretch"
+                             AutomationProperties.Name="Template files; select the active template">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="6,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <CheckBox Grid.Column="0" IsChecked="{Binding IsSelectedForRead}"
+                                              IsEnabled="{Binding IsListable}"
+                                              VerticalAlignment="Center"
+                                              AutomationProperties.Name="{Binding FileName, StringFormat={}Select {0} for reading}"/>
+                                    <StackPanel Grid.Column="1" Margin="9,0,0,0">
+                                        <TextBlock Text="{Binding FileName}" TextTrimming="CharacterEllipsis"
+                                                   ToolTip="{Binding FilePath}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="FontWeight" Value="Normal"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <TextBlock Style="{StaticResource FieldNoteStyle}" Margin="0,1,0,0"
+                                                   ToolTip="{Binding Status}">
+                                            <Run Text="{Binding SizeText, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding StatusDisplay, Mode=OneWay}"/>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
                 </DockPanel>
             </Border>
 
@@ -300,7 +328,7 @@
                               SelectedItem="{Binding SelectedParameter}"
                               IsEnabled="{Binding HasActiveFile}"
                               SelectionMode="Single"
-                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                              ScrollViewer.HorizontalScrollBarVisibility="Auto">
                         <ListView.View>
                             <GridView>
                 <GridViewColumn Width="260">
@@ -857,6 +885,7 @@
                                     <Button x:Name="ApplyEditsButton" Content="Apply edits" Margin="0,0,6,0"
                                             infra:Iconics.Icon="{StaticResource IconCheck}"
                                             Command="{Binding ApplyEditsCommand}"
+                                            ToolTip="Stage the values typed in this form (Ctrl+Enter); nothing is written yet"
                                             AutomationProperties.Name="Stage the form changes for this parameter"/>
                                     <Button x:Name="RevertFormButton" Content="Undo unapplied typing" Margin="0,0,6,0"
                                             infra:Iconics.Icon="{StaticResource IconUndo}"
@@ -918,12 +947,28 @@
                     <TextBlock Margin="8,0,0,0" Text="Review and save in the top bar"
                                Foreground="{DynamicResource MutedForegroundBrush}" VerticalAlignment="Center"
                                FontSize="11"/>
+                    <!-- The keys are listed where the work is reported, so they are found without a help page. -->
+                    <TextBlock Margin="14,0,0,0" Text="Ctrl+Enter stage · Ctrl+Z undo staged · Ctrl+S review · Esc close panel"
+                               Foreground="{DynamicResource MutedForegroundBrush}" VerticalAlignment="Center"
+                               FontSize="11"/>
                 </StackPanel>
                 <Button x:Name="VersionButton" Grid.Column="2" Content="{Binding VersionLabel}"
                         Style="{StaticResource LinkButtonStyle}" Command="{Binding OpenLicensesCommand}"
                         ToolTip="About, licence and bundled-component notices (Ctrl+L)"
                         AutomationProperties.Name="About and licences"/>
             </Grid>
+        </Border>
+
+        <!-- Drag-and-drop affordance. The workspace is scoped by folder, so a dropped folder opens that
+             folder and a dropped template opens the folder holding it. The panel only exists while a
+             drag hovers the window, and never takes the mouse. -->
+        <Border x:Name="DropHint" Grid.RowSpan="3" Panel.ZIndex="30" Margin="16" CornerRadius="8"
+                Visibility="Collapsed" IsHitTestVisible="False"
+                Background="{DynamicResource AccentSoftBrush}"
+                BorderBrush="{DynamicResource AccentBrush}" BorderThickness="2">
+            <TextBlock x:Name="DropHintText" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       FontWeight="SemiBold" FontSize="15" TextWrapping="Wrap" TextAlignment="Center"
+                       Foreground="{DynamicResource AccentBrush}"/>
         </Border>
     </Grid>
 </Window>
