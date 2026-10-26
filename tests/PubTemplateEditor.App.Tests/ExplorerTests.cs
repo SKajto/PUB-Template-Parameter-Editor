@@ -4,6 +4,7 @@ using PubTemplateEditor.App.ViewModels;
 using PubTemplateEditor.Core.Model;
 using PubTemplateEditor.Infrastructure;
 using Xunit;
+using PubTemplateEditor.TestSupport;
 using ShellWindow = PubTemplateEditor.App.MainWindow;
 
 namespace PubTemplateEditor.UiTests;
@@ -26,12 +27,11 @@ public class ExplorerTests
         return path;
     }
 
-    private static string SampleCopy(string name, string dir)
-    {
-        string target = Path.Combine(dir, name);
-        File.Copy(Path.Combine(ThemeTests.RepoRoot(), "examples", name), target, overwrite: true);
-        return target;
-    }
+    /// <summary>
+    /// The native sample when this machine has one, otherwise a synthetic container of the same
+    /// shape: the .dta samples are user content and are not part of the repository.
+    /// </summary>
+    private static string SampleCopy(string name, string dir) => TestSamples.CopyNativeOrSynthetic(dir, name);
 
     private WorkspaceViewModel NewViewModel(string settingsDir, string templateDir) =>
         new(new SettingsService(settingsDir), new EditorSettings { LastFolder = templateDir });

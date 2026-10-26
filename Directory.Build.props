@@ -14,6 +14,8 @@
     <Copyright>Copyright (C) PUB Template Parameter Editor contributors</Copyright>
     <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
     <RepositoryType>git</RepositoryType>
-    <!-- GitHub remote URL is supplied by the owner; leave unset until it is real. -->
+    <!-- The owner's public repository: the corresponding source of every release lives here. -->
+    <RepositoryUrl>https://github.com/SKajto/PUB-Template-Parameter-Editor</RepositoryUrl>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
   </PropertyGroup>
 </Project>

@@ -14,3 +14,10 @@ MSIX/
 
 # Scratch tooling kept outside the source distribution
 .tools/
+
+# Native PUB template samples are user content and stay on a maintainer's disk:
+# they are never committed. The evidence tests verify against their real bytes when
+# present, and tests/TestSampleSupport.cs writes synthetic containers of the same
+# shape when they are not. What the samples taught us is written up in
+# docs/SAMPLE_FINDINGS.md; the files themselves are not the licence's "source".
+examples/*.dta

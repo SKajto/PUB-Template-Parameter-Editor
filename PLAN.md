@@ -746,6 +746,101 @@ Executed commands and results
   does nothing, the result card in the review panel now names the file and the reason - report that
   sentence and it can be traced exactly.
 
+### 2026-10-26 - Stage cleared after a save, application icon, samples out of the repository, publishing setup
+
+What changed
+- **A completed save now clears what it wrote.** `SweepStageAfterWrite(writtenPaths)`
+  (`WorkspaceViewModel.Review.cs`) runs after the reload of every written file and drops each staged
+  change whose proposed value is what the file now holds. Without it the stage, the per-file
+  "staged" badges and the review list kept showing rows that were already applied, so the next save
+  looked like a no-op. `ActionNotice` reports how many rows were swept. New test
+  `ACompletedSaveEmptiesTheStageOfEverythingItWrote` (SaveFlowTests) asserts after a save:
+  `StagedChangeCount == 0`, no review rows, no per-file staged badge, and that a second save starts
+  from an empty stage (it needs `SelectAllReviewCommand` after staging again, because rebuilt review
+  rows start unticked by design).
+- **Real save evidence from the owner's desktop.** The two landscape samples in `examples/` came back
+  modified from a run of the published 16:33 executable, and the byte comparison is the best evidence
+  this milestone got: entry count unchanged (241/241 and 209/209), **no entry lost, no entry added,
+  240 of 241 and 208 of 209 entries byte-identical by CRC**, and inside `template.xml` exactly the
+  intended edits - a single character (`ID(10` to `ID(20`) in one file, and in the other one
+  `access internal -> external` plus a `default` gaining `ID(10)`. The container framing did move:
+  the file shrank 449,898 -> 438,428 bytes because `System.IO.Compression` recompressed the package,
+  which is the documented known risk of the ZIP rewrite and not a content loss. The application's own
+  backups (`%LOCALAPPDATA%/PubTemplateEditor/backups`) hold the pre-save bytes and match the pristine
+  fixtures by SHA-256, and a third save at 16:16:32 shows the editor accepted a file it had written
+  itself without a false outside-edit conflict. This closes the "does Save write anything?" gate for
+  real templates; the remaining native gate is opening such a file in PUB itself.
+- **Application icon.** `tools/brand/generate-brand-assets.ps1` draws the mark with WPF geometry and
+  `RenderTargetBitmap`: a template sheet with an adjustable value line, plus a written-change check
+  on the large tiles. It emits `src/PubTemplateEditor.App/Assets/app.ico` (PNG frames 16/24/32/48/64/
+  128/256), `Assets/app-256.png` and every MSIX tile in `packaging/assets/` (44, 71, 150, 310,
+  310x150, StoreLogo 50, SplashScreen 620x300), replacing the earlier placeholder tiles. Wired as
+  `<ApplicationIcon>Assets\app.ico</ApplicationIcon>`, as a `<Resource>` and as
+  `Icon="pack://application:,,,/PubTemplateEditor;component/Assets/app.ico"` on all three windows.
+  The first attempt used the root namespace `PubTemplateEditor.App` in that URI and crashed the WPF
+  test host with `FileNotFoundException` at window construction - the pack URI names the *assembly*,
+  which is `PubTemplateEditor` (`AssemblyName`), exactly why `EmbeddedNotices` derives it at runtime.
+  `NoticeViewerTests.TheApplicationIconIsEmbeddedAndResolvesForEveryWindow` now resolves the resource
+  and constructs a real window; WPF picks the 16x16 frame for the caption, so the assertion checks
+  that a usable frame decodes. `BrandAssetTests` verifies the ICO directory (sizes, square frames,
+  32 bpp, frames inside the file), that every tile named by the manifest exists at its exact pixel
+  size and is not a placeholder, and that the artwork comes from this repository with no download step.
+  `NOTICE` records the provenance; no icon pack, icon font or stock image is used anywhere.
+- **The native samples left the repository.** `examples/*.dta` is user content: publishing it would
+  put a third party's product data on a public host and it is not the GPL's "corresponding source".
+  They are now git-ignored, untracked, and removed from the whole history with `git filter-branch
+  --index-filter` before the first push, followed by `git reflog expire --expire=now --all` and
+  `git gc --prune=now`; `git rev-list --all --objects | grep '\.dta$'` is now empty and
+  `NoTemplateFileIsTrackedByGit` guards it. Honest incident record: the rewrite plus aggressive gc
+  deleted the working copies, which were still tracked at that moment. Recovery: the stash commit
+  still held all five blobs (`git cat-file`), the pristine variants of the two landscape files were
+  already captured in `artifacts/user-save-2026-10-26/*.pristine.dta`, the application's own backups
+  matched them by SHA-256, and `workspace/JazzTools_ReportTemplates/...` holds the owner's originals.
+  `examples/` is back to the five untouched fixtures, ignored by git.
+  Tests no longer depend on them: `tests/TestSampleSupport.cs` gives each test the native file when
+  the disk has one and a synthetic `.dta`-shaped container (template XML + schema entry + non-XML
+  `__RPE_MAPPINGS__`) otherwise, the native evidence theories carry no rows when the samples are
+  absent, and CI asserts that none is tracked. `docs/SAMPLE_FINDINGS.md` explains why the knowledge,
+  not the bytes, ships.
+- **Publishing setup.** Repository URL `https://github.com/SKajto/PUB-Template-Parameter-Editor` is
+  recorded in `Directory.Build.props` (`RepositoryUrl`, `PublishRepositoryUrl`), in
+  `ProductInfo.RepositoryUrl`/`ReleaseSourceUrl`, in the About text and in `NOTICE`; the reference
+  app's renamed location (`SKajto/DTA-Editor`) is recorded as such. Added `README.md` for a public
+  repository: what the tool does, layout, build/publish commands, the sample policy, and an explicit
+  list of open gates. `packaging/AppxManifest.template.xml` now names `StoreLogo` next to the other
+  tiles.
+- **CI on the free plan and SignPath preparation.** `ci.yml` triggers on `main` *and* `master`
+  (this repository's branch is `master`), gained the "no template content may be published" check and
+  a header explaining why the job stays inside the free plan's fair use: one Windows runner, no
+  matrix, 7-day CI retention, no paid runner, no Docker step, WPF tests inside `dotnet test`.
+  `release.yml` gained the same content guard, the free-plan note, and a `signpath-preparation` job
+  that is off unless `SIGNPATH_ENABLED=true`, fails when the SignPath organisation id, policy id or
+  token are missing, writes the signature configuration JSON naming the executable and its source
+  URL, and then stops with the exact remaining steps. It deliberately does not reference SignPath's
+  GitHub action, because that action's commit SHA has not been resolved and verified - an unpinned
+  third-party action would break the immutability rule applied to every other action here. Documented
+  in `docs/GITHUB_STORE_RELEASE.md` ("Runner budget on the free GitHub plan", "SignPath Foundation
+  signing"): the Store signs the MSIX after certification, so only the GitHub-distributed portable
+  EXE needs this; SignPath's free certificates cover non-commercial open-source distribution, so a
+  paid Store price and the free signing route have to be reviewed together.
+
+Executed commands and results
+- `dotnet test` -> Core 86, Integration 39, App/WPF 83 = **208 tests, 0 failed**; build clean.
+- `python .tools/inspect_user_save.py`, `.tools/show_save_diff.py`, `.tools/restore_samples.py` - the
+  save forensics and the sample recovery described above.
+- `git filter-branch --force --index-filter "git rm -r --cached --ignore-unmatch examples/*.dta"
+  --prune-empty -- master`, then `refs/original` deleted, reflog expired, `git gc --prune=now`.
+- `dotnet publish ... -p:PublishProfile=PortableWin_x64` after the icon wiring - see the entry below
+  for the rebuilt executable.
+
+Open gates after this step
+- Push to `SKajto/PUB-Template-Parameter-Editor` and the first Actions run on the real host: the
+  pinned SHAs, the runner image's .NET 10 SDK and the Windows SDK tools that `packaging/build-msix.ps1`
+  needs are verified only by the run itself, not by this machine.
+- SignPath: project registration and approval, then a verified commit SHA for their signing action.
+- Whether the dark-mode caption/border and the hover cards look right on the desktop, and the native
+  PUB round trip (open a saved file in PUB) - both need a human and the product.
+
 ## Deferred scope
 
 Linux UI, additional architectures, parameter creation/deletion/renaming, presets, recursive folders, in-app PUB generation, browser hosting and custom installer/updater services are outside this initial Windows release. Keep the domain core independent without building a second UI.

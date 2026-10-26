@@ -25,6 +25,7 @@ public partial class LicensesWindow : Window
     public string AboutCopyright => AboutCopyrightText.Text;
     public string AboutRuntime => AboutRuntimeText.Text;
     public string AboutBundled => AboutBundledText.Text;
+    public string AboutSource => AboutSourceText.Text;
 
     public LicensesWindow()
     {
@@ -43,7 +44,8 @@ public partial class LicensesWindow : Window
         AboutLicenseText.Text = $"{ProductInfo.LicenseId} (see the GNU GPL v3 tab for the full text)";
         AboutCopyrightText.Text = ProductInfo.CopyrightLine;
         AboutRuntimeText.Text = $"{ProductInfo.RuntimeDescription}, {ProductInfo.ProcessArchitecture} process on {ProductInfo.OperatingSystemDescription}";
-        AboutSourceText.Text = ProductInfo.SourceNote;
+        AboutSourceText.Text = ProductInfo.SourceNote + " Source: " + ProductInfo.RepositoryUrl
+                             + ". This build: " + ProductInfo.ReleaseSourceUrl;
         AboutBundledText.Text =
             $".NET runtime and WPF ({ProductInfo.RuntimeDescription}) are bundled in the self-contained " +
             "payload under the MIT/.NET Runtime licence; they are not relicensed. Build tooling such as " +
@@ -55,6 +57,6 @@ public partial class LicensesWindow : Window
 
         string version = ProductInfo.Version;
         SourceLine.Text =
-            $"Version {version}. " + ProductInfo.SourceNote;
+            $"Version {version}. " + ProductInfo.SourceNote + " " + ProductInfo.ReleaseSourceUrl;
     }
 }

@@ -3,6 +3,11 @@
 # PR code is not executed here. Requires the 'release-packaging' environment so a
 # maintainer must approve the run (Settings -> Environments -> protection rules).
 #
+# Free GitHub plan: the repository is public, so this Windows job runs on the free GitHub-hosted
+# runner under the fair-use policy for public repositories. It stays deliberately single-runner -
+# no build matrix, no larger runners, no self-hosted machine - and the artifact retention is 90
+# days, which is inside the free plan's storage allowance for a project of this size.
+#
 # Pinned action SHAs are the same verified refs as .github/workflows/ci.yml.
 
 name: Release packaging
@@ -82,6 +87,12 @@ jobs:
           }
         shell: pwsh
 
+      - name: No template content may be published
+        run: |
+          $templates = git ls-files | Where-Object { $_ -match '\.dta$' }
+          if ($templates) { throw "template content is tracked in git: $($templates -join ', ')" }
+        shell: pwsh
+
       - name: Package MSIX for Store submission (unsigned at build time)
         run: >
           powershell -NoProfile -ExecutionPolicy Bypass -File packaging/build-msix.ps1
@@ -133,3 +144,71 @@ jobs:
             artifacts/SHA256SUMS.txt
           retention-days: 90
           if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # SignPath Foundation preparation - signing itself is not wired up yet.
+  #
+  # Only the downloadable portable EXE needs third-party signing: the Microsoft Store signs the
+  # MSIX after certification, so a Store payload is not signed here and a CI-built MSIX is never
+  # presented as Store-signed. SignPath Foundation signs open-source binaries free of charge, on
+  # their terms (see https://signpath.org/terms): the project has to be registered and approved by
+  # them, the repository has to stay public and open source, and the distribution has to remain
+  # non-commercial. None of that is asserted by this workflow, so the job below does not sign -
+  # it checks the prerequisites, produces the input file that SignPath's signer consumes, and stops
+  # with an actionable message until a maintainer has verified and pinned their GitHub action.
+  #
+  # Open the 'signing-signpath' environment only after SignPath approved the project, then set the
+  # repository variables SIGNPATH_ORGANIZATION_ID and SIGNPATH_SIGNATION_POLICY_ID, the environment
+  # secret SIGNPATH_API_TOKEN, and finally SIGNPATH_ENABLED=true to make this job speak.
+  signpath-preparation:
+    name: SignPath signing prerequisites (does not sign)
+    runs-on: ubuntu-latest
+    if: vars.SIGNPATH_ENABLED == 'true'
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Require the SignPath project identifiers
+        env:
+          SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          SIGNPATH_SIGNATION_POLICY_ID: ${{ vars.SIGNPATH_SIGNATION_POLICY_ID }}
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+        run: |
+          missing=()
+          [ -n "$SIGNPATH_ORGANIZATION_ID" ]     || missing+=("variable SIGNPATH_ORGANIZATION_ID")
+          [ -n "$SIGNPATH_SIGNATION_POLICY_ID" ] || missing+=("variable SIGNPATH_SIGNATION_POLICY_ID")
+          [ -n "$SIGNPATH_API_TOKEN" ]           || missing+=("secret SIGNPATH_API_TOKEN in environment signing-signpath")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "SignPath is enabled but not configured:"; printf '  - %s\n' "${missing[@]}"
+            echo "Register the project with SignPath Foundation first: https://signpath.org/terms"
+            exit 1
+          fi
+        shell: bash
+
+      - name: Emit the signature config file
+        run: |
+          mkdir -p artifacts-signpath
+          printf '%s\n' "$SIGN_CONFIG" > artifacts-signpath/sign-path-signature-config.json
+          cat artifacts-signpath/sign-path-signature-config.json
+        env:
+          SIGN_CONFIG: |
+            {
+              "PubTemplateEditor.exe": {
+                "description": "PUB Template Parameter Editor",
+                "descriptionUrl": "https://github.com/SKajto/PUB-Template-Parameter-Editor"
+              }
+            }
+        shell: bash
+
+      - name: Stop before signing - the signer action is not pinned yet
+        run: |
+          echo "Signing has not been wired into this workflow. To finish it:"
+          echo "  1. Get the project approved by SignPath Foundation (public repo, GPL-3.0-only, no commercial distribution)."
+          echo "  2. Resolve the current tag of signpath/action-sign through the GitHub tags API and verify the commit SHA,"
+          echo "     exactly as documented for the other pinned actions in docs/GITHUB_STORE_RELEASE.md."
+          echo "  3. Add a step that hands the portable EXE artifact plus artifacts-signpath/sign-path-signature-config.json"
+          echo "     to that pinned action, and re-hash the signed output before it is attached to a release."
+          echo "A draft package that was never signed must never be described as signed, so this job fails instead."
+          exit 1
+        shell: bash

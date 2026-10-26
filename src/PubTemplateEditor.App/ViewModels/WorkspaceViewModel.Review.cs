@@ -376,6 +376,10 @@ public sealed partial class WorkspaceViewModel
         // until that happens a second save of the same row would look like an outside edit.
         await ReloadWrittenTemplatesAsync(writtenPaths, token);
 
+        // A saved change must not stay in the stage. Anything that now equals what the file holds is no
+        // longer a change at all, and a row that can never be written reads as work still waiting.
+        int swept = SweepStageAfterWrite(writtenPaths);
+
         SaveOutcomeSummary = string.Join(Environment.NewLine,
             [.. results.Select(r => $"{Path.GetFileName(r.FilePath)}: {r.Message}")]);
         LastSaveOutcome = (writtenPaths.Count, problems.Count - unusable.Count) switch
@@ -396,7 +400,9 @@ public sealed partial class WorkspaceViewModel
         if (writtenPaths.Count > 0)
         {
             ActionNotice = $"Saved {fields} field(s) in {writtenPaths.Count} template(s). "
-                + "Original copies are in the app's backup folder; each file was verified after writing."
+                + "The stage of everything saved is cleared; original copies are in the app's backup folder, "
+                + "and each file was verified after writing."
+                + (swept > 0 ? $" {swept} staged change(s) the save had already applied were dropped as well." : string.Empty)
                 + (problems.Count > 0 ? $" {problems.Count} template(s) were not written." : string.Empty);
         }
 
@@ -441,6 +447,46 @@ public sealed partial class WorkspaceViewModel
 
         RefreshCounters();
         RestoreUnappliedFormEdits(typing);
+    }
+
+    /// <summary>
+    /// Drops staged changes of the written files whose proposed value is now what the file actually holds.
+    /// The normal path already removes each written row; this catches what a re-read turned into a no-op,
+    /// so a completed save really does end with an empty stage.
+    /// </summary>
+    private int SweepStageAfterWrite(IReadOnlyList<string> writtenPaths)
+    {
+        var dead = new List<ChangeKey>();
+        foreach (string path in writtenPaths)
+        {
+            TemplateRecord? record = CandidateRecords.FirstOrDefault(r => r.FilePath == path);
+            if (record is not { ReadState: TemplateReadState.Loaded })
+            {
+                continue;
+            }
+
+            foreach (DraftChange change in Drafts.ForFile(path).ToList())
+            {
+                VariableDeclaration? declaration =
+                    record.Declarations.FirstOrDefault(d => d.DeclarationId == change.DeclarationId);
+                if (declaration is null)
+                {
+                    continue;
+                }
+
+                if (string.Equals(declaration.GetField(change.Field).LogicalValue, change.ProposedValue, StringComparison.Ordinal))
+                {
+                    dead.Add(change.Key);
+                }
+            }
+        }
+
+        foreach (ChangeKey key in dead)
+        {
+            Drafts.Remove(key);
+        }
+
+        return dead.Count;
     }
 
     private void DiscardSelectedReview()

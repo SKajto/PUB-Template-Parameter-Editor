@@ -26,8 +26,19 @@ Only explicitly redistributable or synthetic fixtures may be committed.
 
 Design reference: the functionality and screen layout of this editor were
 reviewed against SKajto's "PUB Template Parameter Editor" (an offline
-Electron/TypeScript implementation, GPL-3.0-only),
-https://github.com/SKajto/PUB-Template-Parameter-Editor. This repository is
-an independent C#/WPF implementation; no source files from that project are
+Electron/TypeScript implementation, GPL-3.0-only), which the owner has since
+renamed to "DTA-Editor": https://github.com/SKajto/DTA-Editor. This repository
+is an independent C#/WPF implementation; no source files from that project are
 copied, translated or vendored here. See docs/REFERENCE_UI_FINDINGS.md for
 the reviewed surface, mirrored behaviour and recorded differences.
+
+This project's own repository (the corresponding source of every release):
+https://github.com/SKajto/PUB-Template-Parameter-Editor
+
+Artwork: the application icon (src/PubTemplateEditor.App/Assets/app.ico), the
+window mark and every MSIX tile (packaging/assets) are drawn in this
+repository by tools/brand/generate-brand-assets.ps1 from vector geometry and
+are released under the same GPL-3.0-only terms as the code. No icon pack, icon
+font, stock image or other third-party graphic asset is used, copied or
+bundled. The mark shows a template sheet with an adjustable value line and, on
+the large tiles, a written-change check.

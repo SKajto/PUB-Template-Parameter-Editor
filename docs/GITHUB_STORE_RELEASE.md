@@ -35,6 +35,65 @@ Pin GitHub Actions to verified immutable references, or the repository's support
 
 The workflow files must be implemented and checked against the actual repository paths and chosen packaging tool. This package deliberately does not provide a runnable workflow with guessed action SHAs, app IDs or credentials. Codex should produce those reviewable workflow files in the real project once it has the required evidence.
 
+## Runner budget on the free GitHub plan
+
+The repository is public, and public repositories get GitHub-hosted runners - Windows included -
+without a metered minute allowance, under the fair-use policy. The workflows are written so that
+nothing pushes into paid territory:
+
+| Choice | Why it stays free |
+| --- | --- |
+| one `windows-latest` runner per run, no matrix | Windows runners are not multiplied; a build matrix would be the fastest way to exhaust fair use |
+| `concurrency` group with `cancel-in-progress` on CI | superseded pushes stop instead of queueing extra runs |
+| `retention-days: 7` for CI artifacts, `90` for release artifacts | artifact storage counts against the repository's storage budget |
+| no self-hosted or larger (paid) runner | a self-hosted machine would also break the trusted-release boundary |
+| no Docker-based build step | the build needs only the SDK from `global.json`, so no image pulls and no Linux/Windows split |
+| WPF tests run on an STA host inside `dotnet test` | no GUI session, no RDP job, no extra runner |
+
+The consequence to keep in mind: a `windows-latest` job on the free plan still starts within the
+usual queue, and the whole suite (build plus 208 tests plus publish plus MSIX draft) is designed to
+finish in a few minutes so that a run never looks abusive. If the plan ever changes to private, the
+same jobs fit inside the private-plan Windows minute budget as they are single-runner.
+
+## SignPath Foundation signing
+
+Two different signature questions exist and they must not be merged:
+
+- **MSIX for the Microsoft Store** needs no publisher certificate from us. The Store signs the
+  package after certification. A CI-built MSIX is unsigned, and neither a CI MSIX nor a GitHub EXE
+  may ever be labelled Store-signed.
+- **The portable single-file `PubTemplateEditor.exe`** that GitHub serves is the binary that
+  benefits from a real Authenticode signature (mark-of-the-web and SmartScreen behaviour), and that
+  is the one SignPath Foundation can sign free of charge for open-source projects.
+
+SignPath's free signing is offered on the conditions at <https://signpath.org/terms>. For this
+project the concrete requirements are:
+
+1. The project is genuinely open source and the repository stays public; this source is GPL-3.0-only
+   and carries LICENSE, NOTICE and the third-party notices.
+2. The distribution being signed is the project's own build, from that public source, and the
+   binaries are not sold or put behind a paid gate. Charging for the Store listing would need a
+   commercial SignPath plan instead of the Foundation's free certificates - this project ships the
+   Store package at the price the owner chooses, and the free signing route covers non-commercial
+   open-source distribution, so the Store price question and the signing route have to be reviewed
+   together before the portable EXE is offered publicly.
+3. SignPath registers and approves the project (organisation, project, signation policy) and issues
+   an organisation API token. They also ask for a way to identify the project (its homepage or
+   repository) - for us that is <https://github.com/SKajto/PUB-Template-Parameter-Editor>.
+4. Only trusted, maintainer-approved commits are signed. In this repository the release workflow is
+   gated by a protected environment, and signing secrets live in a separate environment so the CI
+   job that runs untrusted pull-request code never sees the token.
+
+The workflow side is prepared but deliberately not yet executing: the `signpath-preparation` job in
+`.github/workflows/release.yml` runs only when the repository variable `SIGNPATH_ENABLED` is
+`true`, checks that `SIGNPATH_ORGANIZATION_ID`, `SIGNPATH_SIGNATION_POLICY_ID` and the environment
+secret `SIGNPATH_API_TOKEN` are all present, writes the signature configuration file that names the
+executable and its source URL, and then stops with the remaining instruction. It does not reference
+SignPath's GitHub action, because that action's commit SHA has not been resolved and verified with
+the procedure below; adding an unpinned or guessed third-party action would break the immutability
+rule this repository follows for every other action. Until signing is actually wired and a signed
+build was produced, every artifact in this project is recorded as unsigned.
+
 ## Identity version and provenance
 
 Use a release map such as v1.2.3 -> MSIX 1.2.3.0, validating the applicable Store range/ordering rules. Follow current Store guidance reserving the fourth segment as 0 for the package scheme, and reject collisions/downgrades. Do not use a raw GitHub run number in the reserved field. Prereleases and hotfixes need a documented monotonic mapping.

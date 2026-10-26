@@ -5,10 +5,10 @@ using PubTemplateEditor.Infrastructure;
 namespace PubTemplateEditor.Integration.Tests;
 
 /// <summary>
-/// Evidence tests against the dated reference .dta samples shipped in examples/.
-/// They run only when the sample files are present (they are part of this
-/// instruction package, not guaranteed in every fork) and assert the exact
-/// counts independently verified with an external XML parser on 2026-10-25.
+/// Evidence tests against the native .dta samples on a maintainer's disk. The sample files are user
+/// content and are not part of the repository, so the theory simply has no rows where they are
+/// absent - never a false pass. The counts below were verified independently with an external XML
+/// parser on 2026-10-25 against the bytes of those files.
 /// </summary>
 public class NativeEvidenceTests
 {

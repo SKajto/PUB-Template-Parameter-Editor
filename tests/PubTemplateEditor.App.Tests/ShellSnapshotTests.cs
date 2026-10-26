@@ -7,6 +7,7 @@ using PubTemplateEditor.App.ViewModels;
 using PubTemplateEditor.Core.Model;
 using PubTemplateEditor.Infrastructure;
 using Xunit;
+using PubTemplateEditor.TestSupport;
 using ShellWindow = PubTemplateEditor.App.MainWindow;
 
 namespace PubTemplateEditor.UiTests;
@@ -32,6 +33,22 @@ public class ShellSnapshotTests
 
     private static Rect WindowRect => new(0, 0, 1240, 780);
 
+    /// <summary>
+    /// Screenshots are taken over the native samples when they are on disk; otherwise the same view is
+    /// rendered over synthetic containers, so a CI run still produces comparable pictures.
+    /// </summary>
+    private static string ScreenshotsSamples()
+    {
+        if (TestSamples.HasNative("requirements_specification_yps.dta"))
+        {
+            return TestSamples.SamplesDirectory;
+        }
+
+        string dir = Path.Combine(Path.GetTempPath(), "pubte-shot-samples-" + Guid.NewGuid().ToString("N"));
+        TestSamples.WriteSyntheticFolder(dir, "requirements_specification_yps.dta", "example.dta");
+        return dir;
+    }
+
     private void Snapshot(string fileName, ThemeChoice theme, Action<WorkspaceViewModel>? prepare = null)
     {
         _host.Do(() =>
@@ -41,7 +58,7 @@ public class ShellSnapshotTests
             var settings = new EditorSettings
             {
                 Theme = theme.ToString(),
-                LastFolder = Path.Combine(ThemeTests.RepoRoot(), "examples"),
+                LastFolder = ScreenshotsSamples(),
             };
             var vm = new WorkspaceViewModel(new SettingsService(settingsDir), settings);
             prepare?.Invoke(vm);

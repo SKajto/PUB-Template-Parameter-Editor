@@ -3,6 +3,7 @@ using PubTemplateEditor.App;
 using PubTemplateEditor.App.ViewModels;
 using PubTemplateEditor.Core.Model;
 using PubTemplateEditor.Infrastructure;
+using PubTemplateEditor.TestSupport;
 using Xunit;
 
 namespace PubTemplateEditor.UiTests;
@@ -267,6 +268,70 @@ public sealed class SaveFlowTests : IDisposable
         });
     }
 
+    /// <summary>
+    /// What a completed save leaves behind. A change that was written is gone from the stage - the badge,
+    /// the review row and the parameter marker - while a change the user deliberately left unticked stays
+    /// where it was, because "not now" is not "not ever".
+    /// </summary>
+    [Fact]
+    public async Task ACompletedSaveEmptiesTheStageOfEverythingItWrote()
+    {
+        string templates = Sub("templates");
+        string path = WriteTemplate(templates, "t1.dta", TemplateXml(Variable("alpha", "OLD_A"), Variable("beta", "OLD_B")));
+        string state = Sub("state");
+
+        WorkspaceViewModel vm = await ReadAllAsync(templates, state);
+        Stage(vm, "alpha", "A_NEW");
+        Stage(vm, "beta", "B_NEW");
+        Assert.Equal(2, vm.StagedChangeCount);
+
+        _host.Do(() =>
+        {
+            vm.OpenReviewCommand.Execute(null);
+            vm.ReviewRows.Single(r => r.ParameterName == "beta").IsSelected = false;
+        });
+        await SaveOnlyAsync(vm);
+
+        _host.Do(() =>
+        {
+            Assert.Equal("Written", vm.LastSaveOutcome);
+            Assert.Equal(1, vm.StagedChangeCount);
+            Assert.Contains("beta", vm.ReviewRows.Single().ParameterName, StringComparison.Ordinal);
+            // Unticking is remembered across the rebuild, so a leftover row is not silently re-selected.
+            Assert.False(vm.ReviewRows.Single().IsSelected, "a change the user cleared came back ticked");
+            Assert.Contains("Tick at least one", vm.SaveUnavailableReason, StringComparison.Ordinal);
+        });
+
+        string partlySaved = File.ReadAllText(path);
+        Assert.Contains("value=\"A_NEW\"", partlySaved, StringComparison.Ordinal);
+        Assert.Contains("value=\"OLD_B\"", partlySaved, StringComparison.Ordinal);
+
+        _host.Do(() => vm.SelectAllReviewCommand.Execute(null));
+        await SaveOnlyAsync(vm);
+
+        _host.Do(() =>
+        {
+            Assert.False(vm.HasStagedChanges, "the saved change stayed in the stage");
+            Assert.Equal(0, vm.StagedChangeCount);
+            Assert.Empty(vm.ReviewRows);
+            Assert.Equal("Written", vm.LastSaveOutcome);
+            Assert.Equal("Saved 1 field(s) in 1 template file(s)", vm.SaveOutcomeTitle);
+            Assert.Contains("Nothing is staged", vm.SaveUnavailableReason, StringComparison.Ordinal);
+            Assert.Contains("stage of everything saved is cleared", vm.ActionNotice ?? string.Empty, StringComparison.Ordinal);
+        });
+
+        string fullySaved = File.ReadAllText(path);
+        Assert.Contains("value=\"B_NEW\"", fullySaved, StringComparison.Ordinal);
+        Assert.DoesNotContain("OLD_B", fullySaved, StringComparison.Ordinal);
+
+        // The parameter rows drop their staged markers too, so nothing in the shell claims pending work.
+        _host.Do(() =>
+        {
+            Assert.All(vm.VisibleParameters, p => Assert.False(p.HasDrafts));
+            Assert.All(vm.AllFiles, f => Assert.Equal(0, f.StagedEditCount));
+        });
+    }
+
     [Fact]
     public async Task TheSaveActionStaysDisabledWhileNothingUsefulIsTicked()
     {
@@ -364,12 +429,10 @@ public sealed class SaveFlowTests : IDisposable
     [Fact]
     public async Task ASavedChangeInARealContainerSurvivesASecondSaveWithoutLookingLikeAnOutsideEdit()
     {
-        string? samples = SamplesDir();
-        Assert.NotNull(samples);
-
+        // A real .dta container: the native sample when the machine has one, otherwise a synthetic
+        // container with a schema entry and a non-XML mapping entry, so the round trip is comparable.
         string templates = Sub("templates");
-        string path = Path.Combine(templates, "example.dta");
-        File.Copy(Path.Combine(samples!, "example.dta"), path);
+        string path = TestSamples.CopyNativeOrSynthetic(templates, "example.dta");
 
         // Every other entry of the container must come back byte for byte.
         var entriesBefore = ReadEntries(path);

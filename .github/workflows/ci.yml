@@ -1,5 +1,12 @@
 # PR validation for PUB Template Parameter Editor.
-# Runs untrusted contribution code, so: read-only token, no Store secrets, no deploy keys.
+# Runs untrusted contribution code, so: read-only token, no Store secrets, no signing secrets,
+# no deploy keys.
+#
+# Free GitHub plan: this repository is public, so GitHub-hosted runners - including the Windows
+# runner used here - are available at no cost under the fair-use policy for public repositories.
+# The job stays inside that policy: one Windows runner, no build matrix, artifact retention 7 days,
+# no self-hosted runner and no paid feature. Anything that would consume metered minutes of a paid
+# plan (private mirrors, larger runners, concurrency beyond a single group) is deliberately absent.
 #
 # Action references are pinned to immutable commit SHAs. They were resolved from the
 # official repository tag listings on 2026-10-25 (github.com REST API tags endpoint):
@@ -13,7 +20,7 @@ name: CI validation
 on:
   pull_request:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
 
 permissions:
   contents: read
@@ -76,6 +83,18 @@ jobs:
           }
           $tracked = git ls-files | Where-Object { $_ -match '^(bin|obj|artifacts)/|\.pdb$|\.dll$' }
           if ($tracked) { throw "build outputs are tracked in git: $($tracked -join ', ')" }
+        shell: pwsh
+
+      # The native .dta templates in examples/ are user content: committing them would publish
+      # somebody else's product data. The tests work from synthetic containers instead, so CI never
+      # needs the samples and their absence here is correct, not a gap.
+      - name: No template content may be published
+        run: |
+          $templates = git ls-files | Where-Object { $_ -match '\.dta$' }
+          if ($templates) { throw "template content is tracked in git: $($templates -join ', ')" }
+          if (-not (Select-String -Path .gitignore -Pattern 'examples/\*\.dta' -Quiet)) {
+            throw '.gitignore must keep examples/*.dta out of the repository'
+          }
         shell: pwsh
 
       - name: Publish portable single-file EXE (development/optional channel)

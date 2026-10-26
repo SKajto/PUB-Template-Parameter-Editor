@@ -27,6 +27,12 @@ public static class ProductInfo
         "The complete corresponding source for this exact version is published with the " +
         "release of the same version under GPL-3.0-only.";
 
+    /// <summary>The owner's public repository; the project is developed there in the open.</summary>
+    public const string RepositoryUrl = "https://github.com/SKajto/PUB-Template-Parameter-Editor";
+
+    /// <summary>Where the source archive of the running version sits, named after its tag.</summary>
+    public static string ReleaseSourceUrl => RepositoryUrl + "/releases/tag/v" + Version;
+
     public static string Version =>
         typeof(ProductInfo).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
             .InformationalVersion ?? "0.0.0";

@@ -7,6 +7,7 @@ using PubTemplateEditor.App.ViewModels;
 using PubTemplateEditor.Core.Model;
 using PubTemplateEditor.Infrastructure;
 using Xunit;
+using PubTemplateEditor.TestSupport;
 using ShellWindow = PubTemplateEditor.App.MainWindow;
 
 namespace PubTemplateEditor.UiTests;
@@ -31,15 +32,24 @@ public class ShellTests : IDisposable
         return path;
     }
 
-    /// <summary>Copies the tracked native samples into a throwaway folder.</summary>
+    /// <summary>
+    /// A throwaway folder holding template files. Where the native samples are on disk they are used;
+    /// without them (a fresh clone, CI) synthetic containers of the same names and shape stand in, so
+    /// the shell is exercised the same way either way.
+    /// </summary>
     private string SampleFolder(params string[] names)
     {
         string dir = NewTempDir("templates");
-        foreach (string name in names.Length == 0
-            ? Directory.GetFiles(Path.Combine(ThemeTests.RepoRoot(), "examples"), "*.dta")
-            : names.Select(n => Path.Combine(ThemeTests.RepoRoot(), "examples", n)))
+        string[] effective = names.Length == 0
+            ? TestSamples.HasNative("example.dta")
+                ? Directory.GetFiles(TestSamples.SamplesDirectory, "*.dta")
+                    .Select(Path.GetFileName)!.ToArray()
+                : new[] { "example.dta", "requirements_specification_yps.dta", "solution_configuration_specification.dta" }
+            : names;
+
+        foreach (string name in effective)
         {
-            File.Copy(name, Path.Combine(dir, Path.GetFileName(name)), overwrite: true);
+            TestSamples.CopyNativeOrSynthetic(dir, name!);
         }
 
         return dir;
@@ -185,7 +195,11 @@ public class ShellTests : IDisposable
         _host.Do(() =>
         {
             Assert.Equal(2, vm.AllFiles.Count(f => f.Record?.ReadState == TemplateReadState.Loaded));
-            Assert.Equal(234, vm.AllFiles.Single(f => f.FileName == "requirements_specification_yps.dta").Record!.Declarations.Count);
+            // 234 declarations is what the native sample holds; the synthetic stand-in holds three, and
+            // what matters here is that reading really filled the record.
+            int expectedDeclarations = TestSamples.HasNative("requirements_specification_yps.dta") ? 234 : 3;
+            Assert.Equal(expectedDeclarations,
+                vm.AllFiles.Single(f => f.FileName == "requirements_specification_yps.dta").Record!.Declarations.Count);
             Assert.Contains("declaration(s) total", vm.StatusMessage);
             Assert.False(vm.IsBusy);
             Assert.Equal(0.0, vm.Progress);

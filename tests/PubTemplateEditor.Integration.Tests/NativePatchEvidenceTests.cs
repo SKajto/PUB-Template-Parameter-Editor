@@ -6,9 +6,11 @@ using PubTemplateEditor.Infrastructure;
 namespace PubTemplateEditor.Integration.Tests;
 
 /// <summary>
-/// Patching evidence against the dated native .dta samples. The samples are authoritative: they are
-/// opened read-only, patched in memory and never written back. The last assertion of every test is
-/// that the file on disk still has the bytes it had before.
+/// Patching evidence against the native .dta samples. The files live only on a maintainer's disk -
+/// they are user content and are not in the repository - so without them the theory has no rows and
+/// the synthetic container tests in TemplateSaveServiceTests carry that coverage instead. Where the
+/// samples are present they are opened read-only, patched in memory and never written back: the last
+/// assertion of every test is that the file on disk still has the bytes it had before.
 /// </summary>
 public class NativePatchEvidenceTests
 {

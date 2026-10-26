@@ -20,6 +20,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Shared sample policy: native .dta files stay off the repository, synthetic
+         containers stand in everywhere else. Link keeps the solution view tidy. -->
+    <Compile Include="..\TestSampleSupport.cs" Link="TestSupport\TestSampleSupport.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\PubTemplateEditor.App\PubTemplateEditor.App.csproj" />
   </ItemGroup>
 

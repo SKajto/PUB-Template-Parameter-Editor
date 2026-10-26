@@ -7,6 +7,9 @@
     <AssemblyName>PubTemplateEditor</AssemblyName>
     <RootNamespace>PubTemplateEditor.App</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- File icon of the executable and of the window. The artwork is drawn by
+         tools/brand/generate-brand-assets.ps1 in this repository; nothing third-party is embedded. -->
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <DebugType>embedded</DebugType>
   </PropertyGroup>
 
@@ -16,6 +19,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Window and taskbar icon, resolved by pack URI from this assembly. -->
+    <Resource Include="Assets\app.ico" />
     <Resource Include="..\..\LICENSE" Link="Assets\LICENSE.txt" />
     <Resource Include="..\..\NOTICE" Link="Assets\NOTICE.txt" />
     <Resource Include="..\..\THIRD-PARTY-NOTICES.txt" Link="Assets\THIRD-PARTY-NOTICES.txt" />

@@ -1,5 +1,9 @@
 using System;
 using System.IO;
+using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Resources;
 using PubTemplateEditor.App;
 using PubTemplateEditor.App.Infrastructure;
 using PubTemplateEditor.App.ViewModels;
@@ -79,5 +83,52 @@ public class NoticeViewerTests
         {
             Directory.Delete(temp, recursive: true);
         }
+    });
+
+    /// <summary>
+    /// The window, taskbar and Alt+Tab picture. A wrong assembly part in the pack URI does not fail
+    /// the build - it fails at runtime, in a XamlParseException on the first window - so the resource
+    /// is resolved here, and a real window is constructed to prove the same URI works from XAML.
+    /// </summary>
+    [Fact]
+    public void TheApplicationIconIsEmbeddedAndResolvesForEveryWindow() => _host.Dispatcher.Invoke(() =>
+    {
+        var uri = new Uri("pack://application:,,,/PubTemplateEditor;component/Assets/app.ico");
+        StreamResourceInfo? resource = Application.GetResourceStream(uri);
+        Assert.NotNull(resource);
+        Assert.True(resource!.Stream.Length > 1000, "the icon resource looks truncated");
+
+        string temp = Path.Combine(Path.GetTempPath(), "pub-icon-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(temp);
+        try
+        {
+            var vm = new WorkspaceViewModel(new SettingsService(temp), new EditorSettings());
+            var window = new MainWindow(vm);
+            Assert.NotNull(window.Icon);
+            // An .ico decodes to a frame of the multi-frame image, not to a BitmapImage.
+            var frame = Assert.IsAssignableFrom<BitmapSource>(window.Icon);
+            Assert.True(frame.PixelWidth >= 16 && frame.PixelHeight >= 16,
+                $"the icon must decode to a usable frame, got {frame.PixelWidth}x{frame.PixelHeight}");
+            window.Close();
+        }
+        finally
+        {
+            Directory.Delete(temp, recursive: true);
+        }
+    });
+
+    /// <summary>
+    /// The About view has to name where the source of this exact build is, because that is a GPL
+    /// obligation and not a marketing line.
+    /// </summary>
+    [Fact]
+    public void AboutNamesTheRepositoryAndTheSourceOfThisVersion() => _host.Dispatcher.Invoke(() =>
+    {
+        var window = new LicensesWindow();
+        window.Show();
+
+        Assert.Contains("github.com/SKajto/PUB-Template-Parameter-Editor", window.AboutSource);
+        Assert.Contains("/releases/tag/v", window.AboutSource);
+        window.Close();
     });
 }

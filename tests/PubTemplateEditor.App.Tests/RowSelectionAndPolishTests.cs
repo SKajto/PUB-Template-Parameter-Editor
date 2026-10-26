@@ -11,6 +11,7 @@ using PubTemplateEditor.Core.Editing;
 using PubTemplateEditor.Core.Model;
 using PubTemplateEditor.Infrastructure;
 using Xunit;
+using PubTemplateEditor.TestSupport;
 using ShellWindow = PubTemplateEditor.App.MainWindow;
 
 namespace PubTemplateEditor.UiTests;
@@ -34,12 +35,7 @@ public class RowSelectionAndPolishTests
         return path;
     }
 
-    private static string CopySample(string name, string dir)
-    {
-        string target = Path.Combine(dir, name);
-        File.Copy(Path.Combine(ThemeTests.RepoRoot(), "examples", name), target, overwrite: true);
-        return target;
-    }
+    private static string CopySample(string name, string dir) => TestSamples.CopyNativeOrSynthetic(dir, name);
 
     private static WorkspaceViewModel NewViewModel(string settingsDir, string templateDir) =>
         new(new SettingsService(settingsDir), new EditorSettings { LastFolder = templateDir });

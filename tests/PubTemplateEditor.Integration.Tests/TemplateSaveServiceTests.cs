@@ -3,6 +3,7 @@ using PubTemplateEditor.Core.Editing;
 using PubTemplateEditor.Core.Format;
 using PubTemplateEditor.Core.Model;
 using PubTemplateEditor.Infrastructure;
+using PubTemplateEditor.TestSupport;
 
 namespace PubTemplateEditor.Integration.Tests;
 
@@ -42,26 +43,9 @@ public sealed class TemplateSaveServiceTests : IDisposable
 
     private string CopySample(string name = "example.dta")
     {
-        string? samples = FindSamplesDir();
-        Assert.NotNull(samples);
-        string target = Path.Combine(_root, name);
-        File.Copy(Path.Combine(samples!, name), target, overwrite: true);
-        return target;
-    }
-
-    private static string? FindSamplesDir()
-    {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        for (int i = 0; i < 8 && dir is not null; i++, dir = dir.Parent)
-        {
-            string candidate = Path.Combine(dir.FullName, "examples");
-            if (Directory.Exists(candidate) && File.Exists(Path.Combine(candidate, "example.dta")))
-            {
-                return candidate;
-            }
-        }
-
-        return null;
+        // The native sample when this machine carries one, otherwise a synthetic container of the
+        // same shape: the .dta files are user content and are not part of the repository.
+        return TestSamples.CopyNativeOrSynthetic(_root, name);
     }
 
     private TemplateSaveService Service() => new(_state);
@@ -323,7 +307,7 @@ public sealed class TemplateSaveServiceTests : IDisposable
         // it in practice, so the first file is already saved when the second one fails.
         string first = CopySample("example.dta");
         string second = Path.Combine(_root, "second.dta");
-        File.Copy(Path.Combine(FindSamplesDir()!, "example.dta"), second);
+        TestSamples.CopyNativeOrSynthetic(Path.GetDirectoryName(second)!, "example.dta", Path.GetFileName(second));
 
         TemplateReaderService reader = new();
         TemplateRecord firstRecord = reader.Load(first, CancellationToken.None);
@@ -372,7 +356,7 @@ public sealed class TemplateSaveServiceTests : IDisposable
     {
         string first = CopySample();
         string second = Path.Combine(_root, "second.dta");
-        File.Copy(Path.Combine(FindSamplesDir()!, "example.dta"), second);
+        TestSamples.CopyNativeOrSynthetic(Path.GetDirectoryName(second)!, "example.dta", Path.GetFileName(second));
 
         TemplateReaderService reader = new();
         TemplateRecord firstRecord = reader.Load(first, CancellationToken.None);

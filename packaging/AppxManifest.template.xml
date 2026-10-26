@@ -40,7 +40,8 @@
                           Description="Offline editor for PUB template parameters with review-based saving"
                           BackgroundColor="transparent"
                           Square44x44Logo="assets\Square44x44Logo.png"
-                          Square150x150Logo="assets\Square150x150Logo.png">
+                          Square150x150Logo="assets\Square150x150Logo.png"
+                          StoreLogo="assets\StoreLogo.png">
         <uap:DefaultTile Wide310x150Logo="assets\Wide310x150Logo.png"
                          Square71x71Logo="assets\Square71x71Logo.png"
                          Square310x310Logo="assets\Square310x310Logo.png" />
