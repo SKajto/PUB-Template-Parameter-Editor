@@ -3,8 +3,8 @@
 A Windows desktop editor for the variable declarations of PUB template files
 (`.dta`). It is an offline tool: no service, no web view, no telemetry. Edits are
 staged in memory and reach the disk only through an explicit review step.
-It is distributed as one self-contained executable from a GitHub Release, signed
-with a certificate by SignPath Foundation.
+It is distributed as one self-contained executable from a GitHub Release; that
+build carries no code signature, and its SHA-256 is published with the release.
 
 ## What it does
 
@@ -31,7 +31,7 @@ with a certificate by SignPath Foundation.
 | `packaging/` | MSIX manifest, tile assets, `build-msix.ps1` |
 | `tools/brand/` | draws the application icon and tile artwork (see `NOTICE`) |
 | `docs/` | setup, release and format findings |
-| `.github/workflows/` | CI validation, release packaging, signing and release publishing (all pinned by commit SHA) |
+| `.github/workflows/` | CI validation, release packaging and release publishing (all pinned by commit SHA) |
 
 ## Build and test
 
@@ -65,22 +65,20 @@ synthetic containers of the same shape when it does not — see
 `tests/TestSampleSupport.cs`. Before pushing, run the suite once with `examples/`
 renamed away: that is what a fresh clone and CI see.
 
-## Code signing policy
-
-This application is signed with a free certificate provided by
-[SignPath Foundation](https://signpath.org), through [SignPath.io](https://signpath.io)
-(the subscription is being set up, so builds are unsigned until it is active).
+## Privacy, system changes, and why the build is unsigned
 
 - **Privacy:** no user data or any other data are collected or transferred by this
   application. It has no network capability at all.
-- **System changes:** this application does not alter the system — no installer, no
-  service, no startup entry, no registry change, no elevation. It writes only the
-  template files you confirm in Review Save, plus its own files under
-  `%LOCALAPPDATA%\PubTemplateEditor`.
+- **System changes:** it does not alter the system — no installer, no service, no
+  startup entry, no registry change, no elevation. It writes only the template files
+  you confirm in Review Save, plus its own files under `%LOCALAPPDATA%\PubTemplateEditor`.
 - **Uninstall:** delete the program's folder.
-
-What is signed, the team roles and the open gates:
-[docs/CODE_SIGNING_POLICY.md](docs/CODE_SIGNING_POLICY.md).
+- **No code signature.** Free code-signing services for open-source projects require a
+  public trust and visibility record that a repository this new does not have, and a paid
+  certificate is a maintainer decision that has not been made - so every binary here is
+  unsigned. Windows SmartScreen shows *Windows protected your PC* on first run; check the
+  download against the SHA-256 published with the release, and choose *More info* →
+  *Run anyway* only if it matches. [docs/RELEASE_PACKAGING.md](docs/RELEASE_PACKAGING.md).
 
 ## Licensing
 
@@ -104,7 +102,6 @@ continue the work; the result is the owner's responsibility under the same licen
 - [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [SECURITY.md](SECURITY.md)
 - [REQUIREMENTS.md](REQUIREMENTS.md), [ARCHITECTURE.md](ARCHITECTURE.md), [PLAN.md](PLAN.md)
 - [docs/PROJECT_SETUP.md](docs/PROJECT_SETUP.md) — machine and solution setup
-- [docs/RELEASE_PACKAGING.md](docs/RELEASE_PACKAGING.md) — CI, release packaging, signing, GitHub Releases
-- [docs/CODE_SIGNING_POLICY.md](docs/CODE_SIGNING_POLICY.md) — who approves signing, what is signed, privacy
+- [docs/RELEASE_PACKAGING.md](docs/RELEASE_PACKAGING.md) — CI, packaging, publishing, why binaries are unsigned
 - [docs/GPL_RELEASE.md](docs/GPL_RELEASE.md) — source-availability obligations
 - [docs/SAMPLE_FINDINGS.md](docs/SAMPLE_FINDINGS.md) — what the native templates look like

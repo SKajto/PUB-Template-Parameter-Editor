@@ -28,7 +28,7 @@ dotnet publish src/PubTemplateEditor.App/PubTemplateEditor.App.csproj `
 | `src/PubTemplateEditor.App` | WPF shell, view models, themes, packaging of notices |
 | `tests/` | Core unit tests, integration tests on temporary copies, WPF shell tests on an STA host |
 | `packaging/` | MSIX manifest, tile assets, packaging script (local tooling, not a distribution channel) |
-| `.github/workflows/` | CI validation, release packaging, SignPath signing, GitHub Release publishing |
+| `.github/workflows/` | CI validation, release packaging, GitHub Release publishing |
 | `tools/brand/` | draws the application icon and tile artwork |
 | `docs/` | design, format, release and process notes |
 
@@ -45,6 +45,7 @@ dotnet publish src/PubTemplateEditor.App/PubTemplateEditor.App.csproj `
 
 ## Inputs the owner supplies (code and tests do not depend on them)
 
-Native PUB templates for evidence testing (kept local), the SignPath project registration and the
-repository variables/secrets it comes with, and the version tag plus `PUBLISH_GITHUB_RELEASE=true`
-for a release. Track their state in [PLAN.md](../PLAN.md).
+Native PUB templates for evidence testing (kept local), and the version tag plus
+`PUBLISH_GITHUB_RELEASE=true` for a release. The released executable is **not code-signed** -
+[RELEASE_PACKAGING.md](RELEASE_PACKAGING.md) explains why. Track the state of all of this in
+[PLAN.md](../PLAN.md).

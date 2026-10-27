@@ -2,12 +2,11 @@
 
 > [!NOTE]
 > **Channel update, 2026-10-26 (owner decision).** This application is **not** distributed through
-> the Microsoft Store: no Store product or identity is reserved, and no artifact of this project is
-> Store-signed. The shipped artifact is the self-contained single-file
-> `PUB_Template_Parameter_Editor.exe` attached to a GitHub Release, signed by SignPath.io with a
-> certificate by SignPath Foundation. The MSIX packaging in `packaging/` remains as local tooling.
-> Current wording: [docs/RELEASE_PACKAGING.md](RELEASE_PACKAGING.md) and
-> [docs/CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md). The Store-specific lines below are kept as
+> the Microsoft Store: no Store product or identity is reserved, and nothing is store-signed. The
+> shipped artifact is the self-contained single-file `PUB_Template_Parameter_Editor.exe` attached to a
+> GitHub Release, and it carries **no code signature** either - no signing service is available to a
+> project this new, so releases publish SHA-256 hashes instead. The MSIX packaging in `packaging/`
+> remains local tooling. Current wording: [[docs/RELEASE_PACKAGING.md](RELEASE_PACKAGING.md)]. The store-specific lines below are kept as
 > written history rather than rewritten after the fact.
 
 
@@ -69,11 +68,11 @@ Do not substitute dotnet run for published-EXE acceptance. Build success is not 
 
 ## Signing and servicing
 
-The distribution channel is a GitHub Release carrying the single-file executable, and its signature comes from SignPath.io with a certificate by SignPath Foundation (see docs/RELEASE_PACKAGING.md and docs/CODE_SIGNING_POLICY.md). No publisher CA certificate is bought or supplied by the maintainer, and no artifact of this project carries a package-store signature. An artifact built by CI or by a developer is unsigned until submitted to SignPath, and must never be presented otherwise.
+The distribution channel is a GitHub Release carrying the single-file executable, and that executable is **not code-signed**. A free open-source code-signing service declined the project (a repository this new has no public trust or visibility record) and no paid certificate has been acquired, so no binary of this project carries any signature. Never describe a build here as signed, and publish the SHA-256 of every artifact so a download can be checked - see docs/RELEASE_PACKAGING.md. Expect SmartScreen to warn on first run of the downloaded file.
 
 A locally built MSIX is packaged-app testing, not a channel: it is unsigned, its identity placeholders are unresolved on purpose, and offering a package for direct installation would need its own trust setup (certificate matching, side-loading policy) that has not been designed or verified. Do not introduce certificate installation, developer mode or policy changes on a user's managed PC as a prerequisite for the executable; and record accurately whatever environment is used for package testing. Managed-device execution of the released executable is still unverified and remains a test gate.
 
-Rebuild the self-contained payload for supported runtime security patches. Submit a new correctly versioned Store package through the documented release pipeline. Do not implement an updater that modifies files inside the installed MSIX directory. Record source tag, commit, tool/runtime versions and artifact hashes for each channel.
+Rebuild the self-contained payload for supported runtime security patches and publish it as a new correctly versioned release. Do not implement an updater that modifies files inside an installed directory. Record source tag, commit, tool/runtime versions and artifact hashes for each channel.
 
 ## Official documentation verified 25 October 2026
 

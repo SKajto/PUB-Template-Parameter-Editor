@@ -117,13 +117,14 @@ public class CommunityStandardsTests
     {
         string readme = Read("README.md");
         foreach (string file in new[] { "CODE_OF_CONDUCT.md", "CONTRIBUTING.md", "SECURITY.md",
-                                        "docs/CODE_SIGNING_POLICY.md", "docs/SAMPLE_FINDINGS.md" })
+                                        "docs/RELEASE_PACKAGING.md", "docs/SAMPLE_FINDINGS.md" })
         {
             Assert.True(File.Exists(Path.Combine(RepoRoot(), file)), "the README refers to a page that is not there: " + file);
         }
 
-        Assert.Contains("Code signing policy", readme, System.StringComparison.Ordinal);
-        Assert.Contains("SignPath.io", readme, System.StringComparison.Ordinal);
-        Assert.Contains("SignPath Foundation", readme, System.StringComparison.Ordinal);
+        // What the home page promises about the program itself, in words a reader can act on.
+        Assert.Contains("no user data", readme, System.StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("does not alter the system", readme, System.StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("delete the program's folder", readme, System.StringComparison.OrdinalIgnoreCase);
     }
 }

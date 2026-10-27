@@ -4,7 +4,7 @@
 
 | Version | Supported |
 | --- | --- |
-| latest release from the GitHub Releases page (the signed single-file executable) | yes |
+| latest release from the GitHub Releases page (the unsigned single-file executable, with published SHA-256 hashes) | yes |
 | `main` branch (what CI builds) | yes, best effort |
 | older releases | security fixes are applied to the newest release; older ones are rebuilt from the tag when a fix matters |
 
@@ -32,7 +32,9 @@ The program is offline by design, so the interesting attack surface is *the file
   under `%LOCALAPPDATA%\PubTemplateEditor` of the running user.
 - **The distributed executable** is a single self-contained file that extracts its native
   parts to the user's temp directory - ordinary self-contained .NET behaviour, not an installer. It
-  runs under normal Windows policies, and its signature comes from SignPath Foundation.
+  runs under normal Windows policies. It carries **no code signature**, so check the
+  SHA-256 published with the release before running it - a hash that does not match is a
+  supply-chain problem, please report it privately as described below.
 
 ## Reporting a problem
 
@@ -62,5 +64,6 @@ hand-made `.dta`/XML that reproduces the shape is worth more than a large real o
 This project has one maintainer working on it in their own time, so there is no SLA and no bug
 bounty. What you can expect: an acknowledgement, a fix in the next release when the problem is real
 and reproducible, and a credit in the release notes if you want one. What you should not expect:
-support for constructs the format documentation does not define, or a promise about the
-review decisions of third parties such as SignPath Foundation.
+support for constructs the format documentation does not define, and no promise about how
+SmartScreen or antivirus products will treat an unsigned binary (see
+[docs/RELEASE_PACKAGING.md](docs/RELEASE_PACKAGING.md)).

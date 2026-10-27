@@ -7,10 +7,14 @@ namespace PubTemplateEditor.Integration.Tests;
 /// <summary>
 /// The distribution channel and its signing story, checked where it is written down.
 ///
-/// The owner's decision (2026-10-26) is that this application is distributed as a SignPath-signed
-/// single-file executable on a GitHub Release, and not through the Microsoft Store. Half-true
-/// sentences about who signs what are worse than an open gate: they make an unsigned build look
-/// trusted. So the wording is asserted, not just documented.
+/// The distribution channel and the signing status, checked where they are written down.
+///
+/// Owner decisions of 2026-10-26: this application is distributed as a single-file executable on a
+/// GitHub Release, not through the Microsoft Store, and it is **not code-signed** - the free
+/// subscriptions for open-source projects were declined because a new repository has no public trust
+/// record, and no paid certificate has been acquired. Half-true sentences about who signs what are
+/// worse than an open gate: they make an unsigned build look trusted, and a leftover signing job in
+/// a workflow would fail every release run. So the wording and the absence are both asserted.
 /// </summary>
 public class ChannelPolicyTests
 {
@@ -37,7 +41,6 @@ public class ChannelPolicyTests
             "CONTRIBUTING.md",
             "SECURITY.md",
             ".github/PULL_REQUEST_TEMPLATE.md",
-            "docs/CODE_SIGNING_POLICY.md",
             "docs/RELEASE_PACKAGING.md",
             "docs/WINDOWS_PUBLISH.md",
             "docs/GPL_RELEASE.md",
@@ -76,21 +79,56 @@ public class ChannelPolicyTests
     {
         string readme = Read("README.md");
         Assert.Contains("GitHub Release", readme, StringComparison.Ordinal);
-        Assert.Contains("SignPath.io", readme, StringComparison.Ordinal);
-        Assert.Contains("SignPath Foundation", readme, StringComparison.Ordinal);
-        Assert.Contains("Code signing policy", readme, StringComparison.Ordinal);
+        Assert.Contains("no code signature", readme, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("SHA-256", readme, StringComparison.Ordinal);
 
         string release = Read(".github", "workflows", "release.yml");
-        Assert.Contains("signpath/github-action-submit-signing-request", release, StringComparison.Ordinal);
         Assert.Contains("publish-github-release", release, StringComparison.Ordinal);
         Assert.Contains("gh release create", release, StringComparison.Ordinal);
-        // publishing is refused unless the signing job of the same run succeeded
-        Assert.Contains("needs.sign-portable-exe.result == 'success'", release, StringComparison.Ordinal);
+        // the release itself has to say that the binary is unsigned and how to check it
+        Assert.Contains("not code-signed", release, StringComparison.Ordinal);
+        Assert.Contains("SHA256SUMS.txt", release, StringComparison.Ordinal);
 
         // Packaging still exists, but as opt-in tooling rather than a pipeline stage.
         Assert.Contains("buildMsix", release, StringComparison.Ordinal);
         string ci = Read(".github", "workflows", "ci.yml");
         Assert.DoesNotContain("build-msix.ps1", ci, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void NoSigningServiceIsConfiguredOrNamedAnywhereButTheProjectLog()
+    {
+        Assert.False(File.Exists(Path.Combine(RepoRoot(), "docs", "CODE_SIGNING_POLICY.md")),
+            "the signing policy page belonged to a signing subscription this project does not have");
+
+        // No workflow may submit anything to a signer: a job that cannot run would fail every
+        // release, and a leftover secret/variable pair invites someone to re-enable it by accident.
+        foreach (string workflow in Directory.GetFiles(Path.Combine(RepoRoot(), ".github", "workflows"), "*.yml"))
+        {
+            string text = File.ReadAllText(workflow);
+            Assert.DoesNotContain("signpath", text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("signing-request", text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("SIGNPATH_", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("sign-portable-exe", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("signed-portable", text, StringComparison.Ordinal);
+        }
+
+        // The documents a reader or contributor acts on must not point at a signer either. Only
+        // PLAN.md, the project log, records which service was approached and when.
+        string[] files =
+        [
+            "README.md", "SECURITY.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "START_HERE.md",
+            "REQUIREMENTS.md", ".github/PULL_REQUEST_TEMPLATE.md", ".github/CODEOWNERS",
+            "docs/RELEASE_PACKAGING.md", "docs/PROJECT_SETUP.md", "docs/GPL_RELEASE.md",
+            "docs/WINDOWS_PUBLISH.md", "docs/TEST_MATRIX.md", "docs/PRESERVATION_NOTES.md",
+            "packaging/build-msix.ps1", "packaging/AppxManifest.template.xml",
+            "src/PubTemplateEditor.App/Properties/PublishProfiles/PortableWin_x64.pubxml",
+        ];
+        foreach (string file in files)
+        {
+            Assert.False(Regex.IsMatch(Read(file), "signpath", RegexOptions.IgnoreCase),
+                file + " still mentions a signing service that this project does not use");
+        }
     }
 
     [Fact]

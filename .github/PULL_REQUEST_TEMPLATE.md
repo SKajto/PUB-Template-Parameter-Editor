@@ -23,9 +23,9 @@ redesign is hard to review and hard to revert.
 
 Tests run: Core __ / Integration __ / App(WPF) __ → total __.
 
-**What could not be verified here:** <!-- say it plainly. Native PUB round trip, SignPath
-signing, an interactive desktop session and a packaged/sideload scenario are routinely
-unavailable; an unverified gate is acceptable, an implied pass is not. -->
+**What could not be verified here:** <!-- say it plainly. The native PUB round trip, an
+interactive desktop session and a packaged/sideload scenario are routinely unavailable here; an
+unverified gate is acceptable, an implied pass is not. -->
 
 ## Constraints this respects
 
@@ -41,7 +41,7 @@ unavailable; an unverified gate is acceptable, an implied pass is not. -->
 ## If the pull request touches these, say so explicitly
 
 `.github/workflows/**`, `packaging/**`, `Directory.Build.props`, `global.json`,
-`*.pubxml`, `tools/brand/**` — a signed release attests to the automated build of these files as
-much as of the C# sources, so they get the closest review. Note also that WPF fails a forward
+`*.pubxml`, `tools/brand/**` — the released binary is built automatically from these files just as
+much as from the C# sources, so they get the closest review. Note also that WPF fails a forward
 `StaticResource` reference and a wrong pack-URI assembly name **at runtime, not at build time**, so
 such a change needs a test that constructs the window.

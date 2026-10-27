@@ -73,14 +73,9 @@ Community leaders will follow these Community Impact Guidelines in determining t
 
 PUB Template Parameter Editor has one maintainer and a small number of contributors, so the
 "community leaders" referred to above are the repository owners listed in
-[docs/CODE_SIGNING_POLICY.md](docs/CODE_SIGNING_POLICY.md). Reports about conduct in this repository
-are handled by them; nothing about a report is shared with the person reported, and the reporter's
-account is not exposed in issues or commits.
-
-A binary signed through SignPath Foundation is published under their name, so projects using that
-free signing service are additionally bound by the SignPath Foundation conditions and code of
-conduct at <https://signpath.org/terms>. Violations there can pause the subscription or revoke the
-certificate for everyone who uses it, which is a community matter and not only a technical one.
+[.github/CODEOWNERS](.github/CODEOWNERS). Reports about conduct in this repository are handled
+by them; nothing about a report is shared with the person reported, and the reporter's account is
+not exposed in issues or commits.
 
 ## Licensing of this document
 

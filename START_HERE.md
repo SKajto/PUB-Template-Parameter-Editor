@@ -1,11 +1,12 @@
 # PUB Template Parameter Editor fresh project starter
 
 > [!NOTE]
-> **Channel update, 2026-10-26.** Kept as the original brief, with one change: this
-> application is distributed as a
-> SignPath-signed GitHub Release, not through the Microsoft Store, and no Store identity
-> exists. Current build steps: [docs/PROJECT_SETUP.md](docs/PROJECT_SETUP.md); what has actually
-> been done and what is still open: [PLAN.md](PLAN.md).
+> **Channel update, 2026-10-26.** Kept as the original brief, with two changes: this application
+> is distributed as a GitHub Release rather than through the Microsoft Store, and that release is
+> **not code-signed** (no signing service is available to a project this new - releases publish
+> SHA-256 hashes instead). See [docs/RELEASE_PACKAGING.md](docs/RELEASE_PACKAGING.md). Current build
+> steps: [docs/PROJECT_SETUP.md](docs/PROJECT_SETUP.md); what has actually been done and what is
+> still open: [PLAN.md](PLAN.md).
 
 Revision 4, 25 October 2026. This is a complete instruction package for creating a new application from an empty project directory. It contains specifications and configuration examples, not application source or a compiled executable. No prior implementation or completed milestone is assumed.
 

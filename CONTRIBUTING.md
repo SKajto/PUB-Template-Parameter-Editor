@@ -61,12 +61,12 @@ discussed in the pull request. Windows is required for the WPF test project.
 ## Pull requests
 
 Fill in the template. In short: describe the behaviour change, name the tests that prove it,
-state what you could not verify (native PUB round trip, the SignPath signing subscription, a
-real desktop session), and do not add build outputs, binaries or template files.
+state what you could not verify (native PUB round trip, a real desktop session, an
+installed/packaged scenario), and do not add build outputs, binaries or template files.
 
 Build scripts, `global.json`, `Directory.Build.props` and `.github/workflows/*` are reviewed as
-carefully as program code: a signature over a release attests to the automated build of those
-files as much as of the C# sources.
+carefully as program code: the released binary is built automatically from those files just as
+much as from the C# sources, so a change to them is a change to what gets distributed.
 
 Commits should be self-contained and describe *why*. English is used for code, comments and
 commit messages so that the whole history stays readable to everyone.

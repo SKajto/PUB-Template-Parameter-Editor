@@ -1259,6 +1259,48 @@ need the account and the agreement, and neither is done from here without an exp
   the history note only where historical text remains (`REQUIREMENTS.md`, `START_HERE.md`,
   `docs/WINDOWS_PUBLISH.md`, `docs/TEST_MATRIX.md`).
 
+### 2026-10-26 - Code signing dropped: the project was refused by SignPath
+
+- Owner report: the SignPath Foundation free-code-signing application was **refused** - a freshly
+  created repository does not provide the public trust and visibility level their conditions require.
+  Instruction: remove everything relating to signing the application. There is now no signer of any
+  kind for this project, and the plan is not to look for another one: a commercial Authenticode
+  certificate is paid and identity-verified and would be a separate owner decision, and self-signed
+  certificates buy a warning that looks like a signature without any trust - worse than honesty.
+- What was removed:
+  - `docs/CODE_SIGNING_POLICY.md` deleted (it existed for SignPath's conditions);
+  - `sign-portable-exe` job, the pinned `signpath/github-action-submit-signing-request` action, the
+    `signing-signpath` environment, the `SIGNPATH_*` variables/secret and the "refuse to publish an
+    unsigned binary" gate removed from `.github/workflows/release.yml`; the release now publishes the
+    `package` job's own artifacts directly, still gated on `vars.PUBLISH_GITHUB_RELEASE=true`;
+  - SignPath wording removed from README (the section is now "Privacy, system changes, and why the
+    build is unsigned"), SECURITY.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md, PULL_REQUEST_TEMPLATE.md,
+    CODEOWNERS, `docs/PROJECT_SETUP.md`, `docs/WINDOWS_PUBLISH.md`, `START_HERE.md`, `REQUIREMENTS.md`,
+    `docs/TEST_MATRIX.md`, `packaging/AppxManifest.template.xml`, `packaging/build-msix.ps1`
+    (`signedBy` now says plainly that nothing here is signed) and the portable publish profile header;
+  - `ci.yml`: "no signing secrets" and the "(unsigned)" artifact label dropped - "unsigned" only makes
+    sense as a contrast to something that no longer exists.
+- What replaced it, because an unsigned download still has to be checkable:
+  - every release asset gets a SHA-256 (`SHA256SUMS.txt`, with an explicit line saying the build is
+    not code-signed) and the release notes print the executable's hash plus the exact PowerShell
+    command to recompute it, and explain the SmartScreen prompt (*More info* -> *Run anyway*) as a
+    consequence of being unsigned rather than as evidence of a problem;
+  - file metadata (product name, one version everywhere in the build) is still verified by CI - with no
+    signature, that is the only version information a reader can check against the tag;
+  - `docs/RELEASE_PACKAGING.md` gained a "Releases are unsigned, and say so" section. It explains the
+    situation **without naming the service**: shipped documents should not advertise a third party's
+    rejection, and one paragraph is enough for a future maintainer to know the option was considered.
+    The named refusal is recorded here, in the project log.
+- New guard: `ChannelPolicyTests.NoSigningServiceIsConfiguredOrNamedAnywhereButTheProjectLog` -
+  `docs/CODE_SIGNING_POLICY.md` must not come back, no workflow may contain a signing action,
+  `SIGNPATH_`, `sign-portable-exe` or `signed-portable`, and none of the shipped documents may mention
+  a signing service. If signing is ever added, that test is the list of places whose labels have to
+  change together.
+- Open owner action, outside the repository: delete the `signing-signpath` environment and any
+  `SIGNPATH_*` variables/secret in GitHub settings if they were created, since nothing reads them now.
+- Verified: full suite green after the removal - Core 89 + Integration 53 + App/WPF 86 = 228 tests,
+  0 failed, 0 warnings. CI for the pushed commit reported separately.
+
 ## Deferred scope
 
 Linux UI, additional architectures, parameter creation/deletion/renaming, presets, recursive folders, in-app PUB generation, browser hosting and custom installer/updater services are outside this initial Windows release. Keep the domain core independent without building a second UI.

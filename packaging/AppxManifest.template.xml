@@ -5,7 +5,7 @@
   A -Strict (submission) build rejects any unresolved REPLACE_* token; see docs/GITHUB_STORE_RELEASE.md.
   runFullTrust is required because the payload is a self-contained Win32/WPF executable.
   This package is local/packaged-app tooling, not a distribution channel: the project ships a
-  SignPath-signed single-file executable on GitHub and publishes nothing to the Microsoft Store.
+  unsigned single-file executable on GitHub and publishes nothing to the Microsoft Store.
   The identity values below stay unresolved placeholders, and no publisher CA certificate is bought.
 -->
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
