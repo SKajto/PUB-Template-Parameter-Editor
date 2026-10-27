@@ -6,6 +6,18 @@ staged in memory and reach the disk only through an explicit review step.
 It is distributed as one self-contained executable from a GitHub Release; that
 build carries no code signature, and its SHA-256 is published with the release.
 
+The workspace in dark mode: the templates of one folder at the left, the declarations of
+the selected template in the table, and the three editable fields of the selected
+parameter at the right.
+
+<img src="docs/images/app-dark.png" width="880"
+     alt="Dark mode screenshot: on the left a list of four .dta templates with checkboxes, in the middle a table of parameters with the columns name, access, description and default value, on the right the details form of the parameter welcome_message with its value, access and description fields.">
+
+*Every name and value in the picture is invented:* the templates are synthetic `.dta`
+containers written by `tests/PubTemplateEditor.App.Tests/ReadmeImageTests.cs`, which is
+also what regenerates this image (`PUBTE_CAPTURE_README_IMAGES=1`). No real PUB template
+is ever shown, and none is in this repository.
+
 ## What it does
 
 - Lists the templates of one folder and reads their declarations without writing anything.
@@ -15,6 +27,12 @@ build carries no code signature, and its SHA-256 is published with the release.
 - **Review Save** is the only write path: it lists every pending change per file, shows the
   change in place inside the full value, lets you select the rows to apply, and then patches the
   exact source spans of the XML — unrelated bytes and other container entries stay untouched.
+
+  <img src="docs/images/review-dark.png" width="880"
+       alt="Dark mode screenshot of the review step: a table of three staged changes across two templates, each row with a checkbox, the template name, the field, the current value and the proposed value, with Select all, Back and Save buttons below.">
+
+  Review of three staged changes over two templates - nothing has been written yet, and
+  only *Save* here touches a file.
 - Keeps a timestamped backup and a recovery journal beside the user's settings; detects outside
   edits by content fingerprint before writing.
 - Light and dark theme, resizable columns, remembered folders, drag-and-drop of a folder or a
