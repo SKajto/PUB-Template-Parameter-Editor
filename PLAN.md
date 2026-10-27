@@ -1205,6 +1205,34 @@ protection; a version tag plus `PUBLISH_GITHUB_RELEASE=true` for the first signe
 PUB round trip. Publishing a GitHub Release and registering with SignPath are owner actions - they
 need the account and the agreement, and neither is done from here without an explicit instruction.
 
+### 2026-10-26 - Code signing policy trimmed, privacy wording corrected (owner review)
+
+- The README section had grown past its purpose, and one sentence was wrong. It copied the wording
+  SignPath suggests as an example ("will not transfer any information to other networked systems
+  *unless specifically requested by the user or the person installing or operating it*"), which
+  implies the program might transfer data on request. It does not: it transfers nothing, under any
+  circumstance, and has no network capability at all.
+- Both documents now state only what is needed, in the owner's terms:
+  - signing: "signed with a free certificate provided by SignPath Foundation (through SignPath.io)",
+    with one honest status note - the subscription is being set up, so builds are unsigned until it is
+    active;
+  - privacy: no user data, and no data of any kind, are collected or transferred by this application;
+  - system changes: the application does not alter the system - no installer, no service, no startup
+    entry, no registry change, no elevation; it writes only the template files confirmed in Review
+    Save and its own files under `%LOCALAPPDATA%\PubTemplateEditor`;
+  - uninstall: delete the program's folder.
+- `docs/CODE_SIGNING_POLICY.md` keeps only what the SignPath conditions actually ask a project to
+  publish: the SignPath sentence and its pending status, what is signed and what is not, privacy,
+  system changes and uninstallation, the three roles (Author / Reviewer / Approver) with links and the
+  MFA requirement, four bullets on build provenance and file metadata, and the open gates for the
+  owner. Dropped: the long conditions table, the reputation and licence discussion and the channel
+  essay - the first two live in `docs/RELEASE_PACKAGING.md`, where they belong, and duplication is
+  what let the two copies disagree in the first place.
+- History note: an earlier entry in this file quotes the "unless specifically requested" sentence as
+  what was written at the time. It is left as the record and superseded by this entry.
+- Verified: Integration 52 tests green, including `ChannelPolicyTests` (no forbidden signing claim) and
+  `CommunityStandardsTests` (README links resolve, the required wording is present); 0 warnings.
+
 ## Deferred scope
 
 Linux UI, additional architectures, parameter creation/deletion/renaming, presets, recursive folders, in-app PUB generation, browser hosting and custom installer/updater services are outside this initial Windows release. Keep the domain core independent without building a second UI.

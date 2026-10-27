@@ -72,25 +72,20 @@ renamed away: that is what a fresh clone and CI see.
 
 ## Code signing policy
 
-Everything this project publishes is signed the same way: a free certificate
-provided by [SignPath.io](https://signpath.io), certificate by
-[SignPath Foundation](https://signpath.org). That covers the downloadable
-executable, and a package would be signed through the same job if a packaged
-channel were ever used. No other signer is used, and nothing here is
-Store-signed.
+This application is signed with a free certificate provided by
+[SignPath Foundation](https://signpath.org), through [SignPath.io](https://signpath.io)
+(the subscription is being set up, so builds are unsigned until it is active).
 
-- **Privacy:** this program will not transfer any information to other networked
-  systems unless specifically requested by the user or the person installing or
-  operating it. It is offline: no account, no update service, no telemetry.
-- **System changes:** it installs nothing, needs no elevation, and changes template
-  files only through Review Save, which shows every pending change, keeps a backup
-  of each file it replaces and can be cancelled per file.
-- **Uninstall:** delete the program's folder - there is no installer, no service and no
-  startup entry. Its user data lives in `%LOCALAPPDATA%\PubTemplateEditor`
-  (settings, backups and the recovery journal) and can be removed separately.
-- **Team roles** (Author / Reviewer / Approver), the signing configuration and the
-  build provenance are described in
-  [docs/CODE_SIGNING_POLICY.md](docs/CODE_SIGNING_POLICY.md).
+- **Privacy:** no user data or any other data are collected or transferred by this
+  application. It has no network capability at all.
+- **System changes:** this application does not alter the system — no installer, no
+  service, no startup entry, no registry change, no elevation. It writes only the
+  template files you confirm in Review Save, plus its own files under
+  `%LOCALAPPDATA%\PubTemplateEditor`.
+- **Uninstall:** delete the program's folder.
+
+What is signed, the team roles and the open gates:
+[docs/CODE_SIGNING_POLICY.md](docs/CODE_SIGNING_POLICY.md).
 
 ## Licensing
 
