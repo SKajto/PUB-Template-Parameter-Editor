@@ -181,7 +181,10 @@ jobs:
             Tee-Object artifacts/SHA256SUMS.txt
           'commit: ' + (git rev-parse HEAD)  | Tee-Object -Append artifacts/SHA256SUMS.txt
           'dotnet: ' + (dotnet --version)    | Tee-Object -Append artifacts/SHA256SUMS.txt
-          'status: this build is NOT code-signed; no signer is available to this project' |
+          'status: built and uploaded UNSIGNED by CI; any self-signed signature is applied locally' |
+            Tee-Object -Append artifacts/SHA256SUMS.txt |
+            Out-Null
+          'status: a self-signed chain is not trusted by Windows, so treat these hashes as the check' |
             Tee-Object -Append artifacts/SHA256SUMS.txt
         shell: pwsh
 
@@ -251,9 +254,9 @@ jobs:
             echo "Self-contained 64-bit Windows executable: run it directly, no installer and no"
             echo ".NET runtime to install. Requires Windows 10/11 x64."
             echo
-            echo "**This build is not code-signed.** No free code-signing service will vouch for a"
-            echo "repository this new, and a paid certificate is a maintainer decision that has not"
-            echo "been made. Check the download against the SHA-256 below (also in \`SHA256SUMS.txt\`):"
+            echo "**This build is not code-signed.** CI has no signing key, and no certificate from"
+            echo "anyone Windows trusts is in use. Check the download against the SHA-256 below (also"
+            echo "in \`SHA256SUMS.txt\`):"
             echo
             echo "\`\`\`"
             echo "$sha  PUB_Template_Parameter_Editor.exe"

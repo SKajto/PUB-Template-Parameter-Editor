@@ -32,9 +32,10 @@ The program is offline by design, so the interesting attack surface is *the file
   under `%LOCALAPPDATA%\PubTemplateEditor` of the running user.
 - **The distributed executable** is a single self-contained file that extracts its native
   parts to the user's temp directory - ordinary self-contained .NET behaviour, not an installer. It
-  runs under normal Windows policies. It carries **no code signature**, so check the
-  SHA-256 published with the release before running it - a hash that does not match is a
-  supply-chain problem, please report it privately as described below.
+  runs under normal Windows policies. The most it can carry is a **self-signed** signature,
+  which no trust provider on your machine has any reason to believe: verify the SHA-256 published
+  with the release before running it. A hash that does not match, or a signed copy that reports
+  `HashMismatch`, is a supply-chain problem - please report it privately as described below.
 
 ## Reporting a problem
 

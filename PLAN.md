@@ -1324,6 +1324,58 @@ need the account and the agreement, and neither is done from here without an exp
 - Verified: the suite was run on this exact content before the rewrite - Core 89 + Integration 53 +
   App/WPF 86 = 228, 0 failed, 0 warnings - and the rewritten history carries the same trees.
 
+### 2026-10-27 - README screenshots, and a self-signed local signature on the built executable
+
+**Screenshots (previous commit).** `docs/images/app-dark.png` and `docs/images/review-dark.png` are
+rendered by `tests/PubTemplateEditor.App.Tests/ReadmeImageTests.cs` from synthetic demo containers -
+**no real PUB template is ever drawn**, and the test asserts the folder it renders holds exactly the
+four invented files. Generation is opt-in (`PUBTE_CAPTURE_README_IMAGES=1`); the always-on part checks
+the images the README points at exist, decode at 1240x780, stay dark and contain light pixels where
+text should be. Measured layout in the picture: parameter table 514x533 at (328,188) with 4 742 light
+pixels, review list 475x566 with 7 877. The first attempt hung for two minutes and killed the test
+host: closing a window with staged changes raises the real modal prompt, and nobody was there to
+answer - the capture now uses the `NavigationGuard` seam and asserts the prompt was asked once.
+
+**Self-signing, on the owner's instruction.** The local code-signing certificate
+`CN=PUB Template Parameter Editor Local Self-Signed` (already in `Cert:\CurrentUser\My`, created
+2026-10-16, valid to 2031-10-15, SHA-1 thumbprint `FB0885A4472AA277326B4C061893B64CB0A4FCBB`) is now
+applied to the built executable by `tools/signing/self-sign.ps1`.
+
+- Executed: republished the portable exe from the current HEAD with release metadata (`-p:Version=0.1.0
+  -p:PublishProfile=PortableWin_x64`, 131 273 851 bytes) so what gets signed matches the pushed
+  source; signed it; read the signature back; then started the signed exe and confirmed the window
+  title `[PUB Template Parameter Editor]`, that the process stayed alive, that the signature survived
+  the run, and stopped every instance afterwards (an instance my own stray command had launched was
+  found and closed too).
+- Observed, and kept in the record rather than polished: `status UnknownError`, "a certificate chain was
+  processed, but terminates in a root certificate that is not trusted by the trust provider". The file
+  hash changes when the signature is appended (before `5D408995…`, after `0F0AAA1A…`), which is why the
+  script prints the post-signature hash and warns that a release must publish that one.
+- What this does and does not move: it proves the bytes came from this key and detects later tampering
+  (`HashMismatch` is a hard failure in the script). It changes nothing about how Windows or antivirus
+  treat the download - the chain is untrusted, so SmartScreen still shows *Windows protected your PC*.
+  **Build success, self-signature, native PUB acceptance and device policy remain four separate gates**,
+  and a self-signature advances none of the last two. Whether an antivirus product reacts differently
+  to a self-signed file was not observed and stays unverified.
+- Key handling: the private key stays in the user's store and the script refuses to export it
+  (`NonExportable`, no `Export-PfxCertificate`); only the public certificate is committed
+  (`tools/signing/PUB-Template-Parameter-Editor-self-signed.cer`, DER, 891 bytes). `.gitignore` now
+  keeps `*.pfx`, `*.pvk`, `*.spc`, `*.snk` out of the repository. CI cannot sign: the key is not
+  exportable and is not in the pipeline, so a GitHub Release asset is unsigned unless the maintainer
+  signs it locally just before attaching it.
+- Wording swept to match: README ("No signature Windows trusts"), SECURITY (verify the hash; a
+  `HashMismatch` copy is a supply-chain report), `docs/RELEASE_PACKAGING.md` gained "Self-signing on a
+  maintainer's machine (integrity, not trust)" with the cert's identity, validity and the observed
+  status, and `docs/WINDOWS_PUBLISH.md` says hashes are taken after signing.
+- New guards in `ChannelPolicyTests`: the script must use `Set-`/`Get-AuthenticodeSignature`, keep the
+  key non-exportable, fail on `HashMismatch`, and say the chain is untrusted; the published `.cer` must
+  not contain PKCS#12 content (that would mean a private key had been committed); the thumbprint and
+  the honest `UnknownError` status must appear in the packaging notes; and every Markdown file that
+  mentions self-signing must in the same file say the chain is untrusted **and** that SmartScreen still
+  warns. The forbidden-claim list gained "trusted signature", "signed by a trusted", "no SmartScreen
+  warning" and friends - and one of my own sentences had to be reworded, because it negated a phrase
+  the blunt check cannot tell from a claim.
+
 ## Deferred scope
 
 Linux UI, additional architectures, parameter creation/deletion/renaming, presets, recursive folders, in-app PUB generation, browser hosting and custom installer/updater services are outside this initial Windows release. Keep the domain core independent without building a second UI.

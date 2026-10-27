@@ -91,11 +91,12 @@ renamed away: that is what a fresh clone and CI see.
   startup entry, no registry change, no elevation. It writes only the template files
   you confirm in Review Save, plus its own files under `%LOCALAPPDATA%\PubTemplateEditor`.
 - **Uninstall:** delete the program's folder.
-- **No code signature.** Nothing signs the binaries this project publishes, and no
-  certificate has been acquired. Windows SmartScreen therefore shows *Windows protected your
-  PC* on first run: check the download against the SHA-256 published with the release, and
-  choose *More info* → *Run anyway* only if it matches. Antivirus products may warn as well.
-  [docs/RELEASE_PACKAGING.md](docs/RELEASE_PACKAGING.md).
+- **No signature Windows trusts.** No authority vouches for these binaries. A self-signed
+  certificate (`tools/signing/self-sign.ps1`) can mark which build came from the maintainer's
+  machine and detect later tampering, but the chain is untrusted, so Windows SmartScreen still
+  shows *Windows protected your PC* on a downloaded copy. Judge the download by its SHA-256,
+  published with the release: check it, then choose *More info* → *Run anyway* only if it matches.
+  Antivirus products may warn either way. [docs/RELEASE_PACKAGING.md](docs/RELEASE_PACKAGING.md).
 
 ## Licensing
 

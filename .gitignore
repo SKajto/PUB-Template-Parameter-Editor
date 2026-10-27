@@ -21,3 +21,10 @@ MSIX/
 # shape when they are not. What the samples taught us is written up in
 # docs/SAMPLE_FINDINGS.md; the files themselves are not the licence's "source".
 examples/*.dta
+
+# Private keys and PKCS#12 bundles must never enter the repository. Only the public
+# certificate of a self-signed code-signing key is published (tools/signing/*.cer).
+*.pfx
+*.pvk
+*.spc
+*.snk

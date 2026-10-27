@@ -32,6 +32,53 @@ If signing is ever added, every label has to change in the same commit - README,
 release notes, the packaging notes and `ChannelPolicyTests`, which asserts that no document claims a
 signature that does not exist and that no signing service is configured in the workflows.
 
+## Self-signing on a maintainer's machine (integrity, not trust)
+
+`tools/signing/self-sign.ps1` applies an Authenticode signature from a **self-signed** code-signing
+certificate held in the current user's certificate store:
+
+| | |
+| --- | --- |
+| Signer | `CN=PUB Template Parameter Editor Local Self-Signed` |
+| SHA-1 thumbprint | `FB0885A4472AA277326B4C061893B64CB0A4FCBB` |
+| Valid | 2026-10-16 to 2031-10-15, self-issued (subject equals issuer) |
+| Private key | stays in `Cert:\CurrentUser\My`, created non-exportable; never committed, never copied |
+| Public certificate | `tools/signing/PUB-Template-Parameter-Editor-self-signed.cer`, committed so a signature can be inspected without the key |
+| Timestamp | none by default (`-TimestampUrl` is opt-in); without one the signature is only verifiable while the certificate is valid |
+
+Run it against a built executable, and it prints the status it actually observes instead of a
+reassuring word. On the machine that holds the key the status is:
+
+```
+status                 UnknownError
+status message         A certificate chain was processed, but terminates in a root certificate
+                       that is not trusted by the trust provider
+```
+
+That is the expected result for a self-signed certificate, and it is the honest one:
+
+- **what it proves:** these exact bytes came from this key, and nothing has changed them since. Any
+  later edit shows up as `HashMismatch`, which the script refuses to report as success.
+- **what it does not prove:** that anybody trustworthy vouches for the program. The chain is not
+  trusted, so SmartScreen still shows *Windows protected your PC* and antivirus products may still
+  warn. A self-signed signature must never be presented as though someone trustworthy had vouched for the
+  program, and it is not a reason for a user to install a certificate: trusting a self-signed certificate makes *everything*
+  it has ever signed run without a prompt on that machine.
+- **hashes come after signing:** the signature is appended to the file, so its SHA-256 changes. The
+  release must publish the hash of the signed file (the script prints it and warns if a stale hash
+  would be quoted).
+
+Publishing a signed copy is a manual step in the right order: sign, then attach, then restate the hash -
+`tools/signing/self-sign.ps1`, `gh release upload v<version> <signed exe> --clobber`, and update the
+release notes so the printed SHA-256 is the one of the file that is actually attached. A hash taken
+before signing is a mismatch waiting to happen.
+
+CI cannot do this: the private key is non-exportable and lives in a person's store, not in the
+pipeline. If a signed CI build were ever wanted, an exportable PFX would have to become a repository
+secret - a real secret, with everything that implies, and still untrusted by anyone who has not
+decided to trust it. The GitHub Release copy is unsigned unless the maintainer signs it locally just
+before attaching it, and the release notes say which of the two it is.
+
 ## Portable executable
 
 The portable profile is a single self-contained executable with no installer and no required .NET

@@ -59,6 +59,12 @@ public class ChannelPolicyTests
             "Store signing happens",
             "after Partner Center certification",
             "Store submission",
+            "trusted signature",
+            "signed by a trusted",
+            "signature anyone should trust",
+            "no SmartScreen warning",
+            "SmartScreen no longer warns",
+            "SmartScreen warning disappears",
         ];
 
         foreach (string file in files)
@@ -128,6 +134,79 @@ public class ChannelPolicyTests
             Assert.False(Regex.IsMatch(Read(file), "signpath", RegexOptions.IgnoreCase),
                 file + " still mentions a signing service that this project does not use");
         }
+    }
+
+    [Fact]
+    public void SelfSigningIsWiredAndWordedAsIntegrityAndNeverAsTrust()
+    {
+        string script = Read("tools", "signing", "self-sign.ps1");
+
+        // Real signing through the platform, with the result read back rather than assumed.
+        Assert.Contains("Set-AuthenticodeSignature", script, StringComparison.Ordinal);
+        Assert.Contains("Get-AuthenticodeSignature", script, StringComparison.Ordinal);
+        // The private key must not be able to leave the store through this script.
+        Assert.Contains("NonExportable", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("Export-PfxCertificate", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("Exportable", script.Replace("NonExportable", ""), StringComparison.Ordinal);
+        // A broken signature is a hard failure, and the untrusted-chain reality is spelled out.
+        Assert.Contains("HashMismatch", script, StringComparison.Ordinal);
+        Assert.Contains("throw", script, StringComparison.Ordinal);
+        Assert.Contains("SmartScreen", script, StringComparison.Ordinal);
+        Assert.Contains("not trusted", script, StringComparison.Ordinal);
+
+        // What is published is the public certificate only - the byte pattern of a PKCS#12 bundle
+        // (PKCS #12 is 1.2.840.113549.1.12) in a .cer would mean a private key had been committed.
+        string cer = Path.Combine(RepoRoot(), "tools", "signing", "PUB-Template-Parameter-Editor-self-signed.cer");
+        Assert.True(File.Exists(cer), "the public certificate of the signing key should be published next to the script");
+        byte[] der = File.ReadAllBytes(cer);
+        Assert.True(der.Length < 8192, "a public X.509 certificate is small; this one is not");
+        Assert.Equal(0x30, der[0]); // DER SEQUENCE, not PEM text
+        byte[] pkcs12Oid = [0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x0C];
+        Assert.False(ContainsSequence(der, pkcs12Oid), "that file carries PKCS#12 content: a private key would be committed");
+
+        // The provenance record: which key signed, and until when.
+        string packaging = Read("docs", "RELEASE_PACKAGING.md");
+        Assert.Contains("FB0885A4472AA277326B4C061893B64CB0A4FCBB", packaging, StringComparison.Ordinal);
+        Assert.Contains("self-signed", packaging, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("UnknownError", packaging, StringComparison.Ordinal); // the honest observed status
+        // A signature changes the file, so publishing the pre-signature hash would break verification.
+        Assert.Contains("SHA-256 changes", packaging, StringComparison.Ordinal);
+
+        // Any document that mentions self-signing has to say in the same breath that the chain is not
+        // trusted and that SmartScreen still warns - the pairing is what keeps it honest.
+        string[] docs = Directory.GetFiles(RepoRoot(), "*.md", SearchOption.AllDirectories)
+            .Where(f => !f.Contains(Path.DirectorySeparatorChar + ".reference" + Path.DirectorySeparatorChar)
+                        && !f.Contains(Path.DirectorySeparatorChar + ".git" + Path.DirectorySeparatorChar))
+            .Where(f => File.ReadAllText(f).Contains("self-sig", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        Assert.True(docs.Length >= 2, "the README and the packaging notes should both describe the local signature");
+        foreach (string doc in docs)
+        {
+            string text = File.ReadAllText(doc);
+            Assert.True(
+                text.Contains("not trusted", StringComparison.OrdinalIgnoreCase)
+                || text.Contains("untrusted", StringComparison.OrdinalIgnoreCase),
+                Path.GetFileName(doc) + " offers a self-signed signature without saying the chain is untrusted");
+            Assert.True(text.Contains("SmartScreen", StringComparison.OrdinalIgnoreCase),
+                Path.GetFileName(doc) + " offers a self-signed signature without saying the warning stays");
+        }
+    }
+
+    private static bool ContainsSequence(byte[] haystack, byte[] needle)
+    {
+        for (int i = 0; i + needle.Length <= haystack.Length; i++)
+        {
+            bool run = true;
+            for (int j = 0; j < needle.Length; j++)
+            {
+                if (haystack[i + j] != needle[j]) { run = false; break; }
+            }
+
+            if (run) return true;
+        }
+
+        return false;
     }
 
     [Fact]
