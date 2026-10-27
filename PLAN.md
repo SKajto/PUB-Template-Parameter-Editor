@@ -1301,6 +1301,29 @@ need the account and the agreement, and neither is done from here without an exp
 - Verified: full suite green after the removal - Core 89 + Integration 53 + App/WPF 86 = 228 tests,
   0 failed, 0 warnings. CI for the pushed commit reported separately.
 
+### 2026-10-26 - Log wording trimmed, and the commit messages rewritten
+
+- The documents removed the difference between **stating** a decision and **arguing** it. "Nothing
+  signs these binaries; here is the hash to check" is a fact a reader can act on. A paragraph about
+  how a third party evaluated the project is project history, invites disagreement, and ages badly.
+  So README, SECURITY, START_HERE, REQUIREMENTS, `docs/RELEASE_PACKAGING.md`, `docs/WINDOWS_PUBLISH.md`,
+  `docs/TEST_MATRIX.md` and the `ChannelPolicyTests` header now state the fact only. In PLAN.md the
+  older signing sections are marked **superseded** rather than deleted - they are the record of what
+  was configured and verified at the time, and a reader must not implement from them.
+- Six commit messages were rewritten (`git filter-branch --msg-filter`, content untouched) to drop the
+  service name and the evaluation wording. Verification after the rewrite: 34 commits on `main`, zero
+  occurrences of that name in any message, and the tree of every rewritten commit is byte-identical to
+  its predecessor - the pre-scrub commit's tree hash equals the old pushed tip's
+  (`7b6f4abc86dfdd2f016d60cd8709ecbaee4353e5`), so only the documents changed. Author and committer
+  identity and all author dates are unchanged.
+- Force-push used `--force-with-lease` against the old tip. Honest limit: GitHub still serves the
+  **previous** commit objects by their old SHAs (`fc75e7a`, `a0a83f6`, ...), which is platform
+  behaviour for unreachable objects - they are off the branch and off every ref here, but a direct
+  link, a fork or a cached view can still reach them. Getting them removed from the platform is a
+  request to GitHub support, not something this branch can do by itself.
+- Verified: the suite was run on this exact content before the rewrite - Core 89 + Integration 53 +
+  App/WPF 86 = 228, 0 failed, 0 warnings - and the rewritten history carries the same trees.
+
 ## Deferred scope
 
 Linux UI, additional architectures, parameter creation/deletion/renaming, presets, recursive folders, in-app PUB generation, browser hosting and custom installer/updater services are outside this initial Windows release. Keep the domain core independent without building a second UI.
