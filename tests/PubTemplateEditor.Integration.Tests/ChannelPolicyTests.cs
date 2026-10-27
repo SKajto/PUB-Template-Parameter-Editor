@@ -40,6 +40,9 @@ public class ChannelPolicyTests
             "docs/CODE_SIGNING_POLICY.md",
             "docs/RELEASE_PACKAGING.md",
             "docs/WINDOWS_PUBLISH.md",
+            "docs/GPL_RELEASE.md",
+            "docs/PRESERVATION_NOTES.md",
+            "docs/PROJECT_SETUP.md",
             ".github/workflows/ci.yml",
             ".github/workflows/release.yml",
             "packaging/build-msix.ps1",
@@ -99,8 +102,8 @@ public class ChannelPolicyTests
 
         // The supplied planning documents keep their original wording as history, but they must say
         // up front that the channel changed, so nobody implements from a stale premise.
-        foreach (string doc in new[] { "REQUIREMENTS.md", "docs/PROJECT_SETUP.md", "docs/WINDOWS_PUBLISH.md",
-                                       "docs/TEST_MATRIX.md", "docs/GPL_RELEASE.md" })
+        foreach (string doc in new[] { "REQUIREMENTS.md", "START_HERE.md", "docs/WINDOWS_PUBLISH.md",
+                                       "docs/TEST_MATRIX.md" })
         {
             Assert.Contains("Channel update, 2026-10-26", Read(doc), StringComparison.Ordinal);
         }

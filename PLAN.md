@@ -1233,6 +1233,32 @@ need the account and the agreement, and neither is done from here without an exp
 - Verified: Integration 52 tests green, including `ChannelPolicyTests` (no forbidden signing claim) and
   `CommunityStandardsTests` (README links resolve, the required wording is present); 0 warnings.
 
+### 2026-10-26 - The supplied instruction documents cut back to what they are for
+
+- Asked why documents that describe an excluded channel are still there, and what
+  `PRESERVATION_NOTES.md`/`PROJECT_SETUP.md` are for. Answer: they were written **as instructions for
+  the AI agent** that created the project, and they had drifted into restating decisions that are now
+  recorded once elsewhere. So they were rewritten to present tense and to current reality:
+  - `docs/GPL_RELEASE.md`: 57 to 27 lines - one table of what GPL-3.0-only requires here and where
+    each is met, a line on user template data not being source, and one line on the channel ("no
+    app-store terms apply today; if a channel is added later, review its terms before using it").
+    The Store policy links, the section-6 essay and the certification speculation are gone.
+  - `docs/PROJECT_SETUP.md`: now a setup note - what you need, the commands, the layout, the four
+    rules the repository enforces, and the inputs only the owner can supply.
+  - `docs/PRESERVATION_NOTES.md`: rewritten as "what a save must never touch", each rule naming the
+    test that holds it (`TemplateXmlPatcher`/`TemplatePatcherTests`, `DtaContainer`/
+    `NativePatchEvidenceTests`, `TemplateSaveService`/`SaveFlowTests`, `BulkPlan`/`BulkPlanTests`).
+    This is the reason the file exists: the format constraints are easy to break quietly.
+  - `START_HERE.md` keeps the original brief with a marked channel note; `REQUIREMENTS.md` and
+    `docs/TEST_MATRIX.md` keep their Store-era rows as history under the same note.
+- README gained a short "AI assistance and the instruction files" section: the application was written
+  with the help of an AI coding agent under the owner's direction and review, and `AGENTS.md`,
+  `CODEX_START_PROMPT.md`, `START_HERE.md` and `PLAN.md` are agent instructions published so the work
+  stays reproducible and auditable - anyone may hand the same files to an agent.
+- `ChannelPolicyTests` now scans the rewritten documents for stale signing/channel claims and requires
+  the history note only where historical text remains (`REQUIREMENTS.md`, `START_HERE.md`,
+  `docs/WINDOWS_PUBLISH.md`, `docs/TEST_MATRIX.md`).
+
 ## Deferred scope
 
 Linux UI, additional architectures, parameter creation/deletion/renaming, presets, recursive folders, in-app PUB generation, browser hosting and custom installer/updater services are outside this initial Windows release. Keep the domain core independent without building a second UI.

@@ -1,47 +1,50 @@
-# New project setup
+# Setting up this repository
 
-> [!NOTE]
-> **Channel update, 2026-10-26 (owner decision).** This application is **not** distributed through
-> the Microsoft Store: no Store product or identity is reserved, and no artifact of this project is
-> Store-signed. The shipped artifact is the self-contained single-file
-> `PUB_Template_Parameter_Editor.exe` attached to a GitHub Release, signed by SignPath.io with a
-> certificate by SignPath Foundation. The MSIX packaging in `packaging/` remains as local tooling.
-> Current wording: [docs/RELEASE_PACKAGING.md](RELEASE_PACKAGING.md) and
-> [docs/CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md). The Store-specific lines below are kept as
-> written history rather than rewritten after the fact.
+For anyone building or continuing this project - human or AI agent. The original kickoff briefs are
+[START_HERE.md](../START_HERE.md), [AGENTS.md](../AGENTS.md) and
+[CODEX_START_PROMPT.md](../CODEX_START_PROMPT.md); this file is only the current setup.
 
+## What you need
 
-Begin in a fresh task directory containing this instruction package. Create the application from its requirements and supplied format references. Keep unrelated user files intact if the directory is not completely empty.
+Windows 11 x64, the .NET 10 SDK pinned by `global.json`, Git, and a WPF-capable MSBuild toolchain
+(the .NET SDK is enough to build and test; Visual Studio is convenience only).
 
-## Create the repository and solution
+```powershell
+dotnet restore PubTemplateEditor.slnx
+dotnet build PubTemplateEditor.slnx -c Release
+dotnet test  PubTemplateEditor.slnx -c Release          # three projects, no network needed
 
-1. Initialize a local Git repository if one is not present. Use the supplied .gitignore and add generated-artifact ignores as needed. A public GitHub remote can be configured once its real URL is supplied.
-2. Select a supported patched .NET 10 SDK on the development/build machine. Record the actual version in global.json and document verified setup/build commands in the new application README.
-3. Create the solution and projects below using the supported SDK templates. Use net10.0-windows for App and net10.0 for the portable core/services where practical. Add the appropriate project references.
-4. Configure asInvoker, embedded WPF resources, settings paths and the separate portable publish profile. Implement a minimal runnable window before the complete explorer.
-5. Establish MSIX packaging and GitHub CI early, using draft identity placeholders only until real Partner Center values are available. A submission build must reject placeholders.
-6. Add LICENSE using the recorded GPLv3 choice, accurate copyright details and dependency notices. Do not publish uncleared sample templates or credentials.
+# the distributed artifact
+dotnet publish src/PubTemplateEditor.App/PubTemplateEditor.App.csproj `
+  -c Release -p:PublishProfile=PortableWin_x64 -o artifacts/publish/portable-win-x64
+```
 
-| Project or directory | Initial responsibility |
+## Layout
+
+| Path | Responsibility |
 | --- | --- |
-| src/PubTemplateEditor.App | WPF entry point, views, view models, commands and themes |
-| src/PubTemplateEditor.Core | Declarations, comparison, drafts, review and source patches |
-| src/PubTemplateEditor.Infrastructure | File access, settings, hashing, save/recovery and format containers |
-| tests/PubTemplateEditor.Core.Tests | Meaningful format/domain tests |
-| tests/PubTemplateEditor.Integration.Tests | Temporary-file workflows, conflicts and recovery |
-| packaging/ | MSIX manifest/assets and verified packaging configuration |
-| .github/workflows/ | CI, release packaging and protected Store submission |
-| samples/ | Ignored local native templates for inspection; never a public fixture source by default |
-| tests/Fixtures/ | Redistributable synthetic or explicitly cleared test inputs |
+| `src/PubTemplateEditor.Core` | declarations, comparison, drafts, review model, source patching - no WPF, no file IO |
+| `src/PubTemplateEditor.Infrastructure` | container access, folder scan, settings, hashing, save/backup/recovery |
+| `src/PubTemplateEditor.App` | WPF shell, view models, themes, packaging of notices |
+| `tests/` | Core unit tests, integration tests on temporary copies, WPF shell tests on an STA host |
+| `packaging/` | MSIX manifest, tile assets, packaging script (local tooling, not a distribution channel) |
+| `.github/workflows/` | CI validation, release packaging, SignPath signing, GitHub Release publishing |
+| `tools/brand/` | draws the application icon and tile artwork |
+| `docs/` | design, format, release and process notes |
 
-The configuration examples are not a runnable scaffold. Adapt them into the created projects and verify the actual commands; do not mark a build passed from the existence of a .csproj example. Test-only packages are permitted and are not shipped as production dependencies.
+## Rules the repository enforces
 
-## Initial evidence and missing inputs
+- No template files (`examples/*.dta`) and no build output may be committed; CI and
+  `SamplePolicyTests` check this. Tests write synthetic containers when the real files are absent.
+- Run the test suite once with `examples/` moved away before pushing: that is what a fresh clone and
+  CI see.
+- Every GitHub Action is pinned to a verified commit SHA; see
+  [RELEASE_PACKAGING.md](RELEASE_PACKAGING.md) for the current pins.
+- Third-party packages in the shipped application: none. Justification and notices are required if a
+  requirement genuinely needs one.
 
-The package includes dated observations about three XML reference files and one synthetic XML illustration. It does not include those original XML files or native DTA bytes. Obtain representative native templates and verify their format before implementing native write support. Use synthetic inputs to implement and test independent behavior while that evidence is unavailable.
+## Inputs the owner supplies (code and tests do not depend on them)
 
-The GitHub URL, real copyright holder, actual target PUB version and Store identity/product details must be supplied or selected by the owner. Track missing inputs in PLAN.md with the work they affect. They do not prevent creation of the solution, core models, responsive UI or draft CI/packaging files.
-
-## Source control and milestones
-
-Commit coherent working increments according to project conventions. Record what was executed and demonstrated. The project starts with no completed milestones; update PLAN.md from S0 onward. Building software and preparing workflows are within the implementation task. Creating external accounts, accepting agreements and publishing publicly require a separately authorized release task.
+Native PUB templates for evidence testing (kept local), the SignPath project registration and the
+repository variables/secrets it comes with, and the version tag plus `PUBLISH_GITHUB_RELEASE=true`
+for a release. Track their state in [PLAN.md](../PLAN.md).

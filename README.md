@@ -3,13 +3,8 @@
 A Windows desktop editor for the variable declarations of PUB template files
 (`.dta`). It is an offline tool: no service, no web view, no telemetry. Edits are
 staged in memory and reach the disk only through an explicit review step.
-
-**Status:** development milestones S0–S5 are implemented and covered by 227 automated
-tests (211 of them run without the local template samples, which are not shipped).
-The Windows CI pipeline is green on GitHub: build, all three test projects, the
-licensing and content checks, and the portable single-file executable.
-Distribution is a GitHub Release, signed through SignPath.io; the signing
-subscription and a native PUB round trip are open gates — see [PLAN.md](PLAN.md).
+It is distributed as one self-contained executable from a GitHub Release, signed
+with a certificate by SignPath Foundation.
 
 ## What it does
 
@@ -93,6 +88,16 @@ Copyright (C) PUB Template Parameter Editor contributors. Licensed under
 **GPL-3.0-only** ([LICENSE](LICENSE)); see [NOTICE](NOTICE) for the notice that
 accompanies the binaries, including the artwork provenance and the status of the
 bundled .NET runtime, which is not relicensed.
+
+## AI assistance and the instruction files
+
+This application was written with the assistance of an AI coding agent, under the owner's direction
+and review. A few files in the repository are instructions for that agent rather than program code
+or user documentation, and they are published so the work stays reproducible and auditable:
+`AGENTS.md` (standing rules the agent must follow), `CODEX_START_PROMPT.md` and `START_HERE.md`
+(the original kickoff briefs) and `PLAN.md` (the agent's running record of what it changed, what it
+actually verified, and which gates are still open). Anyone may hand the same files to an agent to
+continue the work; the result is the owner's responsibility under the same licence.
 
 ## Documentation
 
