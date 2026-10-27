@@ -4,8 +4,8 @@
 > **Channel update, 2026-10-26 (owner decision).** This application is **not** distributed through
 > the Microsoft Store: no Store product or identity is reserved, and nothing is store-signed. The
 > shipped artifact is the self-contained single-file `PUB_Template_Parameter_Editor.exe` attached to a
-> GitHub Release, and it carries **no code signature** either - no signing service is available to a
-> project this new, so releases publish SHA-256 hashes instead. The MSIX packaging in `packaging/`
+> GitHub Release, and that release carries **no code signature**: nothing signs these binaries, so it
+> publishes SHA-256 hashes instead. The MSIX packaging in `packaging/`
 > remains local tooling. Current wording: [[docs/RELEASE_PACKAGING.md](RELEASE_PACKAGING.md)]. The store-specific lines below are kept as
 > written history rather than rewritten after the fact.
 

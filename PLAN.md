@@ -929,6 +929,8 @@ Open gates after this step
   frame, hover cards, save on the owner's templates).
 
 ### 2026-10-26 - SignPath terms checked against the repository, and the executable renamed to the product name
+*(Superseded on the same day: signing was dropped afterwards - see "Code signing dropped" at the end of
+this log. The section below is the technical record of what was configured then, not current guidance.)*
 
 SignPath configuration verified, not guessed
 - The conditions page was fetched and read in full (`https://signpath.org/terms`, saved as
@@ -970,11 +972,11 @@ SignPath configuration verified, not guessed
   the build-provenance/metadata rules. README gained the matching **Code signing policy** section
   that links to it. Added `.github/CODEOWNERS` so the review responsibility their roles require is
   declared, with build/packaging/CI files called out as part of the signed binary's source.
-- Two claims of mine that the terms do not support were corrected: a Store price is not forbidden by
-  them (GPL allows charging; what they forbid is commercial *dual licensing* of components), and
-  there is a "verifiable reputation" expectation for executables people run because of the
-  signature - a new repository can simply be declined, with no arbitration. Both are written into
-  the docs instead of being glossed over.
+- Two claims of mine that the terms do not support were corrected at the time: a Store price is not
+  forbidden (GPL allows charging; what the terms forbid is commercial *dual licensing* of components),
+  and the packaging rules they describe apply to components rather than to the application's own
+  licence. *(Superseded the same day: signing was dropped, so this section is a technical record of
+  what was configured then, not current guidance.)*
 - Two gates the conditions create that no workflow can close by itself: the project must already be
   **released in the form to be signed** (no GitHub Release yet), and MFA plus branch protection must
   be enabled by the owner. `StoreRelease.settings.json` no longer keeps a placeholder for the source
@@ -1014,8 +1016,6 @@ Open gates after this step
   reviewer, register the project with SignPath, then set the four variables and `SIGNPATH_ENABLED`.
 - A GitHub Release carrying the executable, source archive and notices (their "already released" and
   "documented" conditions), which needs a version decision from the owner.
-- Whether SignPath accepts a brand-new repository at all - their reputation judgement, not a
-  checkbox.
 
 ### 2026-10-26 - Community standards, and the commits now carry the owner's identity
 
@@ -1225,8 +1225,7 @@ need the account and the agreement, and neither is done from here without an exp
   publish: the SignPath sentence and its pending status, what is signed and what is not, privacy,
   system changes and uninstallation, the three roles (Author / Reviewer / Approver) with links and the
   MFA requirement, four bullets on build provenance and file metadata, and the open gates for the
-  owner. Dropped: the long conditions table, the reputation and licence discussion and the channel
-  essay - the first two live in `docs/RELEASE_PACKAGING.md`, where they belong, and duplication is
+  owner. Dropped: the long conditions table, the licence discussion and the channel essay - the first two live in `docs/RELEASE_PACKAGING.md`, where they belong, and duplication is
   what let the two copies disagree in the first place.
 - History note: an earlier entry in this file quotes the "unless specifically requested" sentence as
   what was written at the time. It is left as the record and superseded by this entry.
@@ -1259,21 +1258,22 @@ need the account and the agreement, and neither is done from here without an exp
   the history note only where historical text remains (`REQUIREMENTS.md`, `START_HERE.md`,
   `docs/WINDOWS_PUBLISH.md`, `docs/TEST_MATRIX.md`).
 
-### 2026-10-26 - Code signing dropped: the project was refused by SignPath
+### 2026-10-26 - Code signing dropped: nothing this project publishes is signed
 
-- Owner report: the SignPath Foundation free-code-signing application was **refused** - a freshly
-  created repository does not provide the public trust and visibility level their conditions require.
-  Instruction: remove everything relating to signing the application. There is now no signer of any
-  kind for this project, and the plan is not to look for another one: a commercial Authenticode
-  certificate is paid and identity-verified and would be a separate owner decision, and self-signed
-  certificates buy a warning that looks like a signature without any trust - worse than honesty.
+- Owner instruction: remove everything relating to signing the application. No code-signing route is
+  available to this project, and no substitute is planned: a commercial Authenticode certificate is a
+  paid, identity-verified purchase and a separate owner decision that has not been made, and a
+  self-signed certificate produces a warning that looks like a signature without carrying any trust -
+  worse than saying plainly that the binary is unsigned. What is documented now is the fact that it is
+  unsigned and what a reader can check instead.
 - What was removed:
-  - `docs/CODE_SIGNING_POLICY.md` deleted (it existed for SignPath's conditions);
-  - `sign-portable-exe` job, the pinned `signpath/github-action-submit-signing-request` action, the
-    `signing-signpath` environment, the `SIGNPATH_*` variables/secret and the "refuse to publish an
-    unsigned binary" gate removed from `.github/workflows/release.yml`; the release now publishes the
-    `package` job's own artifacts directly, still gated on `vars.PUBLISH_GITHUB_RELEASE=true`;
-  - SignPath wording removed from README (the section is now "Privacy, system changes, and why the
+  - `docs/CODE_SIGNING_POLICY.md` deleted, since it existed for a signing subscription this project
+    does not have;
+  - the signing job, its pinned third-party signing action, the protected signing environment, its
+    variables/secret and the "do not publish an unsigned binary" gate removed from
+    `.github/workflows/release.yml`; the release now publishes the `package` job's own artifacts
+    directly, still gated on `vars.PUBLISH_GITHUB_RELEASE=true` plus the environment approval;
+  - wording about who signs what removed from README (the section is now "Privacy, system changes, and why the
     build is unsigned"), SECURITY.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md, PULL_REQUEST_TEMPLATE.md,
     CODEOWNERS, `docs/PROJECT_SETUP.md`, `docs/WINDOWS_PUBLISH.md`, `START_HERE.md`, `REQUIREMENTS.md`,
     `docs/TEST_MATRIX.md`, `packaging/AppxManifest.template.xml`, `packaging/build-msix.ps1`
@@ -1287,17 +1287,17 @@ need the account and the agreement, and neither is done from here without an exp
     consequence of being unsigned rather than as evidence of a problem;
   - file metadata (product name, one version everywhere in the build) is still verified by CI - with no
     signature, that is the only version information a reader can check against the tag;
-  - `docs/RELEASE_PACKAGING.md` gained a "Releases are unsigned, and say so" section. It explains the
-    situation **without naming the service**: shipped documents should not advertise a third party's
-    rejection, and one paragraph is enough for a future maintainer to know the option was considered.
-    The named refusal is recorded here, in the project log.
+  - `docs/RELEASE_PACKAGING.md` gained a "Releases are unsigned, and say so" section: one paragraph
+    that states the fact and the consequences, without relitigating how the option was evaluated. A
+    future maintainer needs to know that signing was considered and is not available, and needs the
+    SmartScreen and hash-verification guidance; nothing else in a public document follows from it.
 - New guard: `ChannelPolicyTests.NoSigningServiceIsConfiguredOrNamedAnywhereButTheProjectLog` -
   `docs/CODE_SIGNING_POLICY.md` must not come back, no workflow may contain a signing action,
   `SIGNPATH_`, `sign-portable-exe` or `signed-portable`, and none of the shipped documents may mention
   a signing service. If signing is ever added, that test is the list of places whose labels have to
   change together.
-- Open owner action, outside the repository: delete the `signing-signpath` environment and any
-  `SIGNPATH_*` variables/secret in GitHub settings if they were created, since nothing reads them now.
+- Open owner action, outside the repository: delete the signing environment and any signing
+  variables/secret that were created in the repository settings, since nothing reads them now.
 - Verified: full suite green after the removal - Core 89 + Integration 53 + App/WPF 86 = 228 tests,
   0 failed, 0 warnings. CI for the pushed commit reported separately.
 

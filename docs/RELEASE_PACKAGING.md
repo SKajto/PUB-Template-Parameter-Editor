@@ -13,18 +13,14 @@ How the two artifacts are produced and validated. Commands and verification stat
 
 ## Releases are unsigned, and say so
 
-There is **no code signing** for this project.
-
-Free code-signing subscriptions for open-source projects require a public trust and visibility
-record - a repository this new cannot offer one, and the application for one was declined. The other
-route is an Authenticode certificate from a commercial CA: paid, identity-verified, and a maintainer
-decision that has not been made. So there is no signer, and the consequences are stated instead of
-hidden:
+There is **no code signing** for this project: nothing signs these binaries, and no Authenticode
+certificate has been acquired (a commercial certificate is paid and identity-verified, which makes it
+a maintainer decision). The consequences are stated instead of hidden:
 
 - every binary this repository produces - CI artifact, GitHub Release asset, anything built locally -
   is **unsigned**;
 - Windows SmartScreen shows *Windows protected your PC* on first run of the downloaded executable
-  (there is no reputation to build on yet), and antivirus products may warn as well;
+  because the file is unsigned and came from the internet, and antivirus products may warn too;
 - each release publishes **SHA-256 hashes** (`SHA256SUMS.txt`, and the executable's hash in the
   release notes) so a download can be checked against what the workflow built;
 - release notes say in plain words that the build is unsigned and how to verify it;

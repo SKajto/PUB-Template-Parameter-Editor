@@ -5,16 +5,14 @@ using Xunit;
 namespace PubTemplateEditor.Integration.Tests;
 
 /// <summary>
-/// The distribution channel and its signing story, checked where it is written down.
-///
 /// The distribution channel and the signing status, checked where they are written down.
 ///
 /// Owner decisions of 2026-10-26: this application is distributed as a single-file executable on a
-/// GitHub Release, not through the Microsoft Store, and it is **not code-signed** - the free
-/// subscriptions for open-source projects were declined because a new repository has no public trust
-/// record, and no paid certificate has been acquired. Half-true sentences about who signs what are
-/// worse than an open gate: they make an unsigned build look trusted, and a leftover signing job in
-/// a workflow would fail every release run. So the wording and the absence are both asserted.
+/// GitHub Release rather than through the Microsoft Store, and it is **not code-signed** - nothing
+/// signs these binaries and no certificate has been acquired. Half-true sentences about who signs
+/// what are worse than an open gate: they make an unsigned build look trusted, and a leftover
+/// signing job in a workflow would fail every release run. So the wording, and the absence of any
+/// signing configuration, are both asserted.
 /// </summary>
 public class ChannelPolicyTests
 {
@@ -113,8 +111,9 @@ public class ChannelPolicyTests
             Assert.DoesNotContain("signed-portable", text, StringComparison.Ordinal);
         }
 
-        // The documents a reader or contributor acts on must not point at a signer either. Only
-        // PLAN.md, the project log, records which service was approached and when.
+        // The documents a reader or contributor acts on must not point at a signer either. The dated
+        // technical record stays in PLAN.md, the project log, where superseded decisions are marked as
+        // superseded instead of being rewritten after the fact.
         string[] files =
         [
             "README.md", "SECURITY.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "START_HERE.md",

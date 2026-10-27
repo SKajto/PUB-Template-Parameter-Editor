@@ -3,8 +3,8 @@
 > [!NOTE]
 > **Channel update, 2026-10-26.** Kept as the original brief, with two changes: this application
 > is distributed as a GitHub Release rather than through the Microsoft Store, and that release is
-> **not code-signed** (no signing service is available to a project this new - releases publish
-> SHA-256 hashes instead). See [docs/RELEASE_PACKAGING.md](docs/RELEASE_PACKAGING.md). Current build
+> **not code-signed** (nothing signs these binaries - the release publishes SHA-256 hashes
+> instead). See [docs/RELEASE_PACKAGING.md](docs/RELEASE_PACKAGING.md). Current build
 > steps: [docs/PROJECT_SETUP.md](docs/PROJECT_SETUP.md); what has actually been done and what is
 > still open: [PLAN.md](PLAN.md).
 
