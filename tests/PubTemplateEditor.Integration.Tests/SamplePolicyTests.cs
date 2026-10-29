@@ -20,7 +20,17 @@ public class SamplePolicyTests
         string root = TestSamples.RepoRoot();
 
         string gitignore = File.ReadAllText(Path.Combine(root, ".gitignore"));
-        Assert.Contains("examples/*.dta", gitignore, StringComparison.Ordinal);
+        Assert.Contains("examples/**/*.dta", gitignore, StringComparison.Ordinal);
+
+        // The pattern has to reach into subfolders: samples kept under examples/<something>/
+        // would otherwise sit one `git add examples/` away from being published. Verified with
+        // git itself rather than by reading the pattern, so a pattern that looks right but does
+        // not match is caught.
+        if (RunGit(root, "rev-parse", "--is-inside-work-tree")?.Trim() == "true")
+        {
+            string probe = Path.Combine("examples", "nested", "probe.dta");
+            Assert.Equal(0, RunGitExitCode(root, "check-ignore", "-q", probe));
+        }
 
         // The knowledge, not the bytes, is what travels with the source.
         Assert.True(File.Exists(Path.Combine(root, "docs", "SAMPLE_FINDINGS.md")),
@@ -52,6 +62,33 @@ public class SamplePolicyTests
 
         Assert.True(templates.Count == 0,
             "template content must not be tracked: " + string.Join(", ", templates));
+    }
+
+    private static int RunGitExitCode(string workingDirectory, params string[] arguments)
+    {
+        try
+        {
+            var start = new ProcessStartInfo("git")
+            {
+                WorkingDirectory = workingDirectory,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            };
+            foreach (string argument in arguments)
+            {
+                start.ArgumentList.Add(argument);
+            }
+
+            using Process process = Process.Start(start)!;
+            process.StandardOutput.ReadToEnd();
+            process.WaitForExit(10_000);
+            return process.ExitCode;
+        }
+        catch (Exception)
+        {
+            return -1;
+        }
     }
 
     private static string? RunGit(string workingDirectory, params string[] arguments)

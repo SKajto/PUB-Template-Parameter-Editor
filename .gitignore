@@ -16,15 +16,21 @@ MSIX/
 .tools/
 
 # Native PUB template samples are user content and stay on a maintainer's disk:
-# they are never committed. The evidence tests verify against their real bytes when
-# present, and tests/TestSampleSupport.cs writes synthetic containers of the same
-# shape when they are not. What the samples taught us is written up in
-# docs/SAMPLE_FINDINGS.md; the files themselves are not the licence's "source".
-examples/*.dta
+# they are never committed. The pattern is recursive, because samples kept in a
+# subfolder of examples/ would otherwise slip past it. The evidence tests verify against
+# their real bytes when present, and tests/TestSampleSupport.cs writes synthetic
+# containers of the same shape when they are not. What the samples taught us is written
+# up in docs/SAMPLE_FINDINGS.md; the files themselves are not the licence's "source".
+examples/**/*.dta
 
 # Private keys and PKCS#12 bundles must never enter the repository. Only the public
 # certificate of a self-signed code-signing key is published (tools/signing/*.cer).
+# A signing service that keeps the key in its own hardware (a cloud card) never gives
+# out a PFX at all, so nothing here could hold such a key legitimately.
 *.pfx
+*.pkcs12
+*.p12
+*.csr
 *.pvk
 *.spc
 *.snk
