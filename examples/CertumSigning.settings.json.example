@@ -1,11 +1,9 @@
 {
   "_comment": [
-    "The shape of a filled-in packaging/CertumSigning.settings.json, for the case where a certificate",
-    "was actually bought and verified. Copy the shape, never the values: a made-up thumbprint would",
-    "make the repository claim a provenance that does not exist, and both the tests and the release",
-    "workflow reject an unrecorded or inconsistent key. The real thumbprint comes from the certificate",
-    "the signing client exposes - the script prints what it found. A thumbprint is public information;",
-    "the access to the card is the secret, and it never appears in any file."
+    "Example of a filled-in CertumSigning.settings.json. Copy the shape, never the values: an invented",
+    "thumbprint would make the repository claim a provenance that does not exist, and both the tests",
+    "and the release job reject that. A thumbprint is public information; the access to the signing",
+    "card is the secret, and it never appears in a file."
   ],
   "state": "Recorded",
   "ciSigning": false,

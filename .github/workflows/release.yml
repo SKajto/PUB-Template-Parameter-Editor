@@ -1,7 +1,6 @@
-# Trusted release packaging and publishing. This application is distributed through a GitHub Release;
-# there is no Microsoft Store product. The code is not signed: no signing key exists in this pipeline
-# (a card-backed key is never exportable), so the job asserts the payload is unsigned and publishes
-# SHA-256 hashes. tools/signing/certum-sign.ps1 documents the maintainer-side path.
+# Trusted release packaging and publishing. The application is distributed through a GitHub Release.
+# The code is not signed: a card-backed signing key is never exportable, so no signing key exists in
+# this pipeline; the job asserts the payload is unsigned and publishes SHA-256 hashes instead.
 #
 # Runs only for maintainer-triggered work or tags on the protected default branch; PR code is not
 # executed here. Requires the 'release-packaging' environment so a maintainer must approve the run
@@ -167,10 +166,8 @@ jobs:
           }
         shell: pwsh
 
-      # The honest label: the documents say this build is unsigned, so the payload that comes out of
-      # the build must actually be unsigned. A surprise here means either the wording is now wrong
-      # everywhere, or something signed a binary by accident - both are release-blocking.
-      - name: The payload really is unsigned, as every document says
+      # The documents describe the payload as unsigned, so the build has to match that.
+      - name: "The payload really is unsigned, as every document says"
         run: |
           $exe = 'artifacts/publish/portable-win-x64/PUB_Template_Parameter_Editor.exe'
           $auth = Get-AuthenticodeSignature -LiteralPath $exe

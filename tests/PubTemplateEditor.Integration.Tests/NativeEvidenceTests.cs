@@ -6,10 +6,9 @@ using PubTemplateEditor.TestSupport;
 namespace PubTemplateEditor.Integration.Tests;
 
 /// <summary>
-/// Evidence tests against the native .dta samples on a maintainer's disk. The sample files are user
-/// content and are not part of the repository, so the theory simply has no rows where they are
-/// absent - never a false pass. The counts below were verified independently with an external XML
-/// parser on 2026-10-25 against the bytes of those files.
+/// Evidence tests against the native .dta samples. They are user content and are not part of the
+/// repository, so the theory simply has no rows where they are absent - never a false pass. The
+/// expected counts were verified against the bytes of those files with an external XML parser.
 /// </summary>
 public class NativeEvidenceTests
 {

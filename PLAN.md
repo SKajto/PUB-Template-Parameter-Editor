@@ -1417,6 +1417,11 @@ Self-Signed`, thumbprint `FB0885A4472AA277326B4C061893B64CB0A4FCBB`, no timestam
 release-job steps were extracted and run: step 1 passed; step 2 failed on that self-signed artifact,
 which is the case it exists to stop.
 
+Comments in the scripts, the signing configuration and the policy tests were rewritten to describe
+what the code does and enforces; the run also caught a broken single-quoted string in
+`certum-sign.ps1` (a `'` escape, invalid in PowerShell) that the parser check and the executed
+refusal test both failed on, now fixed and re-run: 89 + 62 + 88 = 239 tests pass.
+
 Open: no certificate exists, so no signature, CA chain, timestamp or vendor-client behaviour has ever
 been observed; `signtool` against a cloud card, MSIX `-Sign`, and SmartScreen/antivirus effect remain
 unverified. The new gates have not run on GitHub: they need a version tag and `release-packaging`

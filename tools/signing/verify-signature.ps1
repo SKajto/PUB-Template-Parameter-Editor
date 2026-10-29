@@ -1,28 +1,16 @@
 <#
 .SYNOPSIS
-    Read back what a signature on a file actually says - for anyone, without trusting this
-    repository's wording.
+    Print what the signature on a file actually says. Read-only.
 
 .DESCRIPTION
-    A release page can claim anything about a binary. The file itself is the evidence, and this
-    script only reads it: it prints the Authenticode status the platform computes, the signer and
-    issuer, the certificate's validity window, whether there is a timestamp, and the chain as
-    Windows builds it. Nothing is written.
+    Reports the Authenticode status the platform computes, the signer and issuer, the certificate's
+    validity window, whether a timestamp is present, the chain this machine builds, and the file's
+    SHA-256. Nothing is written and nothing is signed.
 
-    Use it on a downloaded executable, before running it, together with the SHA-256 published with
-    the release. Expected output for this project today:
-
-        status      NotSigned
-
-    because nothing this project publishes is code-signed. A future release signed with a CA-issued
-    certificate should read `Valid` with a timestamp; a `HashMismatch` on a file that was published
-    signed means the copy you have is not the copy that was signed, and that is a supply-chain
-    report, not a nuisance (see SECURITY.md).
-
-    A `NotTrusted` or `UnknownError` result is read as it is: the chain on THAT machine does not
-    verify. For a self-signed signature that is the normal and honest result, because a self-signed
-    certificate vouches for nothing beyond "these bytes came from this key" - trusting one on a
-    machine makes everything it has ever signed run without a prompt there.
+    An unsigned file reports NotSigned; a self-signed one usually reports UnknownError because its
+    chain ends in a root no trust provider accepts. Trusting such a certificate on a machine makes
+    everything it has ever signed run there without a prompt, so install it only on the machine that
+    owns it.
 
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File tools/signing/verify-signature.ps1 `

@@ -110,8 +110,8 @@ public class PackagingConfigurationTests
     [Fact]
     public void Draft_settings_still_contain_unresolved_identity_placeholders()
     {
-        // REL-04: identity comes from the real reserved product. Until the owner supplies it,
-        // the committed draft must keep REPLACE_* markers so a Strict build refuses to package.
+        // Identity values come from the real reserved product; while it is unknown the draft keeps
+        // REPLACE_* markers, so a Strict build refuses to package.
         string json = File.ReadAllText(Path.Combine(FindPackagingDir(), "StoreRelease.settings.json"));
         using JsonDocument doc = JsonDocument.Parse(json);
         JsonElement root = doc.RootElement;

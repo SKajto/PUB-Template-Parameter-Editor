@@ -1,20 +1,13 @@
 <#
 build-msix.ps1 - assembles the draft/self-contained MSIX payload with Windows SDK MakeAppx.
 
-Design notes (docs/GITHUB_STORE_RELEASE.md):
+Design notes:
 - The MSIX payload is a normal self-contained win-x64 layout, not a single-file bundle.
-- A package built here is for running the app as a packaged app during development. It is not a
-  distribution channel (this project publishes a single-file executable on GitHub), it is built
-  unsigned like everything else here, and if such a package were ever published it would have to be
-  signed and trusted first - see docs/RELEASE_PACKAGING.md and docs/CODE_SIGNING.md. Nothing here
-  is, or may be called, store-signed. An APPX/MSIX is only installable by policy once it carries a
-  signature from a certificate the device trusts, so -Sign exists for that experiment and refuses
-  to run while the repository records no signer.
-  The produced .msix is therefore NOT trusted for arbitrary sideload; it is a submission artifact.
-- -Strict rejects every unresolved REPLACE_* value in packaging/StoreRelease.settings.json,
-  which is what a release/submission build must do (REL-04).
+- The package is for running the app as a packaged app during development. It is unsigned unless
+  -Sign is given, and a device installs such a package only once its signature is trusted.
+- -Strict rejects every unresolved REPLACE_* value in packaging/StoreRelease.settings.json.
 
-Only built-in tools are used: dotnet publish + Windows SDK MakeAppx.
+Only built-in tools are used: dotnet publish + Windows SDK MakeAppx/signtool.
 #>
 [CmdletBinding()]
 param(
@@ -26,9 +19,8 @@ param(
     [string]$OutDir = "",
     [string]$PayloadDir = "",
     [switch]$SkipPublish,
-    # Opt-in: sign the package with the certificate recorded in packaging/CertumSigning.settings.json.
-    # Refuses while that file records no signer, and requires the signing service's client to be
-    # connected on this machine - the key lives on its card, not in this repository.
+    # Opt-in: sign the package with the certificate recorded in packaging/CertumSigning.settings.json;
+    # the key lives on the signing service's card, so its client must be connected on this machine.
     [switch]$Sign,
     [string]$SigningSettings = ""
 )
@@ -223,7 +215,7 @@ $record = [ordered]@{
     identityName            = $identity.Name
     publisher               = $identity.Publisher
     signedBy                = $signedBy
-    packageSignatureState   = $(if ($Sign) { "signed with the recorded certificate, verified with signtool verify /pa /all on this machine" } else { "unsigned, as every artifact this project publishes" })
+    packageSignatureState   = $(if ($Sign) { "signed with the recorded certificate, verified with signtool verify /pa /all on this machine" } else { "unsigned" })
     generatedUtc            = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 }
 $recordPath = Join-Path (Split-Path $msixPath -Parent) "build-info.json"

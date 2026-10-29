@@ -22,10 +22,7 @@ public class SamplePolicyTests
         string gitignore = File.ReadAllText(Path.Combine(root, ".gitignore"));
         Assert.Contains("examples/**/*.dta", gitignore, StringComparison.Ordinal);
 
-        // The pattern has to reach into subfolders: samples kept under examples/<something>/
-        // would otherwise sit one `git add examples/` away from being published. Verified with
-        // git itself rather than by reading the pattern, so a pattern that looks right but does
-        // not match is caught.
+        // The pattern must reach nested folders; ask git rather than trusting how it looks.
         if (RunGit(root, "rev-parse", "--is-inside-work-tree")?.Trim() == "true")
         {
             string probe = Path.Combine("examples", "nested", "probe.dta");

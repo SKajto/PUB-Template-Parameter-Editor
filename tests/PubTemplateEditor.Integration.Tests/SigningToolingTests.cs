@@ -8,15 +8,9 @@ using Xunit;
 namespace PubTemplateEditor.Integration.Tests;
 
 /// <summary>
-/// The signing tooling, and the claims it is allowed to make.
-///
-/// The project publishes unsigned binaries and says so everywhere. That is only honest while two
-/// things hold: nothing in the repository can sign anything (no key, no configured signer, no
-/// pipeline step that pretends to), and the tooling that WOULD sign refuses until a real certificate
-/// is recorded. These tests check both, by reading the scripts, by running the signing script and
-/// asserting that it refuses, and by looking for private-key material in the tracked tree.
-///
-/// Test-only: nothing here signs, and nothing here needs a certificate to pass.
+/// Guards the signing configuration and scripts: the repository holds no key and configures no
+/// signer, the signing scripts refuse until a real certificate is recorded, no workflow calls a
+/// signing tool, and no private-key material is tracked. Nothing here signs anything.
 /// </summary>
 public class SigningToolingTests
 {
@@ -34,18 +28,16 @@ public class SigningToolingTests
         using JsonDocument doc = Settings();
         JsonElement root = doc.RootElement;
 
-        // The state a reader and the release job act on: no certificate has been bought.
+        // The state the release job reads.
         Assert.Equal("Unconfigured", root.GetProperty("state").GetString());
         Assert.False(root.GetProperty("ciSigning").GetBoolean());
         Assert.True(string.IsNullOrEmpty(root.GetProperty("certificateThumbprint").GetString()),
-            "a thumbprint recorded while state says 'no certificate' is exactly the inconsistency the release job rejects");
+            "a thumbprint recorded together with state 'Unconfigured' is the inconsistency the release job rejects");
         Assert.True(string.IsNullOrEmpty(root.GetProperty("signerCommonName").GetString()));
         Assert.True(string.IsNullOrEmpty(root.GetProperty("publicCertificatePath").GetString()),
             "no public certificate may be committed for a certificate that does not exist");
 
-        // The parameters a real signature would use, fixed in advance rather than improvised at the
-        // keyboard: SHA-256 in both places, and a timestamp, without which the signature dies with
-        // the certificate.
+        // Digests and the timestamp are fixed in the configuration rather than chosen at the keyboard.
         Assert.Equal("sha256", root.GetProperty("fileDigestAlgorithm").GetString());
         Assert.Equal("sha256", root.GetProperty("timestampDigestAlgorithm").GetString());
         Assert.False(string.IsNullOrEmpty(root.GetProperty("timestampUrl").GetString()));
@@ -70,13 +62,13 @@ public class SigningToolingTests
     [Fact]
     public void TheSigningScriptRefusesWhileNoCertificateIsRecorded()
     {
-        // Run it, do not just read it: the refusal has to be the script's real behaviour.
+        // Run it: the refusal has to be the script's real behaviour, not just its wording.
         (string? output, int exitCode, bool available) = RunSigningScript(
             "tools" + Path.DirectorySeparatorChar + "signing" + Path.DirectorySeparatorChar + "certum-sign.ps1");
 
         if (!available)
         {
-            return; // no PowerShell on this machine: the script is a Windows tool and cannot be executed here
+            return; // no PowerShell here: the script is a Windows tool and cannot be executed
         }
 
         Assert.NotEqual(0, exitCode);
@@ -100,14 +92,14 @@ public class SigningToolingTests
         Assert.Contains("Sha256", script, StringComparison.Ordinal);
         Assert.Contains("Unconfigured", script, StringComparison.Ordinal);
 
-        // A signature on a user's template file would be a claim about data the program does not own.
+        // Template data files must never be signed.
         Assert.Contains(@"\.dta$", script, StringComparison.Ordinal);
 
         // The key must not be able to leave through this script.
         Assert.DoesNotContain("Export-PfxCertificate", script, StringComparison.Ordinal);
         Assert.Contains("Export-Certificate", script, StringComparison.Ordinal);
 
-        // Self-signed and CA-signed are kept apart in words as well as in code.
+        // The local self-signed key and a CA-issued certificate must stay distinguishable.
         Assert.Contains("self-sign.ps1", script, StringComparison.Ordinal);
         Assert.Contains("self-signed", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("not trusted", script, StringComparison.OrdinalIgnoreCase);
@@ -136,8 +128,8 @@ public class SigningToolingTests
         Assert.Contains("state -eq \"Unconfigured\"", script, StringComparison.Ordinal);
         Assert.Contains("signtool add", script, StringComparison.Ordinal);
         Assert.Contains("verify /pa /all", script, StringComparison.Ordinal);
-        // The default record still says what is true of every artifact built here.
-        Assert.Contains("unsigned, as every artifact this project publishes", script, StringComparison.Ordinal);
+        // The default build record reports the package as unsigned.
+        Assert.Contains("unsigned", script, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -150,7 +142,7 @@ public class SigningToolingTests
         Assert.Contains("Get-AuthenticodeSignature", release, StringComparison.Ordinal);
         Assert.Contains("NotSigned", release, StringComparison.Ordinal);
         Assert.Contains("SIGNING-STATUS.txt", release, StringComparison.Ordinal);
-        // It still calls the binary what it is.
+        // The workflow states its own signing status.
         Assert.Contains("not code-signed", release, StringComparison.Ordinal);
 
         string ci = Read(".github", "workflows", "ci.yml");
@@ -195,8 +187,7 @@ public class SigningToolingTests
         }
 
         Assert.True(offenders.Count == 0,
-            "private key material in a public repository is a security incident, not a packaging detail: "
-            + string.Join(", ", offenders));
+            "private key material must never be tracked: " + string.Join(", ", offenders));
     }
 
     private static (string? output, int exitCode, bool available) RunSigningScript(string relativePath)

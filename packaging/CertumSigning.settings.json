@@ -1,9 +1,9 @@
 {
   "_comment": [
-    "Records WHICH key may sign a release; it holds no key and signs nothing. A card-backed private",
-    "key is never exportable, so it can never be a build secret: ciSigning stays false and CI publishes",
-    "unsigned builds. state 'Unconfigured' means no certificate was acquired, and the signing script",
-    "refuses then. Never invent a thumbprint, a signer name or a validity date here."
+    "Records which key may sign a release; it holds no key. A card-backed private key is never",
+    "exportable, so it can never be a build secret: ciSigning stays false and CI builds unsigned.",
+    "state 'Unconfigured' means no certificate exists, and the signing script refuses then. Values",
+    "here must come from an issued certificate - never invented."
   ],
   "state": "Unconfigured",
   "ciSigning": false,

@@ -14,9 +14,8 @@ public enum TemplateFormat
 
 /// <summary>
 /// Byte-level format detection. Never trusts the extension alone.
-/// Evidence (2026-10, examples/*.dta): native .dta files are ZIP archives
-/// (Deflate, data descriptors, UTF-8 entry names) containing template.xml plus
-/// schemas/ and template_*.properties entries.
+/// Observed in the sample .dta files: they are ZIP archives (Deflate, data descriptors, UTF-8 entry
+/// names) containing template.xml plus schemas/ and template_*.properties entries.
 /// </summary>
 public static class TemplateFormatDetector
 {

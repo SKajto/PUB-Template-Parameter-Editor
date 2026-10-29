@@ -16,19 +16,14 @@ using ShellWindow = PubTemplateEditor.App.MainWindow;
 namespace PubTemplateEditor.UiTests;
 
 /// <summary>
-/// The pictures the README shows.
+/// The pictures the README shows. **Nothing real is ever drawn:** the native PUB templates are user
+/// content that is not in this repository, and their names and values are somebody's business data.
+/// These images come from synthetic demo files this test writes into a private temporary folder -
+/// same container shape, same reading code path, invented content.
 ///
-/// **Nothing real is ever drawn.** The native PUB templates are user content: they are not in this
-/// repository (docs/SAMPLE_FINDINGS.md records what was learned from them), and their parameter names
-/// and values are somebody's business data. A screenshot taken over one would publish exactly what the
-/// sample policy keeps in. So these images come from synthetic demo files that this test writes into a
-/// private temporary folder: same container shape (a ZIP with template.xml plus unrelated entries), same
-/// reading code path, invented content - and the folder is named "PUB demo templates", so the image
-/// itself says what it is.
-///
-/// Generation is deliberate: set PUBTE_CAPTURE_README_IMAGES=1 and run this class. A normal test run
-/// never rewrites a tracked picture; it only checks that the pictures the README points at exist and
-/// are real, decodable, non-blank images.
+/// Regeneration is deliberate: set PUBTE_CAPTURE_README_IMAGES=1 and run this class. A normal test
+/// run never rewrites a tracked picture; it only checks that the README's images exist and are real,
+/// decodable, non-blank files.
 /// </summary>
 [Collection("WPF shell")]
 public class ReadmeImageTests

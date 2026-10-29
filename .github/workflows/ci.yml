@@ -85,11 +85,8 @@ jobs:
           if ($tracked) { throw "build outputs are tracked in git: $($tracked -join ', ')" }
         shell: pwsh
 
-      # The native .dta templates in examples/ are user content: committing them would publish
-      # somebody else's product data. The tests work from synthetic containers instead, so CI never
-      # needs the samples and their absence here is correct, not a gap. The ignore rule is checked by
-      # asking git itself about a nested path, so a pattern that looks right but only matches one
-      # directory deep cannot pass this step.
+      # The .dta templates in examples/ are user content and are not shipped. Ask git about a nested
+      # path so a pattern that only matches one level deep cannot pass.
       - name: No template content may be published
         run: |
           $templates = git ls-files | Where-Object { $_ -match '\.dta$' }
@@ -100,10 +97,8 @@ jobs:
           }
         shell: pwsh
 
-      # A private key, a PKCS#12 bundle or a certificate signing request in a public repository is a
-      # security incident, not a packaging detail. Nothing in this project needs one: a signing key
-      # that lives on a signing service's card is never exported, and the only key material committed
-      # anywhere is a public certificate (see docs/CODE_SIGNING.md).
+      # A signing key that lives on a service's card is never exported, so nothing here needs a
+      # private key file: the only committed key material is a public certificate.
       - name: No private key or key-shaped file may be tracked
         run: |
           $bad = git ls-files | Where-Object { $_ -match '\.(pfx|p12|pkcs12|pvk|spc|snk|csr|key)$' }

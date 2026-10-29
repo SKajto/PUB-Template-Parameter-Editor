@@ -1,50 +1,25 @@
 <#
 .SYNOPSIS
-    Apply the CA-issued Authenticode signature to a built artifact, using a certificate that
-    lives on the signing service's own cloud card.
+    Sign a built artifact with the Authenticode certificate recorded in
+    packaging/CertumSigning.settings.json.
 
 .DESCRIPTION
-    WHAT THIS IS FOR
-    One certificate, one owner, one honest path: the private key never leaves the signing
-    service's hardware, so it is never a file, never a repository secret and never available to a
-    build agent. Signing therefore happens in a person's Windows session, on a machine where the
-    vendor's desktop client is connected to that card. This script is the checked-in description
-    of that step - the command line, the digest algorithms, the timestamp, and the verification
-    that has to pass before a signed file may be published.
+    The private key lives on the signing service's card, so it is never a file, never a repository
+    secret and never available to a build agent: this script runs in a Windows session where the
+    vendor's client is connected to that card. It reads the key's thumbprint from the settings file
+    and refuses while the file records none.
 
-    CURRENT STATUS, RECORDED IN THE REPOSITORY
-    packaging/CertumSigning.settings.json says "state": "Unconfigured": no certificate has been
-    acquired. With that value this script refuses to run, which is the point - a repository that
-    has not decided who signs must not be able to produce a signature that nobody can account for.
-    Everything this project publishes is unsigned until the owner changes that state.
+    Rules the script enforces:
+      - SHA-256 file and timestamp digests, and a mandatory RFC 3161 timestamp: without one the
+        signature stops verifying when the certificate expires;
+      - the result is read back and must report Valid with a timestamp, otherwise the script fails;
+      - signing appends to the file, so the post-signature SHA-256 is printed and any hash file that
+        still quotes the old one is flagged;
+      - no private-key export. -ExportCer writes the public certificate only.
 
-    WHAT A SIGNATURE FROM THIS CLASS OF CERTIFICATE DOES AND DOES NOT DO
-      - it identifies a named individual as the publisher, and it proves the bytes have not changed
-        since that person signed them;
-      - the chain is issued under a root Windows trusts, so the "unknown publisher" state changes and
-        SmartScreen reputation can start to accumulate. Reputation is earned by downloads and age;
-        the first signed releases can still show a SmartScreen prompt, and antivirus products make
-        their own decision either way;
-      - it grants nothing to the publisher over the recipient's copy: the program stays
-        GPL-3.0-only, no licence check or expiry is added, and a source rebuild is legitimately
-        unsigned.
-
-    WHY signtool AND NOT Set-AuthenticodeSignature
-    The vendor documents signtool against the certificate the desktop client exposes, and signtool
-    controls the digest algorithms and the RFC 3161 timestamp explicitly. A card-backed key asks
-    for a PIN per signing session (batch several files in one call to pay it once), so the session
-    model is visible here rather than hidden.
-
-    WHAT IS ALWAYS TRUE IN THIS SCRIPT
-      - the timestamp is mandatory. Without one the signature stops verifying the day the
-        certificate expires, which for this class of certificate is about a year away;
-      - the result is read back and must come back Valid, with a timestamp, before the script says
-        anything resembling success;
-      - the SHA-256 of the file CHANGES when the signature is appended, so the script prints the
-        post-signature hash and warns about any hash file that still quotes the old one;
-      - the private key cannot leave this machine through this script: there is no PFX export, only
-        an optional export of the public certificate (-ExportCer) so a signature can be checked
-        later without the card.
+    signtool is used rather than Set-AuthenticodeSignature because the vendor documents it, it
+    controls the digests and timestamp explicitly, and a card-backed key asks for a PIN once per
+    signing session - batch the files in one call to pay it once.
 
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File tools/signing/certum-sign.ps1
@@ -85,10 +60,9 @@ $settings = Get-Content -Raw -LiteralPath $SettingsPath | ConvertFrom-Json
 
 if ($settings.ciSigning -eq $true) {
     Fail @"
-The configuration says ciSigning=true, but no pipeline here can hold this key: a card-backed
-private key is not exportable and is not a build secret. Either fix the configuration or design
-and build the (self-hosted, interactive) runner that this claim would need - and change the
-release notes, the packaging notes and ChannelPolicyTests in the same commit.
+The configuration says ciSigning=true, but a card-backed private key is not exportable and is not a
+build secret. Unset ciSigning, or add the interactive self-hosted runner that claim needs - and
+update the release notes, README, SECURITY.md and ChannelPolicyTests in the same commit.
 "@
 }
 
@@ -151,16 +125,12 @@ if ($VerifyOnly) {
     Say ''
     Say 'verify-only: nothing was written.'
 
-    # Exit non-zero unless every file verifies, so this mode can be used as a gate and not only as a
-    # printout. An unsigned or self-signed file is a true statement about this project's artifacts,
-    # and the line below says which of the two it is rather than pretending to approve it.
+    # Non-zero unless every file verifies, so this mode works as a gate and not only as a printout.
     $bad = @($seen | Where-Object { $_.Status -ne 'Valid' })
     if ($bad) {
-        Fail ("verify-only found a file that does not verify as Valid: " +
+        Fail ("verify-only: at least one file does not verify as Valid: " +
               (($bad | ForEach-Object { "$($_.Path) = $($_.Status)" }) -join ', ') +
-              ". For every artifact this project has published so far that is the expected answer, because" +
-              " nothing here is code-signed - but nothing may be published as though it were signed until it" +
-              " reads Valid with a timestamp.")
+              ". Nothing may be published as signed until it reads Valid with a timestamp.")
     }
     return
 }
@@ -168,14 +138,10 @@ if ($VerifyOnly) {
 # ---------------------------------------------------------------- the key must be recorded first
 if ($settings.state -eq 'Unconfigured') {
     Fail @"
-No certificate is recorded: $SettingsPath still says "state": "Unconfigured", and the project
-publishes unsigned builds. This script will not invent a key.
-
-To sign anything you have to decide to buy a code-signing certificate, pass the signing service's
-identity and project verification, activate it on a cloud card and connect the vendor's desktop
-client on this machine. Then record what you got in that file - state "Recorded", the real
-certificateThumbprint, signerCommonName and certificateNotAfter - and commit that together with
-the wording in README, SECURITY.md and docs/RELEASE_PACKAGING.md that currently says the opposite.
+No certificate is recorded: $SettingsPath still says "state": "Unconfigured". This script will not
+invent a key. After a certificate is issued, set state to "Recorded" and put the real
+certificateThumbprint, signerCommonName and certificateNotAfter in that file, and update the
+unsigned/signed wording in README, SECURITY.md and docs/RELEASE_PACKAGING.md in the same commit.
 "@
 }
 
@@ -233,7 +199,7 @@ $targets = @()
 foreach ($file in $FilePath) {
     $resolved = (Resolve-Path -LiteralPath $file -ErrorAction SilentlyContinue).Path
     if (-not $resolved) { Fail "not a file: $file" }
-    if ($resolved -match '\.dta$') { Fail 'never sign a user template file: the program signs its own binaries, and a signature on a data file would be a lie about what it means' }
+    if ($resolved -match '\.dta$') { Fail "refusing to sign a template data file: only the application's own binaries are signed" }
     $targets += $resolved
     Pair 'file'           $resolved
     Pair 'size bytes'     (Get-Item -LiteralPath $resolved).Length
@@ -273,7 +239,7 @@ foreach ($resolved in $targets) {
 # ---------------------------------------------------------------- what to publish now
 Say ''
 Say ('-' * 72)
-Say 'The file changed when the signature was appended, so these are the hashes to publish:'
+Say 'publish these hashes (signing appends to the file, so the hash changes):'
 foreach ($p in $published) { Say ("{0}  {1}" -f $p.Sha256, $p.Path) }
 
 $sums = Get-ChildItem -Path (Join-Path $repoRoot 'artifacts') -Filter SHA256SUMS.txt -Recurse -ErrorAction SilentlyContinue
@@ -281,15 +247,9 @@ foreach ($file in $sums) {
     $stale = @($published | Where-Object { (Get-Content -Raw -LiteralPath $file.FullName) -match $_.Sha256 })
     if ($stale) {
         Say ''
-        Say "WARNING: $($file.FullName) still quotes a pre-signature hash for $($stale[0].Path)."
-        Say 'A reader checking the download against that file would get a mismatch: regenerate it from the signed bytes.'
+        Say "WARNING: $($file.FullName) still quotes a pre-signature hash for $($stale[0].Path) - regenerate it from the signed bytes."
     }
 }
-Say ''
-Say 'Publishing order, because a hash taken before signing is a mismatch waiting to happen:'
-Say '  1. sign (this script)          2. re-hash          3. attach the signed file'
-Say '  4. restate the SHA-256 and the signer in the release notes, and keep the notes, README,'
-Say '     SECURITY.md and docs/RELEASE_PACKAGING.md describing the file that is actually attached.'
 
 if ($ExportCer) {
     $dir = Split-Path -Parent $ExportCer
