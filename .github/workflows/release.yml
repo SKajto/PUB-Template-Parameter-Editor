@@ -1,8 +1,7 @@
-# Trusted release packaging and publishing. This application is distributed through a GitHub
-# Release: there is no Microsoft Store product, and there is no code signing - free signing
-# subscriptions for open source require a public trust record this repository does not have, and no
-# paid certificate has been acquired. Every binary this project produces is therefore UNSIGNED, and
-# the release says so and publishes SHA-256 hashes instead. See docs/RELEASE_PACKAGING.md.
+# Trusted release packaging and publishing. This application is distributed through a GitHub Release;
+# there is no Microsoft Store product. The code is not signed: no signing key exists in this pipeline
+# (a card-backed key is never exportable), so the job asserts the payload is unsigned and publishes
+# SHA-256 hashes. tools/signing/certum-sign.ps1 documents the maintainer-side path.
 #
 # Runs only for maintainer-triggered work or tags on the protected default branch; PR code is not
 # executed here. Requires the 'release-packaging' environment so a maintainer must approve the run
@@ -78,6 +77,27 @@ jobs:
       - name: Install .NET from global.json
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
 
+      - name: Signing configuration must not claim a key this pipeline does not have
+        run: |
+          $signing = Get-Content packaging/CertumSigning.settings.json -Raw | ConvertFrom-Json
+          if ($signing.ciSigning -eq $true) {
+            throw "the configuration claims CI signs, but a card-backed key is not exportable and is not a build secret. Unset ciSigning, or build the interactive self-hosted runner that claim would need - and rewrite the notes, README, SECURITY.md and ChannelPolicyTests in the same commit"
+          }
+          if ($signing.state -eq 'Unconfigured' -and $signing.certificateThumbprint) {
+            throw "state says no certificate exists, but a thumbprint is recorded: fix the configuration or sign nothing"
+          }
+          if ($signing.state -ne 'Unconfigured' -and $signing.certificateThumbprint -notmatch '^[0-9A-Fa-f]{40}$') {
+            throw "state is '$($signing.state)' but certificateThumbprint is not a real 40-digit thumbprint"
+          }
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          'signing: none applied by this workflow.'                                            |
+            Tee-Object artifacts/SIGNING-STATUS.txt
+          "configuration state: $($signing.state); ciSigning: $($signing.ciSigning)"          |
+            Tee-Object -FilePath artifacts/SIGNING-STATUS.txt -Append
+          'a signature added later by the maintainer is applied to the published file, and its hash is restated with it (docs/CODE_SIGNING.md)' |
+            Tee-Object -FilePath artifacts/SIGNING-STATUS.txt -Append
+        shell: pwsh
+
       - name: Build
         run: |
           dotnet restore PubTemplateEditor.slnx
@@ -147,6 +167,20 @@ jobs:
           }
         shell: pwsh
 
+      # The honest label: the documents say this build is unsigned, so the payload that comes out of
+      # the build must actually be unsigned. A surprise here means either the wording is now wrong
+      # everywhere, or something signed a binary by accident - both are release-blocking.
+      - name: The payload really is unsigned, as every document says
+        run: |
+          $exe = 'artifacts/publish/portable-win-x64/PUB_Template_Parameter_Editor.exe'
+          $auth = Get-AuthenticodeSignature -LiteralPath $exe
+          "signature status of the built payload: $($auth.Status) - $($auth.StatusMessage)" |
+            Tee-Object -FilePath artifacts/SIGNING-STATUS.txt -Append
+          if ($auth.Status -ne 'NotSigned') {
+            throw "the built payload reports $($auth.Status), but README, SECURITY.md, the packaging notes and these release notes say it is not code-signed. If it genuinely is signed now, all of those and ChannelPolicyTests change in the same commit; if it was signed by accident, find out by what"
+          }
+        shell: pwsh
+
       - name: Upload the optional package as its own artifact
         id: package_artifact
         if: inputs.buildMsix == 'true'
@@ -186,6 +220,12 @@ jobs:
             Out-Null
           'status: a self-signed chain is not trusted by Windows, so treat these hashes as the check' |
             Tee-Object -Append artifacts/SHA256SUMS.txt
+          'status: a CA-issued signature, if the owner ever buys one, is added after this run by' |
+            Tee-Object -Append artifacts/SHA256SUMS.txt
+          'status: tools/signing/certum-sign.ps1, and the hash published with the release is then the' |
+            Tee-Object -Append artifacts/SHA256SUMS.txt
+          'status: post-signature one, because signing appends to the file' |
+            Tee-Object -Append artifacts/SHA256SUMS.txt
         shell: pwsh
 
       - name: Upload release artifacts
@@ -197,6 +237,7 @@ jobs:
             artifacts/source
             artifacts/notices
             artifacts/SHA256SUMS.txt
+            artifacts/SIGNING-STATUS.txt
             artifacts/file-metadata.txt
           retention-days: 90
           if-no-files-found: error
@@ -247,6 +288,9 @@ jobs:
           fi
           src=$(find out -type f -name 'PUB_Template_Parameter_Editor-*-source.tar.gz' -print -quit)
           sums=$(find out -type f -name 'SHA256SUMS.txt' -print -quit)
+          status=$(find out -type f -name 'SIGNING-STATUS.txt' -print -quit)
+          assets=("$exe" "$src" "$sums")
+          if [ -n "${status:-}" ]; then assets+=("$status"); fi
 
           sha=$(sha256sum "$exe" | cut -d' ' -f1 | tr 'a-z' 'A-Z')
 
@@ -267,6 +311,12 @@ jobs:
             echo "file is unsigned and was downloaded from the internet: choose *More info* ->"
             echo "*Run anyway* only if that hash matches. Antivirus software may also warn."
             echo
+            echo "If a copy of this release ever does carry a signature, it was added by the maintainer"
+            echo "after CI built it - the key sits on a signing service's card, out of reach of any build"
+            echo "agent. Read it with \`(Get-AuthenticodeSignature .\PUB_Template_Parameter_Editor.exe).Status\`"
+            echo "and check that the hash above is the one of the file you downloaded, since signing"
+            echo "changes the file. \`SIGNING-STATUS.txt\` next to the binary records what CI knew."
+            echo
             echo "- Complete corresponding source: \`$src\` (also at the tag of this release)."
             echo "- Licence: GPL-3.0-only; see \`LICENSE\`/\`NOTICE\` in the source archive and the"
             echo "  in-app About/Licenses view."
@@ -278,7 +328,7 @@ jobs:
             echo "see SECURITY.md. Do not attach your own template files to an issue."
           } > notes.md
 
-          gh release create "v$VERSION" "$exe" "$src" "$sums" \
+          gh release create "v$VERSION" "${assets[@]}" \
             --target "$COMMIT" \
             --title "PUB Template Parameter Editor $VERSION" \
             --notes-file notes.md

@@ -35,13 +35,14 @@ unverified gate is acceptable, an implied pass is not. -->
 - [ ] nothing writes to a template outside the review step; unrelated bytes stay byte-identical
 - [ ] template files stay untrusted data: no DTD, no external resolution, values treated as text
 - [ ] no `.dta` file, build output, binary or `.pdb` is added to the repository
-- [ ] licences, notices and the SPDX identifier `GPL-3.0-only` are still correct
+- [ ] licences, notices and the SPDX identifier `GPL-3.0-only` are still correct, and the signing
+      wording is still true (nothing published is signed, no pipeline holds a key)
 - [ ] the executable name, the manifest and the packaging scripts still agree
 
 ## If the pull request touches these, say so explicitly
 
 `.github/workflows/**`, `packaging/**`, `Directory.Build.props`, `global.json`,
-`*.pubxml`, `tools/brand/**` — the released binary is built automatically from these files just as
+`*.pubxml`, `tools/brand/**`, `tools/signing/**` — the released binary is built automatically from these files just as
 much as from the C# sources, so they get the closest review. Note also that WPF fails a forward
 `StaticResource` reference and a wrong pack-URI assembly name **at runtime, not at build time**, so
 such a change needs a test that constructs the window.

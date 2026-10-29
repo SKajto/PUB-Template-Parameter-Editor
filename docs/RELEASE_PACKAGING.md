@@ -11,26 +11,20 @@ How the two artifacts are produced and validated. Commands and verification stat
 | MSIX package | optional build for packaged-app testing | **not a channel** - it needs a real package identity that this project does not have, and no store publishes it. `packaging/` and `build-msix.ps1` are kept as local tooling, `buildMsix` defaults to `false`, and the placeholder identity values stay unresolved so nothing can be built from them by accident |
 | CI build | the same executable, uploaded as a workflow artifact | testing only; not distributed |
 
-## Releases are unsigned, and say so
+## Signing
 
-There is **no code signing** for this project: nothing signs these binaries, and no Authenticode
-certificate has been acquired (a commercial certificate is paid and identity-verified, which makes it
-a maintainer decision). The consequences are stated instead of hidden:
+The code is currently **not signed**. There is no Authenticode certificate, so SmartScreen shows
+*Windows protected your PC* on a downloaded copy and antivirus products may warn; each release
+publishes **SHA-256** hashes (`SHA256SUMS.txt` and the hash in the release notes) so a download can be
+checked against what the workflow built, and the executable's file metadata (product name, one version
+everywhere) is set from the release version and verified by CI.
 
-- every binary this repository produces - CI artifact, GitHub Release asset, anything built locally -
-  is **unsigned**;
-- Windows SmartScreen shows *Windows protected your PC* on first run of the downloaded executable
-  because the file is unsigned and came from the internet, and antivirus products may warn too;
-- each release publishes **SHA-256 hashes** (`SHA256SUMS.txt`, and the executable's hash in the
-  release notes) so a download can be checked against what the workflow built;
-- release notes say in plain words that the build is unsigned and how to verify it;
-- the executable's **file metadata** (product name, and one version everywhere in the build) is set
-  from the release version and verified by CI, because that is the only version information a reader
-  of an unsigned binary can check against the tag.
-
-If signing is ever added, every label has to change in the same commit - README, SECURITY.md, the
-release notes, the packaging notes and `ChannelPolicyTests`, which asserts that no document claims a
-signature that does not exist and that no signing service is configured in the workflows.
+Tooling: `tools/signing/certum-sign.ps1` (refuses until a real key is recorded in
+`packaging/CertumSigning.settings.json`; SHA-256, mandatory timestamp, no private-key export),
+`tools/signing/verify-signature.ps1` and `packaging/build-msix.ps1 -Sign` - all Windows SDK `signtool`,
+build-time only, nothing added to the payload. Two `release.yml` steps keep the labels honest: the
+configuration may not claim a key CI cannot have, and the payload must report `NotSigned`;
+`artifacts/SIGNING-STATUS.txt` ships with the release. See [CODE_SIGNING.md](CODE_SIGNING.md).
 
 ## Self-signing on a maintainer's machine (integrity, not trust)
 
@@ -144,6 +138,7 @@ stayed well inside the storage allowance. A `Release packaging` run additionally
 
 `release-<version>`: the portable executable, the complete corresponding source archive
 (GPL-3.0-only obligation), `LICENSE`/`NOTICE` and the bundled third-party notices, `SHA256SUMS.txt`
-(plus the explicit line that the build is not code-signed) and `file-metadata.txt`. Attaching the
+(plus the explicit line that the build is not code-signed), `SIGNING-STATUS.txt` and
+`file-metadata.txt`. Attaching the
 source archive to the same release is what keeps the GPL's "complete corresponding source next to the
 binary" requirement satisfied by the same channel the binary is distributed through.

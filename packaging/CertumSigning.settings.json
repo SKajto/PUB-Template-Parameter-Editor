@@ -1,0 +1,22 @@
+{
+  "_comment": [
+    "Records WHICH key may sign a release; it holds no key and signs nothing. A card-backed private",
+    "key is never exportable, so it can never be a build secret: ciSigning stays false and CI publishes",
+    "unsigned builds. state 'Unconfigured' means no certificate was acquired, and the signing script",
+    "refuses then. Never invent a thumbprint, a signer name or a validity date here."
+  ],
+  "state": "Unconfigured",
+  "ciSigning": false,
+  "provider": "Certum SimplySign (Open Source Code Signing in the Cloud) - not purchased",
+  "signerCommonName": "",
+  "certificateThumbprint": "",
+  "certificateNotAfter": "",
+  "timestampUrl": "http://time.certum.pl",
+  "fileDigestAlgorithm": "sha256",
+  "timestampDigestAlgorithm": "sha256",
+  "publicCertificatePath": "",
+  "notes": {
+    "hashes": "a signature appends to the file, so every published SHA-256 is taken after signing",
+    "licence": "signing adds no restriction: GPL-3.0-only, and a rebuilt binary is unsigned"
+  }
+}

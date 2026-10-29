@@ -67,4 +67,6 @@ bounty. What you can expect: an acknowledgement, a fix in the next release when 
 and reproducible, and a credit in the release notes if you want one. What you should not expect:
 support for constructs the format documentation does not define, and no promise about how
 SmartScreen or antivirus products will treat an unsigned binary (see
-[docs/RELEASE_PACKAGING.md](docs/RELEASE_PACKAGING.md)).
+[docs/RELEASE_PACKAGING.md](docs/RELEASE_PACKAGING.md)). `tools/signing/verify-signature.ps1` reads
+the signature and the hash from the file itself and writes nothing; a file published signed that reads
+`HashMismatch` is a supply-chain report.

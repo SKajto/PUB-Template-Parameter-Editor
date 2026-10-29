@@ -6,8 +6,10 @@ Design notes (docs/GITHUB_STORE_RELEASE.md):
 - A package built here is for running the app as a packaged app during development. It is not a
   distribution channel (this project publishes a single-file executable on GitHub), it is built
   unsigned like everything else here, and if such a package were ever published it would have to be
-  signed and trusted first - see docs/RELEASE_PACKAGING.md. Nothing here is, or may be called,
-  store-signed.
+  signed and trusted first - see docs/RELEASE_PACKAGING.md and docs/CODE_SIGNING.md. Nothing here
+  is, or may be called, store-signed. An APPX/MSIX is only installable by policy once it carries a
+  signature from a certificate the device trusts, so -Sign exists for that experiment and refuses
+  to run while the repository records no signer.
   The produced .msix is therefore NOT trusted for arbitrary sideload; it is a submission artifact.
 - -Strict rejects every unresolved REPLACE_* value in packaging/StoreRelease.settings.json,
   which is what a release/submission build must do (REL-04).
@@ -23,7 +25,12 @@ param(
     [string]$LayoutDir = "",
     [string]$OutDir = "",
     [string]$PayloadDir = "",
-    [switch]$SkipPublish
+    [switch]$SkipPublish,
+    # Opt-in: sign the package with the certificate recorded in packaging/CertumSigning.settings.json.
+    # Refuses while that file records no signer, and requires the signing service's client to be
+    # connected on this machine - the key lives on its card, not in this repository.
+    [switch]$Sign,
+    [string]$SigningSettings = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -142,6 +149,39 @@ if (Test-Path $msixPath) { Remove-Item -Force $msixPath }
 if ($LASTEXITCODE -ne 0) { Fail "makeappx pack failed with exit code $LASTEXITCODE" }
 if (-not (Test-Path $msixPath)) { Fail "makeappx reported success but produced no package" }
 
+# ---------- 5a. optional package signature (APPX signatures are added after packing) ----------
+$signedBy = "none (nothing in this project is code-signed; see docs/RELEASE_PACKAGING.md)"
+$signerSubject = ""
+if ($Sign) {
+    if (-not $SigningSettings) { $SigningSettings = Join-Path $scriptRoot "CertumSigning.settings.json" }
+    if (-not (Test-Path $SigningSettings)) { Fail "no signing configuration at $SigningSettings" }
+    $signing = Get-Content -Raw -Path $SigningSettings | ConvertFrom-Json
+    if ($signing.state -eq "Unconfigured") {
+        Fail "-Sign refused: $SigningSettings records no signer (state Unconfigured). docs/CODE_SIGNING.md says what acquiring one involves; until then every artifact here is unsigned."
+    }
+    $thumb = ($signing.certificateThumbprint -replace '[^0-9A-Fa-f]', '')
+    if ($thumb -notmatch '^[0-9A-Fa-f]{40}$') { Fail "recorded certificateThumbprint is not a 40-digit hex value in $SigningSettings" }
+    if (-not $signing.timestampUrl) { Fail "a timestamp url is required for a package signature: the package would stop verifying with the certificate" }
+
+    $kitsBin = "C:\Program Files (x86)\Windows Kits\10\bin"
+    $signtool = Get-ChildItem -Path $kitsBin -Filter signtool.exe -Recurse -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -match "\\x64\\" } |
+        Sort-Object { [version]($_.Directory.Parent.Name) } -Descending |
+        Select-Object -First 1 -ExpandProperty FullName
+    if (-not $signtool) { Fail "signtool.exe not found under $kitsBin (Windows SDK)" }
+
+    Write-Output " Signing the package with the recorded certificate"
+    & $signtool add /sha1 $thumb /fd sha256 /tr $signing.timestampUrl /td sha256 $msixPath | Out-Host
+    if ($LASTEXITCODE -ne 0) { Fail "signtool add failed with exit code $LASTEXITCODE - is the signing client connected to its card, and is the timestamp service reachable?" }
+
+    & $signtool verify /pa /all $msixPath | Out-Host
+    if ($LASTEXITCODE -ne 0) { Fail "the signed package does not verify: not publishing it (exit $LASTEXITCODE)" }
+    $auth = Get-AuthenticodeSignature -LiteralPath $msixPath
+    if ($auth.Status -ne "Valid") { Fail "package signature reads '$($auth.Status)' ($($auth.StatusMessage)) - refusing to call it signed" }
+    $signedBy = $auth.SignerCertificate.Subject
+    Write-Output " package signature: $signedBy (timestamped by a service the platform accepts)"
+}
+
 # ---------- 6. inspect the produced package ----------
 $inspectDir = Join-Path $env:TEMP ("msix-inspect-" + [Guid]::NewGuid().ToString("N"))
 & $makeappx unpack /p $msixPath /d $inspectDir /o | Out-Host
@@ -182,7 +222,8 @@ $record = [ordered]@{
     packageSizeBytes        = (Get-Item $msixPath).Length
     identityName            = $identity.Name
     publisher               = $identity.Publisher
-    signedBy                = "none (nothing in this project is code-signed; see docs/RELEASE_PACKAGING.md)"
+    signedBy                = $signedBy
+    packageSignatureState   = $(if ($Sign) { "signed with the recorded certificate, verified with signtool verify /pa /all on this machine" } else { "unsigned, as every artifact this project publishes" })
     generatedUtc            = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 }
 $recordPath = Join-Path (Split-Path $msixPath -Parent) "build-info.json"
@@ -193,5 +234,8 @@ Write-Output "MSIX      : $msixPath"
 Write-Output "SHA-256   : $msixHash"
 Write-Output "Build info: $recordPath"
 if (-not $strict) {
-    Write-Output "NOTE: draft mode - identity placeholders are not real and the package is unsigned."
+    Write-Output "NOTE: draft mode - identity placeholders are not real"
+}
+if (-not $Sign) {
+    Write-Output "NOTE: the package is unsigned; a device policy will not install it. -Sign needs a recorded certificate (docs/CODE_SIGNING.md)."
 }

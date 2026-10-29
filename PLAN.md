@@ -1054,12 +1054,9 @@ Community Standards files (the repository's Community page asked for them)
   forms tell the reporter not to attach a template, and every page the README links to exists.
 
 Commit identity
-- The history was authored as `Suad <suad@localhost>` (23 commits), `PUB Template Editor
-  <dev@localhost>` (2) and GitHub's own initial commit as `SKajto
-  <43079991+SKajto@users.noreply.github.com>` (1). The account's canonical private identity was read
-  from the GitHub users API (id 43079991), which is the same address the initial commit already
-  carries, so rewriting to it makes GitHub attribute every commit to the owner instead of showing an
-  unmatched name.
+- The history was authored under two local placeholder identities (23 commits and 2) and GitHub's own initial commit, which already carries the account's noreply address.
+  Rewriting the history to that address is what makes GitHub attribute every commit to the account
+  instead of showing an unmatched name.
 - Repository-local `user.name`/`user.email` are set to that identity in `.git/config` (not a tracked
   file), so new commits are right from the start; the existing history is rewritten with
   `git filter-branch --env-filter` over `main`, then `refs/original` is deleted, the reflog expired
@@ -1375,6 +1372,52 @@ applied to the built executable by `tools/signing/self-sign.ps1`.
   warns. The forbidden-claim list gained "trusted signature", "signed by a trusted", "no SmartScreen
   warning" and friends - and one of my own sentences had to be reworded, because it negated a phrase
   the blunt check cannot tell from a claim.
+
+### 2026-10-29 - Copyright notice names its holder; nothing else personal is published
+
+`NOTICE`, `Directory.Build.props` and `ProductInfo.CopyrightLine` now carry `Copyright (C) 2026` plus
+the holder's name instead of "contributors", so the application identifies who holds it. The owner's
+rule: that name is the **only** personal datum in this repository, and no `.md` file repeats it -
+README, `START_HERE.md`, `docs/GPL_RELEASE.md` and this log say "the holder named in NOTICE". An
+earlier draft put more personal data into documents and into a commit message; it was removed and the
+then-unpushed commits were rewritten. One line of an older, already-pushed entry still names the
+maintainer's first name; removing it would mean rewriting published history, which was not done.
+
+### 2026-10-29 - Signing tooling and CI gates (nothing is signed)
+
+An open-source code-signing key lives in the signing service's own hardware and cannot be exported, so
+it can never be a build secret. CI therefore stays out of the signing path, and the repository gets
+stricter about its own claims.
+
+- `packaging/CertumSigning.settings.json` records which key may sign: `state: Unconfigured`,
+  `ciSigning: false`, SHA-256 and a timestamp url fixed in advance. `examples/` shows the filled shape
+  with a deliberately fake thumbprint.
+- `tools/signing/certum-sign.ps1` refuses while no key is recorded; then `signtool` with SHA-256 and a
+  mandatory timestamp, requires `Valid` plus a timestamp, prints the post-signature SHA-256, exports no
+  private key. `tools/signing/verify-signature.ps1` reads a signature back and writes nothing.
+  `packaging/build-msix.ps1 -Sign` is opt-in and refuses without a recorded key.
+- `release.yml`: one step rejects a configuration that claims a key CI cannot have, one requires the
+  built payload to report `NotSigned`; both record it in `artifacts/SIGNING-STATUS.txt`. `ci.yml`: no
+  key-shaped file may be tracked. `docs/CODE_SIGNING.md` says what a signature would mean here.
+- Tests: new `SigningToolingTests` (8 - one runs the signing script and asserts it refuses);
+  `ChannelPolicyTests` also forbids `signtool` in any workflow. `.gitignore` now covers nested `.dta`
+  samples (`examples/**/*.dta`) and more key-shaped files, and `SamplePolicyTests` asks
+  `git check-ignore` instead of reading the pattern.
+
+Executed: `dotnet build -c Release` 0 warnings; 89 + 62 + 88 = **239** tests pass in the working tree,
+and 89 + 46 + 88 = **223** in a fresh `git archive` tree (no samples, no `.git`).
+`certum-sign.ps1` -> exit 1, "This script will not invent a key". `-VerifyOnly` on the locally
+self-signed artifact -> `signtool`: chain "not trusted by the trust provider", exit 1.
+`verify-signature.ps1` on it -> `UnknownError`, signer `CN=PUB Template Parameter Editor Local
+Self-Signed`, thumbprint `FB0885A4472AA277326B4C061893B64CB0A4FCBB`, no timestamp. The two new
+release-job steps were extracted and run: step 1 passed; step 2 failed on that self-signed artifact,
+which is the case it exists to stop.
+
+Open: no certificate exists, so no signature, CA chain, timestamp or vendor-client behaviour has ever
+been observed; `signtool` against a cloud card, MSIX `-Sign`, and SmartScreen/antivirus effect remain
+unverified. The new gates have not run on GitHub: they need a version tag and `release-packaging`
+approval. The PR template's `examples/`-renamed run was replaced by the fresh-clone run, because
+`mv examples` failed with "Permission denied" here.
 
 ## Deferred scope
 

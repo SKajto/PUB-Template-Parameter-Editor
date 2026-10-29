@@ -40,6 +40,7 @@ public class ChannelPolicyTests
             "SECURITY.md",
             ".github/PULL_REQUEST_TEMPLATE.md",
             "docs/RELEASE_PACKAGING.md",
+            "docs/CODE_SIGNING.md",
             "docs/WINDOWS_PUBLISH.md",
             "docs/GPL_RELEASE.md",
             "docs/PRESERVATION_NOTES.md",
@@ -48,6 +49,8 @@ public class ChannelPolicyTests
             ".github/workflows/release.yml",
             "packaging/build-msix.ps1",
             "packaging/AppxManifest.template.xml",
+            "tools/signing/certum-sign.ps1",
+            "tools/signing/verify-signature.ps1",
         ];
 
         string[] forbiddenClaims =
@@ -100,13 +103,15 @@ public class ChannelPolicyTests
     }
 
     [Fact]
-    public void NoSigningServiceIsConfiguredOrNamedAnywhereButTheProjectLog()
+    public void NoSignerIsConfiguredInThePipelineAndNothingClaimsOne()
     {
         Assert.False(File.Exists(Path.Combine(RepoRoot(), "docs", "CODE_SIGNING_POLICY.md")),
             "the signing policy page belonged to a signing subscription this project does not have");
 
-        // No workflow may submit anything to a signer: a job that cannot run would fail every
+        // No workflow may call a signer or a signing tool: a job that cannot run would fail every
         // release, and a leftover secret/variable pair invites someone to re-enable it by accident.
+        // The signing scripts live in tools/signing/ on purpose - they run in a person's session,
+        // against a key that cannot be exported and therefore cannot reach a build agent.
         foreach (string workflow in Directory.GetFiles(Path.Combine(RepoRoot(), ".github", "workflows"), "*.yml"))
         {
             string text = File.ReadAllText(workflow);
@@ -115,11 +120,31 @@ public class ChannelPolicyTests
             Assert.DoesNotContain("SIGNPATH_", text, StringComparison.Ordinal);
             Assert.DoesNotContain("sign-portable-exe", text, StringComparison.Ordinal);
             Assert.DoesNotContain("signed-portable", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("signtool", text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("Set-AuthenticodeSignature", text, StringComparison.Ordinal);
         }
 
-        // The documents a reader or contributor acts on must not point at a signer either. The dated
-        // technical record stays in PLAN.md, the project log, where superseded decisions are marked as
-        // superseded instead of being rewritten after the fact.
+        // The configuration that records a signer must keep saying there is none, until the owner
+        // decides otherwise in a commit that also rewrites the wording and these tests.
+        using (Stream settings = File.OpenRead(Path.Combine(RepoRoot(), "packaging", "CertumSigning.settings.json")))
+        {
+            using System.Text.Json.JsonDocument doc = System.Text.Json.JsonDocument.Parse(settings);
+            Assert.Equal("Unconfigured", doc.RootElement.GetProperty("state").GetString());
+            Assert.False(doc.RootElement.GetProperty("ciSigning").GetBoolean());
+        }
+
+        // The signing page exists to say one thing plainly, and to point at the tools.
+        string signingPage = Read("docs", "CODE_SIGNING.md");
+        Assert.Contains("not signed", signingPage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("CertumSigning.settings.json", signingPage, StringComparison.Ordinal);
+        Assert.Contains("certum-sign.ps1", signingPage, StringComparison.Ordinal);
+        Assert.Contains("verify-signature.ps1", signingPage, StringComparison.Ordinal);
+        Assert.True(signingPage.Length < 2_000,
+            "the signing page is a pointer, not an essay: " + signingPage.Length + " characters");
+
+        // The documents a reader or contributor acts on must not point at a configured signer either.
+        // The dated technical record stays in PLAN.md, the project log, where superseded decisions are
+        // marked as superseded instead of being rewritten after the fact.
         string[] files =
         [
             "README.md", "SECURITY.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "START_HERE.md",
@@ -127,6 +152,7 @@ public class ChannelPolicyTests
             "docs/RELEASE_PACKAGING.md", "docs/PROJECT_SETUP.md", "docs/GPL_RELEASE.md",
             "docs/WINDOWS_PUBLISH.md", "docs/TEST_MATRIX.md", "docs/PRESERVATION_NOTES.md",
             "packaging/build-msix.ps1", "packaging/AppxManifest.template.xml",
+            "docs/CODE_SIGNING.md", "tools/signing/certum-sign.ps1", "tools/signing/verify-signature.ps1",
             "src/PubTemplateEditor.App/Properties/PublishProfiles/PortableWin_x64.pubxml",
         ];
         foreach (string file in files)
