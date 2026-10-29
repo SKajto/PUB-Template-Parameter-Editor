@@ -244,7 +244,9 @@ public class ChannelPolicyTests
 
         // The supplied planning documents keep their original wording as history, but they must say
         // up front that the channel changed, so nobody implements from a stale premise.
-        foreach (string doc in new[] { "REQUIREMENTS.md", "START_HERE.md", "docs/WINDOWS_PUBLISH.md",
+        // docs/WINDOWS_PUBLISH.md was rewritten outright on 2026-10-29 instead: it describes the
+        // published executable only, and names no other channel at all.
+        foreach (string doc in new[] { "REQUIREMENTS.md", "START_HERE.md",
                                        "docs/TEST_MATRIX.md" })
         {
             Assert.Contains("Channel update, 2026-10-26", Read(doc), StringComparison.Ordinal);

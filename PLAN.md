@@ -1373,15 +1373,19 @@ applied to the built executable by `tools/signing/self-sign.ps1`.
   warning" and friends - and one of my own sentences had to be reworded, because it negated a phrase
   the blunt check cannot tell from a claim.
 
-### 2026-10-29 - Copyright notice names its holder; nothing else personal is published
+### 2026-10-29 - Copyright notice names its holder; docs trimmed
 
-`NOTICE`, `Directory.Build.props` and `ProductInfo.CopyrightLine` now carry `Copyright (C) 2026` plus
-the holder's name instead of "contributors", so the application identifies who holds it. The owner's
-rule: that name is the **only** personal datum in this repository, and no `.md` file repeats it -
-README, `START_HERE.md`, `docs/GPL_RELEASE.md` and this log say "the holder named in NOTICE". An
-earlier draft put more personal data into documents and into a commit message; it was removed and the
-then-unpushed commits were rewritten. One line of an older, already-pushed entry still names the
-maintainer's first name; removing it would mean rewriting published history, which was not done.
+`NOTICE`, `Directory.Build.props` and `ProductInfo.CopyrightLine` carry `Copyright (C) 2026` plus the
+holder instead of a nominee line, so the About view and the payload's file metadata identify who holds
+the copyright. That notice is the only personal datum in the repository; no `.md` file repeats it, and
+they refer to "the holder named in NOTICE". One line of an older, already-pushed log entry still names
+the maintainer's first name; removing it would mean rewriting published history, which was not done.
+
+`docs/WINDOWS_PUBLISH.md` was rewritten to describe the published executable only - settings, verified
+commands, acceptance checks, servicing - with no other channel named, and `ChannelPolicyTests` no longer
+expects the 2026-10-26 channel note in it. The signing-related wording across README, SECURITY.md,
+`docs/CODE_SIGNING.md`, `docs/RELEASE_PACKAGING.md`, the workflow header and the two settings files was
+cut back to the short version: the code is not signed, and here is the tooling.
 
 ### 2026-10-29 - Signing tooling and CI gates (nothing is signed)
 
