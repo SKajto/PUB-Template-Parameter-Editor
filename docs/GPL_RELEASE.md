@@ -7,7 +7,7 @@ that the four freedoms it grants are real for a recipient.
 | --- | --- |
 | The licence text, unmodified | `LICENSE` is the canonical FSF GNU GPL v3 document, byte for byte |
 | A recorded SPDX choice | `GPL-3.0-only` in `Directory.Build.props`, `NOTICE`, the About view and the release notes; switching to `-or-later` would need an explicit decision by the copyright holder |
-| Copyright and provenance notice | `NOTICE` (contributors, artwork provenance, status of bundled components) |
+| Copyright and provenance notice | `NOTICE` names the copyright holder and is the only personal datum published here; it also covers artwork provenance and the status of bundled components |
 | Notices for bundled components | `THIRD-PARTY-NOTICES.txt`; the .NET runtime and WPF are bundled self-contained and keep their own MIT/.NET Runtime terms - bundling them does not relicense them, and they are the kind of system-library inclusion GPL v3 §1 allows |
 | Complete corresponding source next to every binary | each GitHub Release carries the source archive (`PUB_Template_Parameter_Editor-<version>-source.tar.gz`) and is also tagged in Git; the in-app About view names the repository and the source URL of the running version |
 | A recipient can actually rebuild it | build, test and publish commands in [README.md](../README.md) and [PROJECT_SETUP.md](PROJECT_SETUP.md); the CI workflow files are in the repository; nothing needed to build requires the maintainer's secrets, accounts or signing keys |

@@ -9,9 +9,11 @@
     <DebugSymbols>true</DebugSymbols>
     <InvariantGlobalization>false</InvariantGlobalization>
     <VersionPrefix>0.1.0</VersionPrefix>
-    <Company>PUB Template Parameter Editor contributors</Company>
+    <!-- The copyright holder of the application, as it reaches the payload's file
+         metadata and the About view. Nothing else personal is recorded here. -->
+    <Company>Suad Kajtazovic</Company>
     <Product>PUB Template Parameter Editor</Product>
-    <Copyright>Copyright (C) PUB Template Parameter Editor contributors</Copyright>
+    <Copyright>Copyright (C) 2026 Suad Kajtazovic</Copyright>
     <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
     <RepositoryType>git</RepositoryType>
     <!-- The owner's public repository: the corresponding source of every release lives here. -->

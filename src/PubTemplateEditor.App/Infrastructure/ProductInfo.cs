@@ -17,7 +17,7 @@ public static class ProductInfo
         "Edits are staged in memory and written only through Review Save.";
 
     public const string LicenseId = "GPL-3.0-only";
-    public const string CopyrightLine = "Copyright (C) PUB Template Parameter Editor contributors";
+    public const string CopyrightLine = "Copyright (C) 2026 Suad Kajtazovic";
 
     /// <summary>
     /// The GitHub location is fixed when the repository is first published; the exact-version

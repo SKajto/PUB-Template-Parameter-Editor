@@ -50,4 +50,6 @@ Store packaging includes manifests, visual assets and notices. Users install one
 
 The actual public repository URL, copyright holder, target PUB version, representative native DTA files and Partner Center identity/product IDs are not supplied by this package. Record these inputs as they become available and never invent them. GPL-3.0-only is the provisional license identifier; -or-later is a separate owner choice. Store price also remains an owner decision.
 
+Recorded 2026-10-29: the public repository is https://github.com/SKajto/PUB-Template-Parameter-Editor, and the application's copyright notice names an individual holder - the only personal datum published here. Still unrecorded: the target PUB version and representative native DTA files.
+
 Microsoft Store signs MSIX after certification. A pre-Store CI artifact or optional GitHub EXE does not automatically have that signature. Keep actual Store acquisition/execution, account setup and device-policy checks separate from build success. Recheck current release-tool prerequisites when implementing the workflows.

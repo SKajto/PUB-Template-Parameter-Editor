@@ -83,7 +83,7 @@ synthetic containers of the same shape when it does not — see
 `tests/TestSampleSupport.cs`. Before pushing, run the suite once with `examples/`
 renamed away: that is what a fresh clone and CI see.
 
-## Privacy, system changes, and why the build is unsigned
+## Privacy, system changes, and signing
 
 - **Privacy:** no user data or any other data are collected or transferred by this
   application. It has no network capability at all.
@@ -91,16 +91,16 @@ renamed away: that is what a fresh clone and CI see.
   startup entry, no registry change, no elevation. It writes only the template files
   you confirm in Review Save, plus its own files under `%LOCALAPPDATA%\PubTemplateEditor`.
 - **Uninstall:** delete the program's folder.
-- **No signature Windows trusts.** No authority vouches for these binaries. A self-signed
-  certificate (`tools/signing/self-sign.ps1`) can mark which build came from the maintainer's
-  machine and detect later tampering, but the chain is untrusted, so Windows SmartScreen still
-  shows *Windows protected your PC* on a downloaded copy. Judge the download by its SHA-256,
-  published with the release: check it, then choose *More info* → *Run anyway* only if it matches.
-  Antivirus products may warn either way. [docs/RELEASE_PACKAGING.md](docs/RELEASE_PACKAGING.md).
+- **Not signed.** Windows SmartScreen shows *Windows protected your PC* on a downloaded copy: check
+  the SHA-256 published with the release, and choose *More info* → *Run anyway* only if it matches.
+  Antivirus products may warn either way. A self-signed local key (`tools/signing/self-sign.ps1`) only
+  marks which build came from the maintainer's machine — its chain is not trusted.
+  [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md).
 
 ## Licensing
 
-Copyright (C) PUB Template Parameter Editor contributors. Licensed under
+The copyright holder is named in [NOTICE](NOTICE) — the only personal datum this repository
+publishes. Licensed under
 **GPL-3.0-only** ([LICENSE](LICENSE)); see [NOTICE](NOTICE) for the notice that
 accompanies the binaries, including the artwork provenance and the status of the
 bundled .NET runtime, which is not relicensed.
@@ -121,5 +121,6 @@ continue the work; the result is the owner's responsibility under the same licen
 - [REQUIREMENTS.md](REQUIREMENTS.md), [ARCHITECTURE.md](ARCHITECTURE.md), [PLAN.md](PLAN.md)
 - [docs/PROJECT_SETUP.md](docs/PROJECT_SETUP.md) — machine and solution setup
 - [docs/RELEASE_PACKAGING.md](docs/RELEASE_PACKAGING.md) — CI, packaging, publishing, why binaries are unsigned
+- [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md) — what a signature would mean here
 - [docs/GPL_RELEASE.md](docs/GPL_RELEASE.md) — source-availability obligations
 - [docs/SAMPLE_FINDINGS.md](docs/SAMPLE_FINDINGS.md) — what the native templates look like
