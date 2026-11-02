@@ -1480,6 +1480,50 @@ to point at; SmartScreen and antivirus behaviour on a signed build is unobserved
 in the settings file needs a renewal step before 2027-11-02. S5 (native PUB round trip) and the
 interactive desktop checks are unaffected and still open.
 
+### 2026-11-02 - v1.0.0 released, with one signing operation
+
+Released from `2e7f73b` (annotated tag `v1.0.0` → tag object `600d263e`):
+<https://github.com/SKajto/PUB-Template-Parameter-Editor/releases/tag/v1.0.0>. Five assets:
+`PUB_Template_Parameter_Editor.exe`, `PUB_Template_Parameter_Editor-1.0.0-source.tar.gz`,
+`SHA256SUMS.txt`, `SIGNING-STATUS.txt`, `file-metadata.txt`.
+
+Executed, in order, all on this machine:
+
+- `dotnet build PubTemplateEditor.slnx -c Release` 0 warnings; `dotnet test` 89 + 62 + 88 = **239** in
+  the working tree, and 89 + 46 + 88 = **223** in a `git archive` tree (no samples, no `.git`).
+- `git push`; CI validation run `41531969379` green on `main`.
+- `git push origin v1.0.0` → Release packaging run `41532420662` green on the tag: the configuration
+  gate, the file-metadata gate and "The CI build carries no signature, and cannot" all passed, and
+  `publish-github-release` was skipped as designed (its new guard refuses while a certificate is
+  recorded, because CI could only attach its own unsigned build).
+- `dotnet publish ... -p:PublishProfile=PortableWin_x64 -p:Version=1.0.0` at the tagged commit:
+  131,273,851 bytes, `ProductName=PUB Template Parameter Editor`, ProductVersion and FileVersion
+  `1.0.0`, `Get-AuthenticodeSignature` → `NotSigned`, SHA-256 `72D54E46…7738DD54`.
+- `tools/signing/certum-sign.ps1` on that one file - **one signing operation**, because the certificate's
+  signing allowance is finite and signing is never part of a build loop. `signtool sign` with
+  `/fd sha256 /td sha256 /tr http://time.certum.pl`, then read back: `Valid`, timestamp
+  `CN=Certum Timestamp 2026`, chain signer ← Certum Code Signing 2021 CA ← Certum Trusted Network CA 2,
+  131,284,504 bytes, SHA-256 `E397E4AC…2EE63961`.
+- Release created through the GitHub Releases API (no `gh` CLI here), assets uploaded, then the published
+  executable downloaded back: same SHA-256 as the signed file, and `Get-AuthenticodeSignature` → `Valid`
+  with the Certum timestamp. GitHub's own asset digest is `e397e4ac…`, byte for byte the signed file.
+
+Fixed on the way, by CI rather than by reading: the two script defects in the previous entry (the
+client-auth EKU, and `-CodeSigningCert` not binding where the personal store cannot be opened). CI also
+caught the refusal test not seeing the script's reason, so that assertion now prints the script's output.
+
+Open after this release:
+
+- No second machine has judged this chain; a device without the Certum root or without access to the
+  revocation endpoints can report differently, and SmartScreen/antivirus behaviour on a freshly
+  published signed binary is unobserved. Nothing here claims a SmartScreen outcome.
+- Nothing else is signed, and nothing further needs signing: the remaining gates (S5 native PUB round
+  trip, interactive desktop review) run against builds and copies, not against the signature.
+- Renewal gate: the recorded certificate expires 2027-11-02. Releases published before then stay
+  verifiable because of their timestamps; the renewal is a configuration edit plus one signing step per
+  release afterwards.
+
+
 ## Deferred scope
 
 Linux UI, additional architectures, parameter creation/deletion/renaming, presets, recursive folders, in-app PUB generation, browser hosting and custom installer/updater services are outside this initial Windows release. Keep the domain core independent without building a second UI.
