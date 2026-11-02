@@ -7,6 +7,11 @@
 > instead). See [docs/RELEASE_PACKAGING.md](docs/RELEASE_PACKAGING.md). Current build
 > steps: [docs/PROJECT_SETUP.md](docs/PROJECT_SETUP.md); what has actually been done and what is
 > still open: [PLAN.md](PLAN.md).
+>
+> **Signing update, 2026-11-02 (owner decision).** That last point changed: the executable attached to
+> a release is signed with the one certificate recorded in `packaging/CertumSigning.settings.json`,
+> while everything CI builds stays unsigned. Current wording:
+> [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md).
 
 Revision 4, 25 October 2026. This is a complete instruction package for creating a new application from an empty project directory. It contains specifications and configuration examples, not application source or a compiled executable. No prior implementation or completed milestone is assumed.
 

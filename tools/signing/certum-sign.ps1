@@ -6,10 +6,13 @@
 .DESCRIPTION
     The private key lives on the signing service's card, so it is never a file, never a repository
     secret and never available to a build agent: this script runs in a Windows session where the
-    vendor's client is connected to that card. It reads the key's thumbprint from the settings file
-    and refuses while the file records none.
+    vendor's client is connected to that card. The certificate recorded in the settings file is the
+    only key it will use - there is no key parameter, and while the file records none it refuses.
 
     Rules the script enforces:
+      - the recorded certificate is the one that signs: it must be present on this machine, issued by
+        the recorded CA, carry the code-signing purpose, match the recorded signer name and expiry,
+        be inside its validity window and not be self-issued;
       - SHA-256 file and timestamp digests, and a mandatory RFC 3161 timestamp: without one the
         signature stops verifying when the certificate expires;
       - the result is read back and must report Valid with a timestamp, otherwise the script fails;
@@ -35,7 +38,6 @@
 param(
     [string[]]$FilePath = @('artifacts/publish/portable-win-x64/PUB_Template_Parameter_Editor.exe'),
     [string]$SettingsPath = '',
-    [string]$Thumbprint = '',
     [string]$TimestampUrl = '',
     [string]$Description = '',
     [string]$ExportCer = '',
@@ -98,9 +100,9 @@ function Explain([string]$status) {
     switch ($status) {
         'Valid'        { 'the chain this machine trusts leads back to the certificate; on another machine the same file is judged by the same chain, so a failure here is a reason not to publish' }
         'NotTrusted'   { 'the chain is not trusted here. For a certificate under a root Windows trusts this normally means the desktop client is not connected to the card, the intermediate certificates are missing, or the machine has no way to fetch them' }
-        'UnknownError' { 'a chain problem this trust provider cannot resolve. If the chain ends in a self-signed certificate, the wrong certificate was used - the self-signed local key (tools/signing/self-sign.ps1) is integrity only and is never a substitute' }
+        'UnknownError' { 'a chain problem this trust provider cannot resolve. Check that the chain leads to the CA named in the settings file: a chain that ends in a self-issued certificate means the wrong certificate signed this file' }
         'HashMismatch' { 'STOP: the content no longer matches the signature. This file was modified after it was signed - do not publish it, find out what changed' }
-        'NotSigned'    { 'no signature on this file. Correct for every artifact this project builds in CI' }
+        'NotSigned'    { 'no signature on this file. Correct for every artifact this project builds in CI, and a reason to stop before publishing a download' }
         default        { 'read the status message above before publishing anything' }
     }
 }
@@ -140,12 +142,16 @@ if ($settings.state -eq 'Unconfigured') {
     Fail @"
 No certificate is recorded: $SettingsPath still says "state": "Unconfigured". This script will not
 invent a key. After a certificate is issued, set state to "Recorded" and put the real
-certificateThumbprint, signerCommonName and certificateNotAfter in that file, and update the
-unsigned/signed wording in README, SECURITY.md and docs/RELEASE_PACKAGING.md in the same commit.
+certificateThumbprint, signerCommonName, certificateIssuer and certificateNotAfter in that file, and
+update the unsigned/signed wording in README, SECURITY.md and docs/RELEASE_PACKAGING.md in the same
+commit.
 "@
 }
+if ($settings.state -ne 'Recorded') {
+    Fail "$SettingsPath has state '$($settings.state)'; this script signs only when the state is Recorded and the values were read from an issued certificate"
+}
 
-if (-not $Thumbprint) { $Thumbprint = $settings.certificateThumbprint }
+$Thumbprint = $settings.certificateThumbprint
 $Thumbprint = ($Thumbprint -replace '[^0-9A-Fa-f]', '')
 if ($Thumbprint -notmatch '^[0-9A-Fa-f]{40}$') {
     Fail "certificateThumbprint '$($settings.certificateThumbprint)' is not a 40-digit hex thumbprint - record the real one in $SettingsPath before signing"
@@ -154,9 +160,16 @@ if (-not $TimestampUrl) { $TimestampUrl = $settings.timestampUrl }
 if (-not $TimestampUrl) { Fail 'a timestamp url is required: an untimestamped signature stops verifying the day the certificate expires' }
 
 # ---------------------------------------------------------------- the certificate, on this machine
-$cert = Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert |
-    Where-Object { $_.Thumbprint -eq $Thumbprint.ToUpper() } |
-    Select-Object -First 1
+# -CodeSigningCert is a dynamic parameter of the certificate provider and is not available in a session
+# that cannot open the personal store, so the purpose is checked explicitly below instead.
+$cert = $null
+try {
+    $cert = Get-ChildItem -Path Cert:\CurrentUser\My |
+        Where-Object { $_.Thumbprint -eq $Thumbprint.ToUpper() } |
+        Select-Object -First 1
+} catch {
+    Say "note: the personal certificate store could not be read here: $($_.Exception.Message)"
+}
 if (-not $cert) {
     Fail @"
 No certificate with thumbprint $Thumbprint in Cert:\CurrentUser\My.
@@ -167,15 +180,29 @@ certificate the client lists.
 }
 
 if ($cert.Subject -eq $cert.Issuer) {
-    Fail "the certificate found is self-signed ($($cert.Subject)). That is the local build-integrity key, not a publisher certificate; the recorded thumbprint must point at the CA-issued one"
+    Fail "the recorded certificate is self-issued ($($cert.Subject)). Only a certificate a certification authority issued may sign a release: a self-issued one vouches for nothing, and this project keeps no such key"
 }
-$codeSigningEku = '1.3.6.1.5.5.7.3.2'
+# 1.3.6.1.5.5.7.3.3 is id-kp-codeSigning; .3.2 is client authentication, which is not this.
+$codeSigningEku = '1.3.6.1.5.5.7.3.3'
+if (-not $cert.EnhancedKeyUsageList) {
+    Fail "the certificate found lists no purposes, so its code-signing purpose cannot be confirmed: refusing to sign"
+}
 if (-not ($cert.EnhancedKeyUsageList | Where-Object { $_.ObjectId -eq $codeSigningEKU })) {
-    Fail 'that certificate is not valid for code signing (no Code Signing EKU)'
+    Fail "the recorded certificate is not valid for code signing (no code-signing purpose: its EKUs are $(($cert.EnhancedKeyUsageList | ForEach-Object { $_.ObjectId }) -join ', '))"
+}
+if ($settings.certificateIssuer -and $cert.Issuer -ne $settings.certificateIssuer) {
+    Fail "the certificate in the store was issued by '$($cert.Issuer)', but $SettingsPath records '$($settings.certificateIssuer)': a different key is connected, so nothing is signed until that is resolved"
+}
+$certCn = ([regex]'CN=([^,]+)').Match($cert.Subject).Groups[1].Value
+if ($settings.signerCommonName -and $certCn -ne $settings.signerCommonName) {
+    Fail "the certificate's common name '$certCn' is not the recorded signerCommonName in $SettingsPath"
 }
 $now = Get-Date
 if ($now -lt $cert.NotBefore -or $now -gt $cert.NotAfter) {
     Fail "the certificate is outside its validity window ($($cert.NotBefore.ToString('yyyy-MM-dd')) - $($cert.NotAfter.ToString('yyyy-MM-dd')))"
+}
+if ($settings.certificateNotAfter -and $cert.NotAfter.ToString('yyyy-MM-dd') -ne $settings.certificateNotAfter) {
+    Fail "the certificate expires $($cert.NotAfter.ToString('yyyy-MM-dd')) but $SettingsPath records $($settings.certificateNotAfter): update the configuration from the certificate, never the other way round"
 }
 if ($cert.NotAfter -lt $now.AddDays(30)) {
     Say "note: this certificate expires on $($cert.NotAfter.ToString('yyyy-MM-dd')). Renew it, and keep the timestamp on everything already signed - the timestamp is what keeps old releases verifiable."
@@ -191,6 +218,7 @@ Pair 'signer'            $cert.Subject
 Pair 'issuer'            $cert.Issuer
 Pair 'thumbprint'        $cert.Thumbprint
 Pair 'expires'           $cert.NotAfter.ToString('yyyy-MM-dd')
+Pair 'key source'        'the vendor client on this machine (a card-backed key is never a file, never a secret in a pipeline)'
 Pair 'signtool'          $signtool
 Pair 'timestamp'         "$TimestampUrl (sha256)"
 
@@ -200,6 +228,15 @@ foreach ($file in $FilePath) {
     $resolved = (Resolve-Path -LiteralPath $file -ErrorAction SilentlyContinue).Path
     if (-not $resolved) { Fail "not a file: $file" }
     if ($resolved -match '\.dta$') { Fail "refusing to sign a template data file: only the application's own binaries are signed" }
+    $existing = Get-AuthenticodeSignature -LiteralPath $resolved
+    if ($existing.Status -ne 'NotSigned') {
+        $by = if ($existing.SignerCertificate) { "$($existing.SignerCertificate.Subject) [$($existing.SignerCertificate.Thumbprint)]" } else { 'an unreadable signature' }
+        if ($existing.SignerCertificate -and $existing.SignerCertificate.Thumbprint -eq $cert.Thumbprint) {
+            Pair 're-signing' "this file already carries a signature by the recorded key; the new one replaces it and every published hash changes"
+        } else {
+            Fail "$resolved is already signed by $by. This project signs with one certificate, the recorded one; finding out what signed this file comes before signing it"
+        }
+    }
     $targets += $resolved
     Pair 'file'           $resolved
     Pair 'size bytes'     (Get-Item -LiteralPath $resolved).Length

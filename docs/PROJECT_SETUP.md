@@ -46,6 +46,8 @@ dotnet publish src/PubTemplateEditor.App/PubTemplateEditor.App.csproj `
 ## Inputs the owner supplies (code and tests do not depend on them)
 
 Native PUB templates for evidence testing (kept local), and the version tag plus
-`PUBLISH_GITHUB_RELEASE=true` for a release. The released executable is **not code-signed** -
-[RELEASE_PACKAGING.md](RELEASE_PACKAGING.md) explains why. Track the state of all of this in
+`PUBLISH_GITHUB_RELEASE=true` for a release. The certificate that signs a release is recorded in
+`packaging/CertumSigning.settings.json` and lives on the signing service's own card: no pipeline holds
+it, every CI build is unsigned, and a signed release asset is produced by the maintainer's own
+[docs/RELEASE_PACKAGING.md](RELEASE_PACKAGING.md) steps. Track the state of all of this in
 [PLAN.md](../PLAN.md).

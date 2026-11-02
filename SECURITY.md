@@ -4,7 +4,7 @@
 
 | Version | Supported |
 | --- | --- |
-| latest release from the GitHub Releases page (the unsigned single-file executable, with published SHA-256 hashes) | yes |
+| latest release from the GitHub Releases page (the signed single-file executable, with published SHA-256 hashes taken after signing) | yes |
 | `main` branch (what CI builds) | yes, best effort |
 | older releases | security fixes are applied to the newest release; older ones are rebuilt from the tag when a fix matters |
 
@@ -32,9 +32,10 @@ The program is offline by design, so the interesting attack surface is *the file
   under `%LOCALAPPDATA%\PubTemplateEditor` of the running user.
 - **The distributed executable** is a single self-contained file that extracts its native
   parts to the user's temp directory - ordinary self-contained .NET behaviour, not an installer. It
-  runs under normal Windows policies. The most it can carry is a **self-signed** signature,
-  which no trust provider on your machine has any reason to believe: verify the SHA-256 published
-  with the release before running it. A hash that does not match, or a signed copy that reports
+  runs under normal Windows policies. The released executable carries an Authenticode signature from
+  the certificate recorded in `packaging/CertumSigning.settings.json`; a build from CI or from the
+  source archive is unsigned, and the SHA-256 published with a release is the one of the signed file.
+  A hash that does not match, or a published copy that reports
   `HashMismatch`, is a supply-chain problem - please report it privately as described below.
 
 ## Reporting a problem
@@ -66,7 +67,7 @@ This project has one maintainer working on it in their own time, so there is no 
 bounty. What you can expect: an acknowledgement, a fix in the next release when the problem is real
 and reproducible, and a credit in the release notes if you want one. What you should not expect:
 support for constructs the format documentation does not define, and no promise about how
-SmartScreen or antivirus products will treat an unsigned binary (see
+SmartScreen or antivirus products will treat the binary (see
 [docs/RELEASE_PACKAGING.md](docs/RELEASE_PACKAGING.md)). `tools/signing/verify-signature.ps1` reads
 the signature and the hash from the file itself and writes nothing; a file published signed that reads
 `HashMismatch` is a supply-chain report.

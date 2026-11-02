@@ -8,9 +8,10 @@ using Xunit;
 namespace PubTemplateEditor.Integration.Tests;
 
 /// <summary>
-/// Guards the signing configuration and scripts: the repository holds no key and configures no
-/// signer, the signing scripts refuse until a real certificate is recorded, no workflow calls a
-/// signing tool, and no private-key material is tracked. Nothing here signs anything.
+/// Guards the signing configuration and scripts: the repository records one issued code-signing
+/// certificate and holds no key, the signing scripts refuse every other key, no workflow calls a
+/// signing tool, and no private-key material is tracked. Nothing here signs anything: every executed
+/// signing script is given a target that does not exist, so it can only refuse.
 /// </summary>
 public class SigningToolingTests
 {
@@ -23,19 +24,25 @@ public class SigningToolingTests
         JsonDocument.Parse(Read("packaging", "CertumSigning.settings.json"));
 
     [Fact]
-    public void TheRepositoryRecordsNoSignerAndNoKey()
+    public void TheConfigurationRecordsOneIssuedCertificateAndNoKey()
     {
         using JsonDocument doc = Settings();
         JsonElement root = doc.RootElement;
 
-        // The state the release job reads.
-        Assert.Equal("Unconfigured", root.GetProperty("state").GetString());
+        // The state the release job reads: a certificate exists, and CI may not use it.
+        Assert.Equal("Recorded", root.GetProperty("state").GetString());
         Assert.False(root.GetProperty("ciSigning").GetBoolean());
-        Assert.True(string.IsNullOrEmpty(root.GetProperty("certificateThumbprint").GetString()),
-            "a thumbprint recorded together with state 'Unconfigured' is the inconsistency the release job rejects");
-        Assert.True(string.IsNullOrEmpty(root.GetProperty("signerCommonName").GetString()));
-        Assert.True(string.IsNullOrEmpty(root.GetProperty("publicCertificatePath").GetString()),
-            "no public certificate may be committed for a certificate that does not exist");
+        Assert.Matches("^[0-9A-Fa-f]{40}$", root.GetProperty("certificateThumbprint").GetString()!);
+        Assert.False(string.IsNullOrEmpty(root.GetProperty("signerCommonName").GetString()));
+        Assert.False(string.IsNullOrEmpty(root.GetProperty("certificateIssuer").GetString()));
+        Assert.False(string.IsNullOrEmpty(root.GetProperty("publicCertificatePath").GetString()));
+        Assert.True(DateTime.TryParse(root.GetProperty("certificateNotAfter").GetString(), out _),
+            "the expiry is what makes the mandatory timestamp matter, so it has to be a date");
+
+        // The file is a record, never a key: no private-key field of any shape may appear in it.
+        string raw = Read("packaging", "CertumSigning.settings.json");
+        Assert.DoesNotContain("-----BEGIN", raw, StringComparison.Ordinal);
+        Assert.DoesNotContain("PrivateKey", raw, StringComparison.Ordinal);
 
         // Digests and the timestamp are fixed in the configuration rather than chosen at the keyboard.
         Assert.Equal("sha256", root.GetProperty("fileDigestAlgorithm").GetString());
@@ -57,22 +64,55 @@ public class SigningToolingTests
         // is the only one any tool reads by default.
         string exampleThumbprint = doc.RootElement.GetProperty("certificateThumbprint").GetString()!;
         Assert.Matches("^[0-9A-Fa-f]{40}$", exampleThumbprint);
+        using JsonDocument recorded = Settings();
+        Assert.NotEqual(recorded.RootElement.GetProperty("certificateThumbprint").GetString(), exampleThumbprint);
     }
 
     [Fact]
-    public void TheSigningScriptRefusesWhileNoCertificateIsRecorded()
+    public void TheSigningScriptRefusesAnythingOtherThanTheRecordedCertificate()
     {
-        // Run it: the refusal has to be the script's real behaviour, not just its wording.
-        (string? output, int exitCode, bool available) = RunSigningScript(
-            "tools" + Path.DirectorySeparatorChar + "signing" + Path.DirectorySeparatorChar + "certum-sign.ps1");
+        // Every run here gets a target file that does not exist, so a script that failed to refuse
+        // could not sign anything real. The refusals have to be the script's behaviour, not its wording.
+        string nowhere = Path.Combine(Path.GetTempPath(), "pubte-signing-refusal-check", "nothing-here.exe");
+        string real = Read("packaging", "CertumSigning.settings.json");
 
-        if (!available)
+        var cases = new (string Field, string Value, string Pattern)[]
         {
-            return; // no PowerShell here: the script is a Windows tool and cannot be executed
-        }
+            // no certificate recorded at all
+            ("state", "\"Unconfigured\",", "Unconfigured|will not invent a key"),
+            // a state that is neither of the two the configuration is allowed to carry
+            ("state", "\"Almost\",", "only when the state is Recorded"),
+            // a well-formed configuration naming a key no signing client presents
+            ("certificateThumbprint", "\"0000000000000000000000000000000000000000\",", "No certificate with thumbprint"),
+        };
 
-        Assert.NotEqual(0, exitCode);
-        Assert.Matches("Unconfigured|will not invent a key", output ?? string.Empty);
+        foreach ((string field, string value, string pattern) in cases)
+        {
+            string path = Path.Combine(Path.GetTempPath(), "pubte-signing-refusal-check",
+                                       field + "-" + value.Trim('"', ',') + ".json");
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, WithField(real, field, value));
+
+            (string? output, int exitCode, bool available) = RunSigningScript(
+                "tools" + Path.DirectorySeparatorChar + "signing" + Path.DirectorySeparatorChar + "certum-sign.ps1",
+                "-SettingsPath", path, "-FilePath", nowhere);
+
+            if (!available)
+            {
+                return; // no PowerShell here: the script is a Windows tool and cannot be executed
+            }
+
+            Assert.True(exitCode != 0, $"the script exited 0 for {field}={value}");
+            Assert.True(Regex.IsMatch(output ?? string.Empty, pattern),
+                        $"the script did not refuse {field} = {value} (exit {exitCode}):{Environment.NewLine}{output}");
+        }
+    }
+
+    /// <summary>Replaces the line of one top-level field of the settings document.</summary>
+    private static string WithField(string json, string field, string value)
+    {
+        string pattern = @"(?m)^(\s*)""" + field + @"""[^\n]*$";
+        return Regex.Replace(json, pattern, m => m.Groups[1].Value + "\"" + field + "\": " + value);
     }
 
     [Fact]
@@ -99,10 +139,11 @@ public class SigningToolingTests
         Assert.DoesNotContain("Export-PfxCertificate", script, StringComparison.Ordinal);
         Assert.Contains("Export-Certificate", script, StringComparison.Ordinal);
 
-        // The local self-signed key and a CA-issued certificate must stay distinguishable.
-        Assert.Contains("self-sign.ps1", script, StringComparison.Ordinal);
-        Assert.Contains("self-signed", script, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("not trusted", script, StringComparison.OrdinalIgnoreCase);
+        // The code-signing purpose is id-kp-codeSigning (1.3.6.1.5.5.7.3.3); a self-issued certificate
+        // never signs a release, and a file signed by another key is never re-signed silently.
+        Assert.Contains("1.3.6.1.5.5.7.3.3", script, StringComparison.Ordinal);
+        Assert.Contains("self-issued", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("already signed by", script, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -138,7 +179,9 @@ public class SigningToolingTests
         string release = Read(".github", "workflows", "release.yml");
 
         Assert.Contains("Signing configuration must not claim a key this pipeline does not have", release, StringComparison.Ordinal);
-        Assert.Contains("The payload really is unsigned, as every document says", release, StringComparison.Ordinal);
+        Assert.Contains("The CI build carries no signature, and cannot", release, StringComparison.Ordinal);
+        Assert.Contains("CI may only publish a build it can describe", release, StringComparison.Ordinal);
+        Assert.Contains("signingState", release, StringComparison.Ordinal);
         Assert.Contains("Get-AuthenticodeSignature", release, StringComparison.Ordinal);
         Assert.Contains("NotSigned", release, StringComparison.Ordinal);
         Assert.Contains("SIGNING-STATUS.txt", release, StringComparison.Ordinal);
@@ -190,7 +233,7 @@ public class SigningToolingTests
             "private key material must never be tracked: " + string.Join(", ", offenders));
     }
 
-    private static (string? output, int exitCode, bool available) RunSigningScript(string relativePath)
+    private static (string? output, int exitCode, bool available) RunSigningScript(string relativePath, params string[] extraArguments)
     {
         foreach (string candidate in new[] { "powershell.exe", "pwsh" })
         {
@@ -205,6 +248,10 @@ public class SigningToolingTests
                 };
                 foreach (string a in new[] { "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
                                              "-File", Path.Combine(RepoRoot(), relativePath) })
+                {
+                    start.ArgumentList.Add(a);
+                }
+                foreach (string a in extraArguments)
                 {
                     start.ArgumentList.Add(a);
                 }

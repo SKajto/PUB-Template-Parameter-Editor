@@ -64,10 +64,13 @@ Windows run, and a WPF build from a non-Windows host still needs real Windows ex
 
 ## Signing and servicing
 
-The code is currently not signed, so SmartScreen warns on the downloaded copy and the release publishes
-the SHA-256 to check it against. [CODE_SIGNING.md](CODE_SIGNING.md) covers the tooling; if a signature
-is ever added, the published hash is the one of the signed file. Rebuild and re-publish this payload
-for runtime security patches — there is no updater and nothing writes into the program directory.
+The released executable is signed with the one certificate recorded in
+`packaging/CertumSigning.settings.json`, in a maintainer's session; the build this document describes,
+and every CI build, is unsigned. SmartScreen may still prompt for a signed file that has no reputation
+yet, so the release publishes the SHA-256 of the signed file to check it against, and
+[CODE_SIGNING.md](CODE_SIGNING.md) covers the tooling and the certificate's expiry. Rebuild and
+re-publish this payload for runtime security patches — there is no updater and nothing writes into the
+program directory.
 
 ## Platform documentation checked 2026-10-25
 

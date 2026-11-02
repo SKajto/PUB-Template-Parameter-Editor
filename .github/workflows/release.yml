@@ -1,6 +1,7 @@
-# Trusted release packaging and publishing. The application is distributed through a GitHub Release.
-# The code is not signed: a card-backed signing key is never exportable, so no signing key exists in
-# this pipeline; the job asserts the payload is unsigned and publishes SHA-256 hashes instead.
+# Trusted release packaging. The application is distributed through a GitHub Release.
+# This pipeline builds and tests unsigned: a card-backed signing key is not exportable, so no signing
+# key exists in CI, and the job asserts that its own payload carries no signature. The signed download
+# is produced on a maintainer's machine (docs/RELEASE_PACKAGING.md, 'Publishing a release').
 #
 # Runs only for maintainer-triggered work or tags on the protected default branch; PR code is not
 # executed here. Requires the 'release-packaging' environment so a maintainer must approve the run
@@ -25,7 +26,7 @@ on:
       appVersion:
         description: App version MAJOR.MINOR.PATCH (becomes the release tag's version and the file metadata)
         required: true
-        default: 0.1.0
+        default: 1.0.0
       buildMsix:
         description: Also build an MSIX (packaged-app testing only - not a distribution channel, and it needs resolved packaging identity values)
         type: choice
@@ -54,6 +55,7 @@ jobs:
     outputs:
       appVersion: ${{ steps.version.outputs.appVersion }}
       packageVersion: ${{ steps.version.outputs.packageVersion }}
+      signingState: ${{ steps.signing_config.outputs.state }}
       # empty unless buildMsix=true
       msixArtifactName: ${{ steps.package_artifact.outputs.artifact_name }}
 
@@ -77,8 +79,10 @@ jobs:
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
 
       - name: Signing configuration must not claim a key this pipeline does not have
+        id: signing_config
         run: |
           $signing = Get-Content packaging/CertumSigning.settings.json -Raw | ConvertFrom-Json
+          "state=$($signing.state)" >> $env:GITHUB_OUTPUT
           if ($signing.ciSigning -eq $true) {
             throw "the configuration claims CI signs, but a card-backed key is not exportable and is not a build secret. Unset ciSigning, or build the interactive self-hosted runner that claim would need - and rewrite the notes, README, SECURITY.md and ChannelPolicyTests in the same commit"
           }
@@ -88,12 +92,21 @@ jobs:
           if ($signing.state -ne 'Unconfigured' -and $signing.certificateThumbprint -notmatch '^[0-9A-Fa-f]{40}$') {
             throw "state is '$($signing.state)' but certificateThumbprint is not a real 40-digit thumbprint"
           }
+          if ($signing.state -ne 'Unconfigured' -and $signing.publicCertificatePath -and -not (Test-Path $signing.publicCertificatePath)) {
+            throw "the configuration points at $($signing.publicCertificatePath), which is not in the repository: a release cannot describe a certificate nobody can inspect"
+          }
           New-Item -ItemType Directory -Force artifacts | Out-Null
           'signing: none applied by this workflow.'                                            |
             Tee-Object artifacts/SIGNING-STATUS.txt
           "configuration state: $($signing.state); ciSigning: $($signing.ciSigning)"          |
             Tee-Object -FilePath artifacts/SIGNING-STATUS.txt -Append
-          'a signature added later by the maintainer is applied to the published file, and its hash is restated with it (docs/CODE_SIGNING.md)' |
+          'the certificate recorded in packaging/CertumSigning.settings.json signs a release in a' |
+            Tee-Object -FilePath artifacts/SIGNING-STATUS.txt -Append
+          'maintainer session; CI has no key, so this artifact and this build are unsigned'   |
+            Tee-Object -FilePath artifacts/SIGNING-STATUS.txt -Append
+          'a published download may therefore carry a signature this run did not apply; its hash is the' |
+            Tee-Object -FilePath artifacts/SIGNING-STATUS.txt -Append
+          'post-signature one (docs/CODE_SIGNING.md)'                                         |
             Tee-Object -FilePath artifacts/SIGNING-STATUS.txt -Append
         shell: pwsh
 
@@ -166,15 +179,15 @@ jobs:
           }
         shell: pwsh
 
-      # The documents describe the payload as unsigned, so the build has to match that.
-      - name: "The payload really is unsigned, as every document says"
+      # CI has no signing key and no way to reach one, so its own payload must be bare.
+      - name: "The CI build carries no signature, and cannot"
         run: |
           $exe = 'artifacts/publish/portable-win-x64/PUB_Template_Parameter_Editor.exe'
           $auth = Get-AuthenticodeSignature -LiteralPath $exe
-          "signature status of the built payload: $($auth.Status) - $($auth.StatusMessage)" |
+          "signature status of the executable this workflow built: $($auth.Status) - $($auth.StatusMessage)" |
             Tee-Object -FilePath artifacts/SIGNING-STATUS.txt -Append
           if ($auth.Status -ne 'NotSigned') {
-            throw "the built payload reports $($auth.Status), but README, SECURITY.md, the packaging notes and these release notes say it is not code-signed. If it genuinely is signed now, all of those and ChannelPolicyTests change in the same commit; if it was signed by accident, find out by what"
+            throw "this build reports $($auth.Status), but the key is on a signing service's card and this runner has no way to reach it. Find out what signed the file, and rewrite the notes, README, SECURITY.md and ChannelPolicyTests only if the pipeline genuinely gained a signer"
           }
         shell: pwsh
 
@@ -212,17 +225,18 @@ jobs:
             Tee-Object artifacts/SHA256SUMS.txt
           'commit: ' + (git rev-parse HEAD)  | Tee-Object -Append artifacts/SHA256SUMS.txt
           'dotnet: ' + (dotnet --version)    | Tee-Object -Append artifacts/SHA256SUMS.txt
-          'status: built and uploaded UNSIGNED by CI; any self-signed signature is applied locally' |
+          'status: these hashes are of the UNSIGNED build this workflow produced' |
             Tee-Object -Append artifacts/SHA256SUMS.txt |
             Out-Null
-          'status: a self-signed chain is not trusted by Windows, so treat these hashes as the check' |
+          'status: CI has no signing key, because a card-backed key is not exportable and is not a' |
             Tee-Object -Append artifacts/SHA256SUMS.txt
-          'status: a CA-issued signature, if the owner ever buys one, is added after this run by' |
+          'status: build secret; the executable published for download is signed in a maintainer session' |
             Tee-Object -Append artifacts/SHA256SUMS.txt
-          'status: tools/signing/certum-sign.ps1, and the hash published with the release is then the' |
+          'status: by the certificate recorded in packaging/CertumSigning.settings.json, and the hash' |
             Tee-Object -Append artifacts/SHA256SUMS.txt
-          'status: post-signature one, because signing appends to the file' |
+          'status: published with a release is then the post-signature one, because signing appends' |
             Tee-Object -Append artifacts/SHA256SUMS.txt
+          'status: to the file' | Tee-Object -Append artifacts/SHA256SUMS.txt
         shell: pwsh
 
       - name: Upload release artifacts
@@ -240,14 +254,18 @@ jobs:
           if-no-files-found: error
 
   # ---------------------------------------------------------------------------
-  # Publish the build as the project's distribution channel.
+  # Publish this build as a GitHub Release - only while CI is the whole story.
   #
   # A GitHub Release is where this application is obtained, and it is also where the GPL's complete
   # corresponding source sits next to the binary. The runner's preinstalled GitHub CLI is used with
   # the job's own token, which keeps third-party actions out of the publishing path.
   #
-  # The executable is unsigned. That is stated plainly in the release notes, together with the
-  # SHA-256 the reader can check and what SmartScreen will do on first run.
+  # Once the signing configuration records a certificate, the executable users download is the
+  # maintainer-signed one, and CI must not publish its own unsigned copy under notes that would have to
+  # describe it. The job then refuses; that release is assembled as documented in
+  # docs/RELEASE_PACKAGING.md ('Publishing a release'). While no certificate is recorded, the executable
+  # CI built is what users get, and these notes say so plainly - with the SHA-256 to check the download
+  # against and what SmartScreen will do on first run.
   publish-github-release:
     name: Publish the release on GitHub
     runs-on: ubuntu-latest
@@ -259,6 +277,20 @@ jobs:
       actions: read          # download the artifacts this same run produced
 
     steps:
+      - name: CI may only publish a build it can describe
+        env:
+          SIGNING_STATE: ${{ needs.package.outputs.signingState }}
+        run: |
+          set -eu
+          if [ "$SIGNING_STATE" != "Unconfigured" ]; then
+            echo "the signing configuration records a certificate (state: $SIGNING_STATE), so the"
+            echo "downloadable executable is signed in a maintainer session. CI has no key and can only"
+            echo "attach its own unsigned build, which the release notes would then misdescribe."
+            echo "Assemble the release as documented in docs/RELEASE_PACKAGING.md instead."
+            exit 1
+          fi
+        shell: bash
+
       - name: Download this run's artifacts
         env:
           GH_TOKEN: ${{ github.token }}
@@ -295,9 +327,10 @@ jobs:
             echo "Self-contained 64-bit Windows executable: run it directly, no installer and no"
             echo ".NET runtime to install. Requires Windows 10/11 x64."
             echo
-            echo "**This build is not code-signed.** CI has no signing key, and no certificate from"
-            echo "anyone Windows trusts is in use. Check the download against the SHA-256 below (also"
-            echo "in \`SHA256SUMS.txt\`):"
+            echo "**The executable attached here is not code-signed**: it is the build this workflow"
+            echo "produced, and this job publishes only while the signing configuration records no"
+            echo "certificate at all (docs/RELEASE_PACKAGING.md, 'Publishing a release'). Check the"
+            echo "download against the SHA-256 below (also in \`SHA256SUMS.txt\`):"
             echo
             echo "\`\`\`"
             echo "$sha  PUB_Template_Parameter_Editor.exe"
@@ -308,11 +341,12 @@ jobs:
             echo "file is unsigned and was downloaded from the internet: choose *More info* ->"
             echo "*Run anyway* only if that hash matches. Antivirus software may also warn."
             echo
-            echo "If a copy of this release ever does carry a signature, it was added by the maintainer"
-            echo "after CI built it - the key sits on a signing service's card, out of reach of any build"
-            echo "agent. Read it with \`(Get-AuthenticodeSignature .\PUB_Template_Parameter_Editor.exe).Status\`"
-            echo "and check that the hash above is the one of the file you downloaded, since signing"
-            echo "changes the file. \`SIGNING-STATUS.txt\` next to the binary records what CI knew."
+            echo "Where a release of this project is signed, the signing happened on a maintainer's"
+            echo "machine after the build: the key sits on a signing service's card, out of reach of any"
+            echo "build agent. Read it with \`(Get-AuthenticodeSignature .\PUB_Template_Parameter_Editor.exe).Status\`,"
+            echo "which has to be \`Valid\` with a timestamp, and check that the hash above is the one of"
+            echo "the file you downloaded, since signing appends to the file. \`SIGNING-STATUS.txt\` next"
+            echo "to the binary records what CI knew."
             echo
             echo "- Complete corresponding source: \`$src\` (also at the tag of this release)."
             echo "- Licence: GPL-3.0-only; see \`LICENSE\`/\`NOTICE\` in the source archive and the"

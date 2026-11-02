@@ -8,6 +8,10 @@
 > publishes SHA-256 hashes instead. The MSIX packaging in `packaging/`
 > remains local tooling. Current wording: [[docs/RELEASE_PACKAGING.md](RELEASE_PACKAGING.md)]. The store-specific lines below are kept as
 > written history rather than rewritten after the fact.
+>
+> **Signing update, 2026-11-02 (owner decision).** The published release executable is signed with the
+> single certificate recorded in `packaging/CertumSigning.settings.json`; CI builds and any rebuild from
+> the source archive stay unsigned. Current wording: [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md).
 
 
 Status: fresh Windows C# project baseline, revision 4, 25 October 2026. Build the application from the requirements below; no implementation or completed checks are assumed. The user description is authoritative. Added interpretations are explicit implementation defaults.

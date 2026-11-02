@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Xunit;
 
@@ -81,8 +82,15 @@ public class ChannelPolicyTests
     {
         string readme = Read("README.md");
         Assert.Contains("GitHub Release", readme, StringComparison.Ordinal);
-        Assert.Contains("no code signature", readme, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("SHA-256", readme, StringComparison.Ordinal);
+
+        // The released download is signed, and README says which key and how to check it. It must not
+        // keep claiming the old unsigned state, and it must not promise anything about SmartScreen.
+        Assert.Contains("Authenticode", readme, StringComparison.Ordinal);
+        Assert.Contains("CertumSigning.settings.json", readme, StringComparison.Ordinal);
+        Assert.Contains("Get-AuthenticodeSignature", readme, StringComparison.Ordinal);
+        Assert.DoesNotContain("no code signature", readme, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("not code-signed", readme, StringComparison.OrdinalIgnoreCase);
 
         string release = Read(".github", "workflows", "release.yml");
         Assert.Contains("publish-github-release", release, StringComparison.Ordinal);
@@ -98,7 +106,7 @@ public class ChannelPolicyTests
     }
 
     [Fact]
-    public void NoSignerIsConfiguredInThePipelineAndNothingClaimsOne()
+    public void NoSignerIsConfiguredInThePipelineAndTheRecordedOneIsNamedExactly()
     {
         Assert.False(File.Exists(Path.Combine(RepoRoot(), "docs", "CODE_SIGNING_POLICY.md")),
             "the signing policy page belonged to a signing subscription this project does not have");
@@ -116,21 +124,23 @@ public class ChannelPolicyTests
             Assert.DoesNotContain("Set-AuthenticodeSignature", text, StringComparison.Ordinal);
         }
 
-        // Until a certificate is recorded, the settings file must keep saying there is none.
+        // A certificate is recorded, and the recording says plainly that CI cannot use it.
         using (Stream settings = File.OpenRead(Path.Combine(RepoRoot(), "packaging", "CertumSigning.settings.json")))
         {
             using System.Text.Json.JsonDocument doc = System.Text.Json.JsonDocument.Parse(settings);
-            Assert.Equal("Unconfigured", doc.RootElement.GetProperty("state").GetString());
+            Assert.Equal("Recorded", doc.RootElement.GetProperty("state").GetString());
             Assert.False(doc.RootElement.GetProperty("ciSigning").GetBoolean());
         }
 
-        // The signing page states the status and points at the tools; it stays short.
+        // The signing page states the state, the one key and the tools; it stays short.
         string signingPage = Read("docs", "CODE_SIGNING.md");
-        Assert.Contains("not signed", signingPage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Everything CI builds is unsigned", signingPage, StringComparison.Ordinal);
+        Assert.Contains("One key", signingPage, StringComparison.Ordinal);
         Assert.Contains("CertumSigning.settings.json", signingPage, StringComparison.Ordinal);
         Assert.Contains("certum-sign.ps1", signingPage, StringComparison.Ordinal);
         Assert.Contains("verify-signature.ps1", signingPage, StringComparison.Ordinal);
-        Assert.True(signingPage.Length < 2_000,
+        Assert.DoesNotContain("self-sign.ps1", signingPage, StringComparison.Ordinal);
+        Assert.True(signingPage.Length < 2_400,
             "the signing page is a pointer, not an essay: " + signingPage.Length + " characters");
 
         // Documents that readers and contributors act on must not point at a configured signer.
@@ -152,59 +162,73 @@ public class ChannelPolicyTests
     }
 
     [Fact]
-    public void SelfSigningIsWiredAndWordedAsIntegrityAndNeverAsTrust()
+    public void OnlyTheRecordedCertificateSignsAndNoOtherKeyIsKeptOrOffered()
     {
-        string script = Read("tools", "signing", "self-sign.ps1");
+        // The self-signed build-integrity key and its certificate are gone: a release of this project
+        // is signed by one CA-issued certificate, or not at all.
+        Assert.False(File.Exists(Path.Combine(RepoRoot(), "tools", "signing", "self-sign.ps1")),
+            "a self-signed signing tool invites a signed-looking download that vouches for nothing");
+        foreach (string cer in Directory.GetFiles(Path.Combine(RepoRoot(), "tools", "signing"), "*.cer"))
+        {
+            Assert.EndsWith("code-signing.cer", cer, StringComparison.OrdinalIgnoreCase);
+        }
+        foreach (string doc in Directory.GetFiles(RepoRoot(), "*.md", SearchOption.AllDirectories)
+                     .Where(f => Path.GetFileName(f) != "PLAN.md"   // the running log keeps its own history
+                                 && !f.Contains(Path.DirectorySeparatorChar + ".reference" + Path.DirectorySeparatorChar)
+                                 && !f.Contains(Path.DirectorySeparatorChar + ".git" + Path.DirectorySeparatorChar)
+                                 && !f.Contains(Path.DirectorySeparatorChar + "artifacts" + Path.DirectorySeparatorChar)))
+        {
+            Assert.False(File.ReadAllText(doc).Contains("self-sign.ps1", StringComparison.OrdinalIgnoreCase),
+                Path.GetFileName(doc) + " still points at the self-signed key this project no longer keeps");
+        }
 
-        // Real signing through the platform, with the result read back rather than assumed.
-        Assert.Contains("Set-AuthenticodeSignature", script, StringComparison.Ordinal);
-        Assert.Contains("Get-AuthenticodeSignature", script, StringComparison.Ordinal);
-        Assert.Contains("NonExportable", script, StringComparison.Ordinal);
+        // The signing script is the only thing that signs, and it signs with the recorded key only.
+        string script = Read("tools", "signing", "certum-sign.ps1");
+        Assert.DoesNotContain("[string]$Thumbprint", script, StringComparison.Ordinal);
+        Assert.Contains("1.3.6.1.5.5.7.3.3", script, StringComparison.Ordinal);   // id-kp-codeSigning
+        Assert.DoesNotContain("1.3.6.1.5.5.7.3.2", script, StringComparison.Ordinal);
+        Assert.Contains("self-issued", script, StringComparison.Ordinal);
+        Assert.Contains("already signed by", script, StringComparison.Ordinal);
+        Assert.Contains("Export-Certificate", script, StringComparison.Ordinal);
         Assert.DoesNotContain("Export-PfxCertificate", script, StringComparison.Ordinal);
-        Assert.DoesNotContain("Exportable", script.Replace("NonExportable", ""), StringComparison.Ordinal);
-        // A broken signature is a hard failure, and the untrusted chain has to be named.
-        Assert.Contains("HashMismatch", script, StringComparison.Ordinal);
-        Assert.Contains("throw", script, StringComparison.Ordinal);
-        Assert.Contains("SmartScreen", script, StringComparison.Ordinal);
-        Assert.Contains("not trusted", script, StringComparison.Ordinal);
 
-        // Only the public certificate is published: PKCS#12 content (#12 is 1.2.840.113549.1.12) in a
-        // .cer would mean a private key had been committed.
-        string cer = Path.Combine(RepoRoot(), "tools", "signing", "PUB-Template-Parameter-Editor-self-signed.cer");
-        Assert.True(File.Exists(cer), "the public certificate of the signing key should be published next to the script");
-        byte[] der = File.ReadAllBytes(cer);
+        // The public half of the recorded certificate is published, and it is a certificate rather
+        // than a key bundle: PKCS#12 content (#12 is 1.2.840.113549.1.12) would be a private key.
+        using JsonDocument document = JsonDocument.Parse(
+            Read("packaging", "CertumSigning.settings.json"));
+        JsonElement configuration = document.RootElement;
+        string published = Path.Combine(RepoRoot(),
+            configuration.GetProperty("publicCertificatePath").GetString()!);
+        Assert.True(File.Exists(published), "the recorded certificate has no public half in the repository");
+        byte[] der = File.ReadAllBytes(published);
         Assert.True(der.Length < 8192, "a public X.509 certificate is small; this one is not");
         Assert.Equal(0x30, der[0]); // DER SEQUENCE, not PEM text
         byte[] pkcs12Oid = [0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x0C];
         Assert.False(ContainsSequence(der, pkcs12Oid), "that file carries PKCS#12 content: a private key would be committed");
 
-        // Which key signed, and until when.
+        var issued = System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadCertificate(der);
+        string recordedThumbprint = configuration.GetProperty("certificateThumbprint").GetString()!;
+        Assert.Equal(recordedThumbprint, issued.Thumbprint);
+        Assert.NotEqual("FB0885A4472AA277326B4C061893B64CB0A4FCBB", issued.Thumbprint);
+        Assert.Equal("1.2.840.113549.1.1.11", issued.SignatureAlgorithm.Value); // sha256RSA
+        Assert.Equal(issued.NotAfter.ToString("yyyy-MM-dd"), configuration.GetProperty("certificateNotAfter").GetString());
+        Assert.Equal(configuration.GetProperty("certificateIssuer").GetString(), issued.Issuer);
+        Assert.NotEqual(issued.Subject, issued.Issuer); // an authority issued it, so it vouches for something
+        Assert.Equal(
+            configuration.GetProperty("signerCommonName").GetString(),
+            System.Text.RegularExpressions.Regex.Match(issued.Subject, "CN=([^,]+)").Groups[1].Value);
+        // id-kp-codeSigning appears as an OID (6.8 = OID of 8 bytes) inside the extended key usage
+        // extension; the chain's intermediates carry other purposes, so search the certificate for this one.
+        Assert.True(
+            ContainsSequence(der, [0x06, 0x08, 0x2B, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x03]),
+            "the published certificate does not carry the code-signing purpose");
+
+        // The packaging notes describe the signed download, the unsigned CI build and the order of work.
         string packaging = Read("docs", "RELEASE_PACKAGING.md");
-        Assert.Contains("FB0885A4472AA277326B4C061893B64CB0A4FCBB", packaging, StringComparison.Ordinal);
-        Assert.Contains("self-signed", packaging, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("UnknownError", packaging, StringComparison.Ordinal); // observed status
-        // A signature changes the file, so publishing the pre-signature hash would break verification.
+        Assert.Contains("Publishing a release", packaging, StringComparison.Ordinal);
         Assert.Contains("SHA-256 changes", packaging, StringComparison.Ordinal);
-
-        // A document offering a self-signed signature has to say the chain is not trusted and that
-        // SmartScreen still warns.
-        string[] docs = Directory.GetFiles(RepoRoot(), "*.md", SearchOption.AllDirectories)
-            .Where(f => !f.Contains(Path.DirectorySeparatorChar + ".reference" + Path.DirectorySeparatorChar)
-                        && !f.Contains(Path.DirectorySeparatorChar + ".git" + Path.DirectorySeparatorChar))
-            .Where(f => File.ReadAllText(f).Contains("self-sig", StringComparison.OrdinalIgnoreCase))
-            .ToArray();
-
-        Assert.True(docs.Length >= 2, "the README and the packaging notes should both describe the local signature");
-        foreach (string doc in docs)
-        {
-            string text = File.ReadAllText(doc);
-            Assert.True(
-                text.Contains("not trusted", StringComparison.OrdinalIgnoreCase)
-                || text.Contains("untrusted", StringComparison.OrdinalIgnoreCase),
-                Path.GetFileName(doc) + " offers a self-signed signature without saying the chain is untrusted");
-            Assert.True(text.Contains("SmartScreen", StringComparison.OrdinalIgnoreCase),
-                Path.GetFileName(doc) + " offers a self-signed signature without saying the warning stays");
-        }
+        Assert.Contains("NotSigned", packaging, StringComparison.Ordinal);
+        Assert.Contains("certum-sign.ps1", packaging, StringComparison.Ordinal);
     }
 
     private static bool ContainsSequence(byte[] haystack, byte[] needle)

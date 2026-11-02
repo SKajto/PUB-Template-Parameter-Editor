@@ -1,22 +1,27 @@
 {
   "_comment": [
     "Records which key may sign a release; it holds no key. A card-backed private key is never",
-    "exportable, so it can never be a build secret: ciSigning stays false and CI builds unsigned.",
-    "state 'Unconfigured' means no certificate exists, and the signing script refuses then. Values",
-    "here must come from an issued certificate - never invented."
+    "exportable, so it can never be a build secret: ciSigning stays false and every CI build is",
+    "unsigned. state 'Recorded' means a certificate has been issued and is present on the signing",
+    "client; every value below was read from that certificate, none of it invented. The signer name",
+    "is stored as a unicode escape so that no tool can corrupt it through a console code page.",
+    "This is the only key this project signs with: the signing scripts refuse a self-signed key, a",
+    "key without the code-signing purpose, an expired key and any key other than this one."
   ],
-  "state": "Unconfigured",
+  "state": "Recorded",
   "ciSigning": false,
-  "provider": "Certum SimplySign (Open Source Code Signing in the Cloud) - not purchased",
-  "signerCommonName": "",
-  "certificateThumbprint": "",
-  "certificateNotAfter": "",
+  "provider": "Certum SimplySign Desktop, Open Source Code Signing in the Cloud certificate",
+  "signerCommonName": "Open Source Developer Suad Kajtazovi\u0107",
+  "certificateThumbprint": "E3C2C007D2C2CDB84B26672F7F861D0A04FF4A3E",
+  "certificateIssuer": "CN=Certum Code Signing 2021 CA, O=Asseco Data Systems S.A., C=PL",
+  "certificateNotAfter": "2027-11-02",
   "timestampUrl": "http://time.certum.pl",
   "fileDigestAlgorithm": "sha256",
   "timestampDigestAlgorithm": "sha256",
-  "publicCertificatePath": "",
+  "publicCertificatePath": "tools/signing/PUB-Template-Parameter-Editor-code-signing.cer",
   "notes": {
     "hashes": "a signature appends to the file, so every published SHA-256 is taken after signing",
-    "licence": "signing adds no restriction: GPL-3.0-only, and a rebuilt binary is unsigned"
+    "licence": "signing adds no restriction: GPL-3.0-only, and a rebuilt binary is unsigned",
+    "renewal": "the certificate expires on certificateNotAfter; record the renewed values here, and keep the timestamp on everything already signed - the timestamp is what keeps old releases verifiable"
   }
 }

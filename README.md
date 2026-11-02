@@ -4,7 +4,8 @@ A Windows desktop editor for the variable declarations of PUB template files
 (`.dta`). It is an offline tool: no service, no web view, no telemetry. Edits are
 staged in memory and reach the disk only through an explicit review step.
 It is distributed as one self-contained executable from a GitHub Release; that
-build carries no code signature, and its SHA-256 is published with the release.
+build carries an Authenticode signature from the one certificate the project records, and its
+SHA-256 — taken after signing — is published with the release.
 
 The workspace in dark mode: the templates of one folder at the left, the declarations of
 the selected template in the table, and the three editable fields of the selected
@@ -65,7 +66,7 @@ dotnet publish src/PubTemplateEditor.App/PubTemplateEditor.App.csproj `
   -c Release -p:PublishProfile=PortableWin_x64 -o artifacts/publish/portable-win-x64
 
 # optional: package the app locally (not a distribution channel)
-powershell -File packaging/build-msix.ps1 -Version 0.1.0 -Mode Draft
+powershell -File packaging/build-msix.ps1 -Version 1.0.0 -Mode Draft
 ```
 
 The shipped artifact is `PUB_Template_Parameter_Editor.exe` - a single self-contained
@@ -91,11 +92,14 @@ renamed away: that is what a fresh clone and CI see.
   startup entry, no registry change, no elevation. It writes only the template files
   you confirm in Review Save, plus its own files under `%LOCALAPPDATA%\PubTemplateEditor`.
 - **Uninstall:** delete the program's folder.
-- **Not signed.** Windows SmartScreen shows *Windows protected your PC* on a downloaded copy: check
-  the SHA-256 published with the release, and choose *More info* → *Run anyway* only if it matches.
-  Antivirus products may warn either way. A self-signed local key (`tools/signing/self-sign.ps1`) only
-  marks which build came from the maintainer's machine — its chain is not trusted.
-  [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md).
+- **Signed, and everything CI builds is not.** The executable attached to a GitHub Release is signed in
+  a maintainer's session with the certificate recorded in `packaging/CertumSigning.settings.json`; the
+  key sits in the signing service's own hardware, out of reach of any build agent. Read it with
+  `(Get-AuthenticodeSignature .\PUB_Template_Parameter_Editor.exe).Status` — `Valid`, with a timestamp.
+  A freshly published signed file can still draw a SmartScreen prompt until the file has reputation, so
+  check the SHA-256 published with the release (taken after signing) before running it. Antivirus
+  products may warn either way. One certificate signs this project's releases, and
+  [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md) says how it is used and what happens at renewal.
 
 ## Licensing
 
@@ -120,7 +124,7 @@ continue the work; the result is the owner's responsibility under the same licen
 - [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [SECURITY.md](SECURITY.md)
 - [REQUIREMENTS.md](REQUIREMENTS.md), [ARCHITECTURE.md](ARCHITECTURE.md), [PLAN.md](PLAN.md)
 - [docs/PROJECT_SETUP.md](docs/PROJECT_SETUP.md) — machine and solution setup
-- [docs/RELEASE_PACKAGING.md](docs/RELEASE_PACKAGING.md) — CI, packaging, publishing, why binaries are unsigned
-- [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md) — what a signature would mean here
+- [docs/RELEASE_PACKAGING.md](docs/RELEASE_PACKAGING.md) — CI, packaging, publishing a release, signing
+- [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md) — the one certificate, and what a signature proves
 - [docs/GPL_RELEASE.md](docs/GPL_RELEASE.md) — source-availability obligations
 - [docs/SAMPLE_FINDINGS.md](docs/SAMPLE_FINDINGS.md) — what the native templates look like

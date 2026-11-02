@@ -8,6 +8,12 @@
 > publishes SHA-256 hashes instead. The MSIX packaging in `packaging/`
 > remains local tooling. Current wording: [[docs/RELEASE_PACKAGING.md](RELEASE_PACKAGING.md)]. The store-specific lines below are kept as
 > written history rather than rewritten after the fact.
+>
+> **Signing update, 2026-11-02 (owner decision).** The executable attached to a release is signed with
+> the single certificate recorded in `packaging/CertumSigning.settings.json`; CI builds and any rebuild
+> from the release source archive stay unsigned. Current wording:
+> [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md). T31 and the other store rows below describe the
+> withdrawn store design.
 
 
 Automate deterministic core and filesystem checks. Exercise workflows through the real WPF application where practical. Perform PUB checks in the actual target PUB environment and packaged runtime checks on the supported Windows baseline and intended managed Windows environment. Maintain requirement traceability as implementation develops.
@@ -52,5 +58,6 @@ Automate deterministic core and filesystem checks. Exercise workflows through th
 | T35 Offline notices | LIC-01,02,05 | About/Licenses shows the selected GPL text/copyright/warranty and actual bundled-component notices offline; source URL and app/package versions are accurate |
 | T36 Listing/initial setup | REL-09, LIC-03,06 | Verify actual product/price/automation eligibility and first submission steps; listing provides clear source/license directions and no conflicting app-added restrictions |
 | T37 CI artifact provenance | REL-02,03 | Trusted release package/source/hash record derives from one selected commit; avoid implicit promotion of untrusted PR artifacts; record Store-modified signature/hash separately |
+| T38 Published asset signature | REL-11 | The executable attached to a release reports `Valid` with a timestamp, and its signer certificate matches the thumbprint, issuer, name and expiry recorded in `packaging/CertumSigning.settings.json`; the public half of that certificate is in the repository and is not a key bundle; a CI build of the same commit reports `NotSigned`; the published SHA-256 matches the signed file |
 
 Performance acceptance should use a representative folder agreed with the user. At minimum, loading the supplied approximately 2 MB XML samples and comparing their roughly 218 declarations must not block normal window interaction. Record measurements before inventing a large-folder speed guarantee.

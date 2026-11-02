@@ -7,71 +7,82 @@ How the two artifacts are produced and validated. Commands and verification stat
 
 | Channel | Artifact | Status |
 | --- | --- | --- |
-| **GitHub Release** | `PUB_Template_Parameter_Editor.exe`, one self-contained single-file 64-bit Windows executable | the distribution channel: created by the `publish-github-release` job when `PUBLISH_GITHUB_RELEASE=true` |
+| **GitHub Release** | `PUB_Template_Parameter_Editor.exe`, one self-contained single-file 64-bit Windows executable | the distribution channel: built and signed by the maintainer (see *Publishing a release*), attached together with its source and hashes |
 | MSIX package | optional build for packaged-app testing | **not a channel** - it needs a real package identity that this project does not have, and no store publishes it. `packaging/` and `build-msix.ps1` are kept as local tooling, `buildMsix` defaults to `false`, and the placeholder identity values stay unresolved so nothing can be built from them by accident |
 | CI build | the same executable, uploaded as a workflow artifact | testing only; not distributed |
 
 ## Signing
 
-The code is currently **not signed**. There is no Authenticode certificate, so SmartScreen shows
-*Windows protected your PC* on a downloaded copy and antivirus products may warn; each release
-publishes **SHA-256** hashes (`SHA256SUMS.txt` and the hash in the release notes) so a download can be
-checked against what the workflow built, and the executable's file metadata (product name, one version
-everywhere) is set from the release version and verified by CI.
+One certificate signs this project's releases: the one recorded in
+`packaging/CertumSigning.settings.json`. Its thumbprint, issuer, signer name and expiry were read from
+the issued certificate, and its public half is committed at
+`tools/signing/PUB-Template-Parameter-Editor-code-signing.cer`. The private key stays in the signing
+service's own hardware, so it is never a file and never a build secret: `ciSigning` is `false`, no
+workflow calls a signing tool (`ChannelPolicyTests` keeps it that way), and everything CI builds reports
+`NotSigned`.
 
-Tooling: `tools/signing/certum-sign.ps1` (refuses until a real key is recorded in
-`packaging/CertumSigning.settings.json`; SHA-256, mandatory timestamp, no private-key export),
-`tools/signing/verify-signature.ps1` and `packaging/build-msix.ps1 -Sign` - all Windows SDK `signtool`,
-build-time only, nothing added to the payload. Two `release.yml` steps keep the labels honest: the
-configuration may not claim a key CI cannot have, and the payload must report `NotSigned`;
-`artifacts/SIGNING-STATUS.txt` ships with the release. See [CODE_SIGNING.md](CODE_SIGNING.md).
-
-## Self-signing on a maintainer's machine (integrity, not trust)
-
-`tools/signing/self-sign.ps1` applies an Authenticode signature from a **self-signed** code-signing
-certificate held in the current user's certificate store:
-
-| | |
+| Artifact | Signature |
 | --- | --- |
-| Signer | `CN=PUB Template Parameter Editor Local Self-Signed` |
-| SHA-1 thumbprint | `FB0885A4472AA277326B4C061893B64CB0A4FCBB` |
-| Valid | 2026-10-16 to 2031-10-15, self-issued (subject equals issuer) |
-| Private key | stays in `Cert:\CurrentUser\My`, created non-exportable; never committed, never copied |
-| Public certificate | `tools/signing/PUB-Template-Parameter-Editor-self-signed.cer`, committed so a signature can be inspected without the key |
-| Timestamp | none by default (`-TimestampUrl` is opt-in); without one the signature is only verifiable while the certificate is valid |
+| the executable attached to a GitHub Release | signed: SHA-256 file digest, SHA-256 timestamp digest, RFC 3161 timestamp at the url in the settings file, read back as `Valid` |
+| the same executable built by the `CI validation` or `Release packaging` workflow | `NotSigned`, asserted by a release step and recorded in `SIGNING-STATUS.txt` |
+| a rebuild from the release source archive | unsigned: the GPL's rights do not depend on the key |
+| the optional MSIX | unsigned unless `build-msix.ps1 -Sign` runs on the maintainer's machine; not a distribution channel |
 
-Run it against a built executable, and it prints the status it actually observes instead of a
-reassuring word. On the machine that holds the key the status is:
+`tools/signing/certum-sign.ps1` is the only thing that signs. It takes no key parameter: it uses the
+recorded certificate or nothing, and it refuses while no certificate is recorded, a self-issued
+certificate, a certificate without the code-signing purpose, a certificate whose issuer, name or expiry
+does not match the recorded values, and a file already signed by another key. After signing it reads the
+result back and fails unless the platform reports `Valid` with a timestamp.
+`tools/signing/verify-signature.ps1` reads a signature and a hash and writes nothing, so anyone can
+check a download against what the release claims.
 
+A signature is appended to the file, so **SHA-256 changes**: every published hash — in `SHA256SUMS.txt`
+and in the release notes — is taken from the signed bytes. The certificate expires on the date the
+settings file records; the timestamp is what keeps releases published before then verifiable afterwards.
+A renewal replaces the recorded values in the same commit that updates the wording in README,
+SECURITY.md and these notes, and is reported in [PLAN.md](../PLAN.md).
+
+## Publishing a release
+
+The release is assembled where the key is, which is a maintainer's Windows session. With the SDK
+installed, the signing client connected and the repository clean at the commit being released:
+
+```powershell
+# tests green at this commit first (docs/PROJECT_SETUP.md), then the payload
+ dotnet publish src/PubTemplateEditor.App/PubTemplateEditor.App.csproj -c Release `
+  -p:PublishProfile=PortableWin_x64 -p:Version=<version> `
+  -p:AssemblyVersion=<version> -p:FileVersion=<version> -p:InformationalVersion=<version> `
+  -p:IncludeSourceRevisionInInformationalVersion=false -o artifacts/publish/portable-win-x64
+
+# the file metadata must report <version>, and the payload must still be unsigned before signing
+(Get-Item artifacts/publish/portable-win-x64/PUB_Template_Parameter_Editor.exe).VersionInfo
+(Get-AuthenticodeSignature artifacts/publish/portable-win-x64/PUB_Template_Parameter_Editor.exe).Status
+
+# sign with the recorded certificate (the client asks for its PIN), then read the result back
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/signing/certum-sign.ps1 `
+  -FilePath artifacts/publish/portable-win-x64/PUB_Template_Parameter_Editor.exe `
+  -Description "PUB Template Parameter Editor <version>"
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/signing/verify-signature.ps1 `
+  -FilePath artifacts/publish/portable-win-x64/PUB_Template_Parameter_Editor.exe
+
+# tag the released commit, build the corresponding source from the tag, hash the signed bytes
+git tag -a v<version> -m "v<version>"
+git push origin v<version>
+git archive --format=tar.gz -o artifacts/source/PUB_Template_Parameter_Editor-<version>-source.tar.gz v<version>
+Get-FileHash -Algorithm SHA256 artifacts/publish/portable-win-x64/PUB_Template_Parameter_Editor.exe
 ```
-status                 UnknownError
-status message         A certificate chain was processed, but terminates in a root certificate
-                       that is not trusted by the trust provider
-```
 
-That is the expected result for a self-signed certificate, and it is the honest one:
+Then attach the signed executable, the source archive, `SHA256SUMS.txt`, `SIGNING-STATUS.txt` and
+`file-metadata.txt` to the release — with `gh release create v<version> …` where the CLI is available,
+or through the repository's Releases API where it is not — and write the notes from those signed bytes:
+version, the commit the tag points at, the SHA-256 of the file that is actually attached, and the
+command that reads the signature back.
 
-- **what it proves:** these exact bytes came from this key, and nothing has changed them since. Any
-  later edit shows up as `HashMismatch`, which the script refuses to report as success.
-- **what it does not prove:** that anybody trustworthy vouches for the program. The chain is not
-  trusted, so SmartScreen still shows *Windows protected your PC* and antivirus products may still
-  warn. A self-signed signature must never be presented as though someone trustworthy had vouched for the
-  program, and it is not a reason for a user to install a certificate: trusting a self-signed certificate makes *everything*
-  it has ever signed run without a prompt on that machine.
-- **hashes come after signing:** the signature is appended to the file, so its SHA-256 changes. The
-  release must publish the hash of the signed file (the script prints it and warns if a stale hash
-  would be quoted).
-
-Publishing a signed copy is a manual step in the right order: sign, then attach, then restate the hash -
-`tools/signing/self-sign.ps1`, `gh release upload v<version> <signed exe> --clobber`, and update the
-release notes so the printed SHA-256 is the one of the file that is actually attached. A hash taken
-before signing is a mismatch waiting to happen.
-
-CI cannot do this: the private key is non-exportable and lives in a person's store, not in the
-pipeline. If a signed CI build were ever wanted, an exportable PFX would have to become a repository
-secret - a real secret, with everything that implies, and still untrusted by anyone who has not
-decided to trust it. The GitHub Release copy is unsigned unless the maintainer signs it locally just
-before attaching it, and the release notes say which of the two it is.
+`release.yml` still builds and tests the tagged commit and uploads that build as a workflow artifact,
+which is the independent check of the released commit; single-file WPF publishes are not byte-identical,
+so it is a build-and-test agreement, not a hash match. Its `publish-github-release` job refuses to create
+a release while the signing configuration records a certificate: the only executable CI can attach is
+the unsigned one it just built, and the notes would then have to call it something it is not.
 
 ## Portable executable
 
@@ -96,7 +107,7 @@ program that runs with no runtime files at all.
 
 ```powershell
 .\packaging\generate-placeholder-assets.ps1
-.\packaging\build-msix.ps1 -Version 0.1.0 -Mode Placeholder   # local layout/deployment test only
+.\packaging\build-msix.ps1 -Version 1.0.0 -Mode Draft   # local layout/deployment test only
 ```
 
 `Mode Strict` refuses to run while identity values are unresolved. The manifest declares
@@ -137,8 +148,8 @@ stayed well inside the storage allowance. A `Release packaging` run additionally
 ## What a release contains
 
 `release-<version>`: the portable executable, the complete corresponding source archive
-(GPL-3.0-only obligation), `LICENSE`/`NOTICE` and the bundled third-party notices, `SHA256SUMS.txt`
-(plus the explicit line that the build is not code-signed), `SIGNING-STATUS.txt` and
-`file-metadata.txt`. Attaching the
+(GPL-3.0-only obligation), `LICENSE`/`NOTICE` and the bundled third-party notices, `SHA256SUMS.txt`,
+`SIGNING-STATUS.txt` (what CI's own unsigned build reported, and where the published asset's signature
+came from) and `file-metadata.txt`. Attaching the
 source archive to the same release is what keeps the GPL's "complete corresponding source next to the
 binary" requirement satisfied by the same channel the binary is distributed through.

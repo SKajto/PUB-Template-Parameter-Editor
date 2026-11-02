@@ -36,7 +36,8 @@ unverified gate is acceptable, an implied pass is not. -->
 - [ ] template files stay untrusted data: no DTD, no external resolution, values treated as text
 - [ ] no `.dta` file, build output, binary or `.pdb` is added to the repository
 - [ ] licences, notices and the SPDX identifier `GPL-3.0-only` are still correct, and the signing
-      wording is still true (nothing published is signed, no pipeline holds a key)
+      wording is still true (one recorded certificate signs a release, no pipeline holds a key, every
+      CI build is unsigned)
 - [ ] the executable name, the manifest and the packaging scripts still agree
 
 ## If the pull request touches these, say so explicitly

@@ -1428,6 +1428,58 @@ unverified. The new gates have not run on GitHub: they need a version tag and `r
 approval. The PR template's `examples/`-renamed run was replaced by the fresh-clone run, because
 `mv examples` failed with "Permission denied" here.
 
+### 2026-11-02 - One CA-issued code-signing certificate is recorded; the self-signed key is gone
+
+`packaging/CertumSigning.settings.json` moved to `state: "Recorded"`. Thumbprint, issuer, signer name,
+expiry and the public-certificate path were read from the issued certificate and are asserted against
+its public half, now committed at `tools/signing/PUB-Template-Parameter-Editor-code-signing.cer`
+(DER, 1739 bytes, `rsaEncryption` 4096-bit, EKU code signing, issued by `CN=Certum Code Signing 2021 CA`,
+valid to 2027-11-02). `ciSigning` stays `false`: the key lives in the signing service's own hardware, so
+no pipeline can hold it.
+
+`tools/signing/self-sign.ps1` and `tools/signing/PUB-Template-Parameter-Editor-self-signed.cer` are
+deleted, and the self-signed key was removed from `Cert:\CurrentUser\My`. A release is now signed by the
+recorded certificate or not at all.
+
+- `tools/signing/certum-sign.ps1` no longer takes a key parameter: it uses the recorded certificate only,
+  and refuses while the state is not `Recorded`, a self-issued certificate, a certificate without the
+  code-signing purpose, an issuer/name/expiry that disagrees with the recorded values, and a file already
+  signed by another key. While wiring this up the vendor-documented path exposed a real defect: the script
+  required the EKU `1.3.6.1.5.5.7.3.2` (client authentication) instead of `1.3.6.1.5.5.7.3.3`
+  (code signing), so it would have rejected the certificate it exists to use. It also reads the personal
+  store without `-CodeSigningCert`: that dynamic parameter of the certificate provider does not bind in a
+  session that cannot open the store, which is what made the first CI run of this commit crash instead of
+  refuse; the code-signing purpose is now checked from the certificate itself, and an unreadable store is
+  reported as a refusal.
+- `release.yml` keeps its own build unsigned and now says so accurately: the configuration gate also
+  rejects a recorded `publicCertificatePath` whose file is missing and exports `signingState`; the payload
+  gate asserts `NotSigned`; and `publish-github-release` refuses to create a release while a certificate
+  is recorded, because the only executable CI can attach is the unsigned one it just built. No workflow
+  calls a signing tool.
+- `docs/RELEASE_PACKAGING.md` gains *Publishing a release* (publish, read the file metadata back, sign,
+  read the signature back, tag, build the source archive from the tag, hash the signed bytes, attach) and
+  loses its self-signing section. README, SECURITY.md, START_HERE.md, REQUIREMENTS.md,
+  docs/CODE_SIGNING.md, docs/PROJECT_SETUP.md, docs/WINDOWS_PUBLISH.md, the PR template and
+  `docs/TEST_MATRIX.md` (new row T38) now describe a signed download and an unsigned CI build.
+  `VersionPrefix` is 1.0.0, and the `-Mode Placeholder` example in the packaging notes was wrong:
+  `build-msix.ps1` accepts `Draft` or `Strict`.
+- Tests: `ChannelPolicyTests` asserts the recorded state, the one-key rule, the published certificate
+  against every recorded value, and that no document offers the deleted tool; `SigningToolingTests`
+  executes `certum-sign.ps1` three times against doctored settings (`Unconfigured`, `Almost`, a
+  well-formed but unknown thumbprint) with a target file that does not exist, so every run can only
+  refuse; `X509CertificateLoader` and DER OID searches replace nothing that needs a certificate store,
+  so these tests also pass where no key is connected.
+
+Executed: `dotnet build PubTemplateEditor.slnx -c Release` with 0 warnings; `dotnet test` 89 + 62 + 88 =
+**239** pass in the working tree, and 89 + 46 + 88 = **223** in a `git archive` tree of the staged tree
+(no samples, no `.git`). `certum-sign.ps1` with the real configuration against a nonexistent target
+printed the certificate it found and stopped before signing.
+
+Open: nothing has been signed yet, so no signed artifact, timestamp response or `Valid` read-back exists
+to point at; SmartScreen and antivirus behaviour on a signed build is unobserved; the certificate expiry
+in the settings file needs a renewal step before 2027-11-02. S5 (native PUB round trip) and the
+interactive desktop checks are unaffected and still open.
+
 ## Deferred scope
 
 Linux UI, additional architectures, parameter creation/deletion/renaming, presets, recursive folders, in-app PUB generation, browser hosting and custom installer/updater services are outside this initial Windows release. Keep the domain core independent without building a second UI.

@@ -42,7 +42,7 @@ body:
         From the About/Licenses view: application version, ".NET …" runtime line and the operating
         system line. Say whether you ran the Store package or the portable executable.
       placeholder: |
-        PUB Template Parameter Editor 0.1.0, .NET 10.0.x (x64 process on Windows 11 …), portable exe
+        PUB Template Parameter Editor 1.0.0, .NET 10.0.x (x64 process on Windows 11 …), portable exe
     validations:
       required: true
 

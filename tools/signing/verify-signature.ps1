@@ -7,10 +7,9 @@
     validity window, whether a timestamp is present, the chain this machine builds, and the file's
     SHA-256. Nothing is written and nothing is signed.
 
-    An unsigned file reports NotSigned; a self-signed one usually reports UnknownError because its
-    chain ends in a root no trust provider accepts. Trusting such a certificate on a machine makes
-    everything it has ever signed run there without a prompt, so install it only on the machine that
-    owns it.
+    An unsigned file reports NotSigned - correct for every build this project's CI produces. A file
+    whose chain ends somewhere this machine does not accept reports UnknownError or NotTrusted, which
+    for a published download means do not run it and report the file.
 
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File tools/signing/verify-signature.ps1 `
@@ -81,7 +80,7 @@ foreach ($r in $results) {
         Pair 'thumbprint'   $r.thumbprint
         Pair 'valid from'   $r.validFrom
         Pair 'valid until'  $r.validTo
-        Pair 'self-signed'  $(if ($r.selfSigned) { 'yes - subject equals issuer, so nobody outside that key vouches for it' } else { 'no' })
+        Pair 'self-signed'  $(if ($r.selfSigned) { 'yes - subject equals issuer, so nobody outside that key vouches for it, and no release of this project may be signed that way' } else { 'no - a certification authority issued it' })
         Pair 'timestamp'    $(if ($r.timestamp) { $r.timestamp } else { 'none - stops verifying when the certificate expires' })
         Pair 'chain'        $r.chain
     }
