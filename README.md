@@ -90,7 +90,8 @@ renamed away: that is what a fresh clone and CI see.
   application. It has no network capability at all.
 - **System changes:** it does not alter the system — no installer, no service, no
   startup entry, no registry change, no elevation. It writes only the template files
-  you confirm in Review Save, plus its own files under `%LOCALAPPDATA%\PubTemplateEditor`.
+  you confirm in Review Save, plus its own files under `%LOCALAPPDATA%\PubTemplateEditor` (settings,
+  backups, the recovery journal and a fault log).
 - **Uninstall:** delete the program's folder.
 - **Signed, and everything CI builds is not.** The executable attached to a GitHub Release is signed in
   a maintainer's session with the certificate recorded in `packaging/CertumSigning.settings.json`; the

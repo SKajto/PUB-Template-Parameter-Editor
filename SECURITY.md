@@ -29,7 +29,7 @@ The program is offline by design, so the interesting attack surface is *the file
   A container that is not a readable ZIP, or has no template entry, is reported as unreadable and
   the other files in the folder are still listed.
 - **No elevated privileges, no service, no startup entry.** Settings, backups and the journal live
-  under `%LOCALAPPDATA%\PubTemplateEditor` of the running user.
+  under `%LOCALAPPDATA%\PubTemplateEditor` of the running user, together with a plain-text fault log.
 - **The distributed executable** is a single self-contained file that extracts its native
   parts to the user's temp directory - ordinary self-contained .NET behaviour, not an installer. It
   runs under normal Windows policies. The released executable carries an Authenticode signature from
@@ -55,7 +55,13 @@ Include, as far as you can:
 - whether a template file triggered it, and *how the file is shaped* — the offending element,
   attribute or container entry — rather than the file itself,
 - the last lines of `%LOCALAPPDATA%\PubTemplateEditor\recovery-journal.jsonl` **with paths and
-  values removed**, if a save was involved.
+  values removed**, if a save was involved,
+- for a crash: the last record of `%LOCALAPPDATA%\PubTemplateEditor\crash.log`, **with any folder paths
+  removed**. It holds the fault, its message and the stack, which is usually the whole diagnosis; so does
+  the *Application Error* (id 1000) and *.NET Runtime* (id 1026) entry in the Application event log, whose
+  stack says whether the shell's folder dialog was involved - a fault inside that dialog is the shell's,
+  and this program can only report it afterwards. `tools/diagnostics/crash-evidence.ps1` collects all of
+  it, read-only.
 
 Please do not attach your real templates to any issue, public or private. They are your business
 data, and the maintainer cannot learn anything from them that a synthetic file cannot show: a small

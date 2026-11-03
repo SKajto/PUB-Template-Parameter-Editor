@@ -1524,6 +1524,62 @@ Open after this release:
   release afterwards.
 
 
+### 2026-11-03 - A folder dialog fault that closed the program on another machine
+
+Field report: on a Windows 11 Enterprise 25H2 machine the window disappeared without a message when
+*Choose folder* was pressed; drag-and-drop was unaffected. `tools/diagnostics/crash-evidence.ps1` run
+there produced the whole diagnosis in one event-log entry (`.NET Runtime` id 1026):
+
+```
+System.ArgumentException: Value does not fall within the expected range.
+   at MS.Internal.Interop.HRESULT.ThrowIfFailed()
+   at MS.Internal.AppModel.ShellUtil.GetShellItemForPath(String path)
+   at Microsoft.Win32.CommonItemDialog.PrepareDialog(IFileDialog dialog)
+   at Microsoft.Win32.CommonItemDialog.RunDialog(IntPtr hwndOwner)
+   at WorkspaceViewModel.OpenFolder()
+```
+
+Cause, reproduced on this machine in a throwaway WPF probe against the real `OpenFolderDialog`: the
+remembered folder in that machine's `settings.json` was written with '/' separators. The file system
+opens such a path, so `Directory.Exists` accepted it and it became the dialog's `InitialDirectory`;
+`SHCreateItemFromParsingName` answers E_INVALIDARG for it, WPF throws from inside the dialog's own
+setup (before any window exists to cancel), and with nothing handling an exception out of a command, the
+process ended. A normalised path that has simply gone away is handled by the shell and shows the dialog
+anyway - the separator form is the fatal one, along with the `\?\` device-namespace form.
+
+Fixed at three levels, because all three were real defects:
+
+- `Infrastructure/FolderPaths.cs` normalises every folder path entering the application (settings file,
+  drag-and-drop, dialog result) to the absolute '\' form both consumers accept, and refuses rather than
+  guesses at relative, device-namespace and malformed text. `IsShellAddressable` is what the dialog is
+  allowed to be given. Recent-folder entries are normalised on load, duplicates folded, and the settings
+  file is rewritten once so a hand-edited entry stops coming back on every start.
+- `App/Infrastructure/FolderPicker.cs` puts the dialog behind `IFolderPicker`. `OpenFolder` hands it only
+  an addressable starting folder, catches the expected shell/path faults (`ArgumentException`,
+  `IOException`, `COMException`, `InvalidOperationException`), retries once with no starting folder, and
+  otherwise reports the failure in the status/error area and points at drag-and-drop as the way in.
+  Nothing about the open folder or the staged edits changes when a dialog fails.
+- `Infrastructure/CrashLog.cs` and `Infrastructure/UiFaultGuard.cs` plus handlers in `App.xaml.cs`: a
+  fault that reaches the dispatcher is appended to `%LOCALAPPDATA%\PubTemplateEditor\crash.log` with its
+  type, message, stack and context, shown in one sentence with the log path, and survived - up to three
+  faults per session, after which the program is allowed to stop. Writing the log can never itself be
+  the fault, and a report that fails is not a second fault. `SECURITY.md` now asks for that record, with
+  folder paths removed, in a crash report.
+
+Tests: 89 + 92 + 94 = **275** (was 239) - `FolderPathTests` (the separator and root forms, idempotence,
+addressability against a real temp folder), `CrashLogTests`, `UiFaultGuardTests` (recorded, bounded,
+unwritable log still decided), and `FolderDialogFaultTests` in the WPF host against a `IFolderPicker`
+double: the '/' settings entry from the field report, a folder that disappeared, a dialog that refuses
+once (retried with no starting folder, notice shown) and a dialog that always refuses (session survives,
+`ActionError` and the drag hint set). Executed: `dotnet build -c Release` 0 warnings, `dotnet test` as
+above, all green locally; not yet run against a live desktop session or on a 25H2 Enterprise machine.
+
+Open: the 1.0.0 download on another machine still has the fault, so it needs a new release to fix -
+one signing operation, which is the maintainer's call, and `settings.json` can be repaired in place in the
+meantime (rewrite the entry with backslashes or drop it). `PLAN.md` milestone S5 and the interactive
+desktop review remain open as before.
+
+
 ## Deferred scope
 
 Linux UI, additional architectures, parameter creation/deletion/renaming, presets, recursive folders, in-app PUB generation, browser hosting and custom installer/updater services are outside this initial Windows release. Keep the domain core independent without building a second UI.

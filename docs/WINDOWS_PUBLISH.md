@@ -62,9 +62,10 @@ Windows run, and a WPF build from a non-Windows host still needs real Windows ex
    policy to make a test pass.
 7. If it dies on another machine with no message, run `tools/diagnostics/crash-evidence.ps1` there
    (read-only: WER reports, the Application event log, the payload's own version and signature, the
-   user's settings, error-reporting policy) and record the faulting module before changing code. The
-   application cannot log such a fault itself: a fault inside the shell's folder dialog ends the process
-   before any handler in it runs, which is why that machine's report is the only evidence.
+   user's settings, error-reporting policy) and record the faulting module before changing code. A managed
+   fault now reaches `%LOCALAPPDATA%\PubTemplateEditor\crash.log` with its type, message and stack, which
+   is what identified the folder-dialog fault; a fault that ends the process inside native shell code
+   would leave only the WER and event-log entries, so collect both.
 8. Keep observed results and open gates separate.
 
 ## Signing and servicing

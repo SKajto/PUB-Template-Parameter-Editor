@@ -30,6 +30,11 @@ public sealed partial class WorkspaceViewModel : ViewModelBase
     private readonly TemplateReaderService _reader = new();
     private readonly TemplateFolderScanner _scanner = new();
 
+    /// <summary>The folder dialog, behind an interface so the recovery around it is testable.</summary>
+    private readonly IFolderPicker _folderPicker;
+
+    private const string FolderDialogTitle = "Choose the folder containing .dta templates";
+
     /// <summary>
     /// Staged field changes of this session. Nothing in loading, comparing, bulk staging or
     /// editing touches a file; only the save review (S4) writes, and only for selected fields.
@@ -56,8 +61,14 @@ public sealed partial class WorkspaceViewModel : ViewModelBase
     /// application data folder, which is what the shipped app uses; tests pass a temporary folder so a
     /// save test cannot touch real user state.
     /// </param>
-    public WorkspaceViewModel(SettingsService settings, EditorSettings loadedSettings, string? saveStateDirectory = null)
+    /// <param name="folderPicker">
+    /// Null means the real Windows folder dialog. Tests pass a double that refuses, because the fault
+    /// worth testing is the shell rejecting a remembered folder.
+    /// </param>
+    public WorkspaceViewModel(SettingsService settings, EditorSettings loadedSettings, string? saveStateDirectory = null,
+                              IFolderPicker? folderPicker = null)
     {
+        _folderPicker = folderPicker ?? new ShellFolderPicker();
         _settings = settings;
         _saver = new TemplateSaveService(saveStateDirectory);
         _loadedSettings = loadedSettings;
@@ -83,19 +94,31 @@ public sealed partial class WorkspaceViewModel : ViewModelBase
         RefreshThemeSelection();
 
         // FILE-01: restore remembered folder; a missing folder produces a clear message.
+        // Entries are normalised on the way in, because the file is user-editable and the shell and the
+        // file system disagree about what a path looks like: an entry written with '/' opens on disk but
+        // is refused by the folder dialog later.
         foreach (string folder in _loadedSettings.RecentFolders)
         {
-            if (!string.IsNullOrWhiteSpace(folder) && !RecentFolders.Contains(folder, StringComparer.OrdinalIgnoreCase))
+            string? remembered = FolderPaths.Normalize(folder);
+            if (remembered is not null && !RecentFolders.Contains(remembered, StringComparer.OrdinalIgnoreCase))
             {
-                RecentFolders.Add(folder);
+                RecentFolders.Add(remembered);
             }
+        }
+
+        if (RecentFolders.Count != _loadedSettings.RecentFolders.Count)
+        {
+            // Rewrite the user's list once, so a malformed entry does not come back on every start.
+            _loadedSettings.RecentFolders = RecentFolders.ToList();
+            _settings.Save(_loadedSettings);
         }
 
         Raise(nameof(HasRecentFolders));
 
-        if (!string.IsNullOrWhiteSpace(loadedSettings.LastFolder))
+        string? lastFolder = FolderPaths.Normalize(loadedSettings.LastFolder);
+        if (lastFolder is not null)
         {
-            TrySetFolder(loadedSettings.LastFolder!);
+            TrySetFolder(lastFolder);
         }
         else
         {
@@ -453,28 +476,77 @@ public sealed partial class WorkspaceViewModel : ViewModelBase
             return;
         }
 
-        var dialog = new Microsoft.Win32.OpenFolderDialog
-        {
-            Title = "Choose the folder containing .dta templates",
-            Multiselect = false,
-        };
+        // The open folder is only a convenience for where the dialog starts. The shell answers
+        // E_INVALIDARG for a path it cannot address - a '/' separator, a folder that has gone away - and
+        // it does so from inside the dialog's own setup, before a window exists to cancel. An exception
+        // that escapes from a UI command ends the process, so the starting folder is checked here and a
+        // refusal is caught, reported and retried without one.
+        string? start = FolderPaths.IsShellAddressable(FolderPath) ? FolderPath : null;
 
-        if (FolderPath is not null && Directory.Exists(FolderPath))
+        string? chosen = PickFolder(start, out string? refusal);
+        bool openedWithoutStart = false;
+
+        if (chosen is null && refusal is not null && start is not null)
         {
-            dialog.InitialDirectory = FolderPath;
+            chosen = PickFolder(null, out refusal);
+            openedWithoutStart = chosen is not null;
         }
 
-        if (dialog.ShowDialog() == true)
+        if (refusal is not null)
         {
-            TrySetFolder(dialog.FolderName);
+            ActionError = $"The folder dialog could not be opened: {refusal}";
+            StatusMessage = "The folder dialog failed. The templates can still be opened by dragging "
+                          + "a folder or a .dta file onto this window.";
+            return;
+        }
+
+        if (chosen is null)
+        {
+            return;                                       // cancelled: nothing changes
+        }
+
+        TrySetFolder(chosen);
+
+        if (openedWithoutStart)
+        {
+            // Set after the folder was applied, because opening a folder clears the notices.
+            ActionNotice = $"'{start}' could not be used as the dialog's starting folder, so the "
+                         + "folder dialog opened at its default location instead.";
+        }
+    }
+
+    /// <summary>
+    /// One attempt at the dialog. A cancellation is a null result with no refusal; only a shell that
+    /// rejects the dialog produces a refusal message. Anything outside this list of expected shell and
+    /// path faults is left to the dispatcher's handler rather than swallowed here.
+    /// </summary>
+    private string? PickFolder(string? initialDirectory, out string? refusal)
+    {
+        try
+        {
+            refusal = null;
+            return _folderPicker.PickFolder(initialDirectory, FolderDialogTitle);
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException
+                                   or System.Runtime.InteropServices.COMException or InvalidOperationException)
+        {
+            refusal = ex.Message;
+            return null;
         }
     }
 
     private void TrySetFolder(string path)
     {
+        string? normalized = FolderPaths.Normalize(path);
+        if (normalized is null)
+        {
+            StatusMessage = $"'{path}' is not a usable folder path. Choose another folder.";
+            return;
+        }
+
         try
         {
-            var listed = _scanner.Scan(path);
+            var listed = _scanner.Scan(normalized);
 
             AllFiles.Clear();
             foreach (var entry in listed)
@@ -482,7 +554,7 @@ public sealed partial class WorkspaceViewModel : ViewModelBase
                 AllFiles.Add(new TemplateItem(entry.FilePath, true, entry.SizeBytes, entry.ListingError, Drafts));
             }
 
-            FolderPath = path;
+            FolderPath = normalized;
             SetActiveFileDirectly(AllFiles.FirstOrDefault());
             ApplyFileFilter();
             RefreshCounters();
@@ -495,13 +567,13 @@ public sealed partial class WorkspaceViewModel : ViewModelBase
             ActionError = null;
 
             // Persist the working folder immediately (GEN/FILE-01).
-            _loadedSettings.LastFolder = path;
-            RememberFolder(path);
+            _loadedSettings.LastFolder = normalized;
+            RememberFolder(normalized);
             _settings.Save(_loadedSettings);
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Folder '{path}' could not be opened: {ex.Message}. Choose another folder.";
+            StatusMessage = $"Folder '{normalized}' could not be opened: {ex.Message}. Choose another folder.";
         }
     }
 
@@ -554,21 +626,23 @@ public sealed partial class WorkspaceViewModel : ViewModelBase
     /// </summary>
     public bool TryOpenDroppedPath(string? path)
     {
-        if (string.IsNullOrWhiteSpace(path))
+        string? dropped = FolderPaths.Normalize(path);
+        if (dropped is null)
         {
+            StatusMessage = "Only a template folder or a .dta template file can be dropped here.";
             return false;
         }
 
         string folder;
         try
         {
-            if (Directory.Exists(path))
+            if (Directory.Exists(dropped))
             {
-                folder = path!;
+                folder = dropped;
             }
-            else if (File.Exists(path) && string.Equals(Path.GetExtension(path), DtaExtension, StringComparison.OrdinalIgnoreCase))
+            else if (File.Exists(dropped) && string.Equals(Path.GetExtension(dropped), DtaExtension, StringComparison.OrdinalIgnoreCase))
             {
-                folder = Path.GetDirectoryName(path) ?? string.Empty;
+                folder = Path.GetDirectoryName(dropped) ?? string.Empty;
             }
             else
             {
