@@ -60,7 +60,12 @@ Windows run, and a WPF build from a non-Windows host still needs real Windows ex
 6. Run it in the intended managed environment under its existing policy; if blocked, record the exact
    event/rule, path, hash and whether the exe or an extracted file was stopped. Do not change device
    policy to make a test pass.
-7. Keep observed results and open gates separate.
+7. If it dies on another machine with no message, run `tools/diagnostics/crash-evidence.ps1` there
+   (read-only: WER reports, the Application event log, the payload's own version and signature, the
+   user's settings, error-reporting policy) and record the faulting module before changing code. The
+   application cannot log such a fault itself: a fault inside the shell's folder dialog ends the process
+   before any handler in it runs, which is why that machine's report is the only evidence.
+8. Keep observed results and open gates separate.
 
 ## Signing and servicing
 
