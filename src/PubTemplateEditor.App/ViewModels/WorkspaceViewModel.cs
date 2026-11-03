@@ -270,9 +270,9 @@ public sealed partial class WorkspaceViewModel : ViewModelBase
         ? "No folder selected"
         : $"{AllFiles.Count} template(s) in folder";
 
-    public string OperationText => _isBusy
-        ? ProgressText
-        : "Offline · Review Save writes selected changes";
+    // The footer stays quiet when nothing is happening; the folder count and the staged badge already
+    // say what there is to see. Only a running operation has something worth reporting.
+    public string OperationText => _isBusy ? ProgressText : string.Empty;
 
     public ThemeChoice Theme
     {

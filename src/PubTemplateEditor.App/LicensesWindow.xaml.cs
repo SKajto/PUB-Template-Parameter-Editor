@@ -27,7 +27,6 @@ public partial class LicensesWindow : Window
     public string LicenseContent => LicenseText.Text;
     public string NoticeContent => NoticeText.Text;
     public string ThirdPartyContent => ThirdPartyText.Text;
-    public string SourceContent => SourceLine.Text;
     public int NoticeTabCount => NoticeTabs.Items.Count;
 
     /// <summary>About view fields, exposed for UI tests.</summary>
@@ -37,7 +36,6 @@ public partial class LicensesWindow : Window
     public string AboutCopyright => AboutCopyrightText.Text;
     public string AboutRuntime => AboutRuntimeText.Text;
     public string AboutBundled => AboutBundledText.Text;
-    public string AboutOperation => AboutOperationText.Text;
     public string AboutRepositoryUri => RepositoryLink.NavigateUri?.ToString() ?? string.Empty;
     public string AboutSourceUri => SourceLink.NavigateUri?.ToString() ?? string.Empty;
     public string AboutIssuesUri => IssuesLink.NavigateUri?.ToString() ?? string.Empty;
@@ -65,23 +63,20 @@ public partial class LicensesWindow : Window
         NoticeText.Text = EmbeddedNotices.Read(EmbeddedNotices.CopyrightNotice);
         ThirdPartyText.Text = EmbeddedNotices.Read(EmbeddedNotices.ThirdParty);
 
-        // About view: identity, licence and the bundled runtime, all offline.
+        // About view: identity, licence and runtime.
         AboutNameText.Text = ProductInfo.Name;
         AboutTaglineText.Text = ProductInfo.Tagline;
         AboutDescriptionText.Text = ProductInfo.Description;
         AboutVersionText.Text = ProductInfo.Version;
-        AboutLicenseText.Text = $"{ProductInfo.LicenseId} (see the GNU GPL v3 tab for the full text)";
+        AboutLicenseText.Text = ProductInfo.LicenseId;
         AboutCopyrightText.Text = ProductInfo.CopyrightLine;
-        AboutOperationText.Text = "Offline; template files stay on this computer. Nothing is fetched or sent "
-                                + "unless you click a link or ask for a release check.";
         AboutRuntimeText.Text = $"{ProductInfo.RuntimeDescription}, {ProductInfo.ProcessArchitecture} process on {ProductInfo.OperatingSystemDescription}";
 
         SetLink(RepositoryLink, RepositoryLinkText, ProductInfo.RepositoryUrl, ProductInfo.RepositoryLabel);
         SetLink(SourceLink, SourceLinkText, ProductInfo.ReleaseSourceUrl, $"v{ProductInfo.Version} source archive");
         SetLink(IssuesLink, IssuesLinkText, ProductInfo.IssuesUrl, "report a problem or ask a question");
 
-        UpdateStatusRun.Text = "No check has been made in this window. The button above asks once for the newest "
-                             + "published version number; nothing is downloaded and nothing about this computer is sent.";
+        // The status line stays empty until a release check has an answer to give.
         HideReleaseLink();
 
         AboutBundledText.Text =
@@ -92,9 +87,6 @@ public partial class LicensesWindow : Window
             "This program is free software and comes with ABSOLUTELY NO WARRANTY; to the extent permitted " +
             "by law, no warranty is given. You can redistribute it and/or modify it under the GNU General " +
             "Public License version 3.";
-
-        string version = ProductInfo.Version;
-        SourceLine.Text = $"Version {version}. " + ProductInfo.SourceNote;
 
         Closed += (_, _) => _checkInProgress?.Cancel();
     }
@@ -153,7 +145,7 @@ public partial class LicensesWindow : Window
         _checkInProgress = new CancellationTokenSource();
         CheckUpdateButton.IsEnabled = false;
         HideReleaseLink();
-        UpdateStatusRun.Text = "Asking which version is published as the newest…";
+        UpdateStatusRun.Text = "Checking…";
 
         try
         {
@@ -161,14 +153,14 @@ public partial class LicensesWindow : Window
 
             if (!answer.Succeeded)
             {
-                UpdateStatusRun.Text = $"No release check: {answer.Reason} Nothing else changed.";
+                UpdateStatusRun.Text = $"Release check failed: {answer.Reason}";
                 return;
             }
 
             ReleaseInfo? published = null;
-            if (!ReleaseInfo.TryParse(answer.Json, out published))            {
-                UpdateStatusRun.Text = "The release service answered with something this program could not read "
-                                     + "as a release. Nothing else changed.";
+            if (!ReleaseInfo.TryParse(answer.Json, out published))
+            {
+                UpdateStatusRun.Text = "The release service answered with something that is not a release.";
                 return;
             }
 
@@ -177,23 +169,20 @@ public partial class LicensesWindow : Window
             {
                 case UpdateState.NewerAvailable:
                     SetReleaseLink(ProductInfo.ReleasesUrl, $"open the {published.Tag} release");
-                    UpdateStatusRun.Text = $"Version {published.Tag} is published; this is {ProductInfo.Version}."
-                                         + (published.IsPreRelease ? " That is a pre-release." : string.Empty) + " ";
+                    UpdateStatusRun.Text = $"{published.Tag} is available; this program is {ProductInfo.Version}."
+                                         + (published.IsPreRelease ? " Pre-release." : string.Empty) + " ";
                     break;
 
                 case UpdateState.UpToDate:
-                    SetReleaseLink(ProductInfo.ReleasesUrl, "open the release list");
-                    UpdateStatusRun.Text = $"This is the newest published release ({ProductInfo.Version}). ";
+                    UpdateStatusRun.Text = $"{ProductInfo.Version} is the newest published release.";
                     break;
 
                 case UpdateState.UnknownVersion:
-                    UpdateStatusRun.Text = $"The newest published release is tagged '{published.Tag}', "
-                                         + "which this program cannot read as a version number. Nothing else changed.";
+                    UpdateStatusRun.Text = $"The newest published release is tagged '{published.Tag}', which is not a version number.";
                     break;
 
                 default:
-                    UpdateStatusRun.Text = "The release service answered, but this program could not read the answer. "
-                                         + "Nothing else changed.";
+                    UpdateStatusRun.Text = "The release answer could not be read.";
                     break;
             }
         }

@@ -28,6 +28,11 @@ Use the supplied specifications, reference XML findings and any provided sample 
 - Preflight all outputs, detect external file changes with content fingerprints, keep backups and a recovery journal, and verify per-file replacement. Do not describe a multi-file batch as globally atomic.
 - Build meaningful tests around immutable fixtures and temporary test copies: declaration fidelity, exact value preservation, matching, bulk boundaries, field-level review, Back, conflicts and recovery. Never test writes against authoritative templates.
 
+## Interface copy
+
+- Keep on-screen text short. Do not restate what is visible or repeat text the same window already shows elsewhere: no layout instructions, no standing disclaimers where a result belongs, no duplicate version/licence/source sentences. A status line stays empty until there is something to report.
+- Show the licence to people as GPL-3.0. Keep the machine-readable SPDX expression GPL-3.0-only in Directory.Build.props, packaging metadata, LICENSE, NOTICE and docs; they name the same licence.
+
 ## Repository licensing and release
 
 - Apply GPLv3 consistently. The provisional SPDX choice is GPL-3.0-only; record it and change to -or-later only if the owner explicitly selects that grant. Use real copyright holder details.

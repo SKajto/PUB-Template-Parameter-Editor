@@ -13,19 +13,13 @@ public static class ProductInfo
     public const string Tagline = "Local template workspace";
 
     public const string Description =
-        "Offline editor for the variable declarations of PUB template (.dta) files. " +
+        "Editor for the variable declarations of PUB template (.dta) files. " +
         "Edits are staged in memory and written only through Review Save.";
 
-    public const string LicenseId = "GPL-3.0-only";
+    // Shown to people; the machine-readable SPDX expression in Directory.Build.props, packaging and
+    // NOTICE stays GPL-3.0-only, which is the same licence: version 3, no later versions.
+    public const string LicenseId = "GPL-3.0";
     public const string CopyrightLine = "Copyright (C) 2026 Suad Kajtazovic";
-
-    /// <summary>
-    /// The GitHub location is fixed when the repository is first published; the exact-version
-    /// source link is part of the release/Store metadata, not a compiled-in guess.
-    /// </summary>
-    public const string SourceNote =
-        "The complete corresponding source for this exact version is published with the " +
-        "release of the same version under GPL-3.0-only.";
 
     /// <summary>The public repository this project is developed in.</summary>
     public const string RepositoryUrl = "https://github.com/SKajto/PUB-Template-Parameter-Editor";

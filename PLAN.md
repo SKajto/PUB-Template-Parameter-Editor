@@ -1624,6 +1624,35 @@ repo file): running `1.0.0` -> `UpToDate` with `tag=v1.0.0`; `0.9.0` -> `NewerAv
 default-browser association, and what a corporate proxy answers to that request.
 
 
+### 2026-11-03 - Interface copy trimmed; the About view stops repeating itself
+
+The owner read the running window and rejected text that restates what the same window already shows.
+Removed rather than reworded:
+
+- About footnote "Version 1.0.0. The complete corresponding source for this exact version ...". The
+  window already carries a `v1.0.0 source archive` link and the licence/notices tabs.
+- About status filler "No check has been made in this window. ...". The line is empty until a release
+  check has an answer, and then it holds only that answer ("Checking...", "v1.0.1 is available; this
+  program is 1.0.0. open the v1.0.1 release", "1.0.0 is the newest published release.",
+  "Release check failed: <reason>").
+- About row "Operation: Offline; template files stay on this computer ...", and the main-window footer
+  "Offline . Review Save writes selected changes". A footer that is quiet when nothing runs still
+  reports "Reading... 42%" while a folder is being read.
+- Main-window footer instruction "Review and save in the top bar"; the shortcut-keys line stays.
+- The check button tooltip shortened to "Asks once for the newest published version number"; the
+  status-line tooltip removed. `ProductInfo.SourceNote` deleted with its last user.
+
+Licence label: the About view reads `GPL-3.0`. `GPL-3.0-only` remains in `Directory.Build.props`,
+`packaging/StoreRelease.settings.json`, `LICENSE`, `NOTICE` and the docs, where a valid SPDX
+expression is required; both name version 3 without an "or later" grant, so no licence term changed.
+`docs/GPL_RELEASE.md` and `docs/REFERENCE_UI_FINDINGS.md` now describe that split.
+The rule itself is recorded in `AGENTS.md` under "Interface copy", so later screens start short.
+
+Executed: `dotnet build src/PubTemplateEditor.App -c Release` 0 warnings; `dotnet test` 113 + 102 + 107
+= **322** green. Five assertions that named the deleted sentences now name the shorter ones; the
+embedded-NOTICE assertion still insists on `GPL-3.0-only`. Not yet looked at by the owner.
+
+
 ## Deferred scope
 
 Linux UI, additional architectures, parameter creation/deletion/renaming, presets, recursive folders, in-app PUB generation, browser hosting and custom installer/updater services are outside this initial Windows release. Keep the domain core independent without building a second UI.

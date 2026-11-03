@@ -135,7 +135,7 @@ public class ShellSnapshotTests
             Assert.Equal(vm.ActiveTemplateName, window.ActiveTemplateLabel.Text);
             Assert.Equal("Parameters not read yet", window.SummaryLabel.Text);
             Assert.Equal($"{vm.TotalFileCount} template(s) in folder", window.FooterCountLabel.Text);
-            Assert.Equal("Offline · Review Save writes selected changes", window.FooterOperationLabel.Text);
+            Assert.Equal(string.Empty, window.FooterOperationLabel.Text);   // quiet while nothing runs
             Assert.Equal(vm.VersionLabel, Assert.IsType<string>(window.VersionLabel.Content));
             Assert.StartsWith("Version ", vm.VersionLabel);
 

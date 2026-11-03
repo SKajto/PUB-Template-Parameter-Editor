@@ -160,7 +160,7 @@ public class AboutLinksAndReleaseCheckTests
         Assert.Equal(0, feed.Calls);                 // no request on opening, and none in the background
         Assert.False(about.Checking);
         Assert.False(about.ReleaseLinkVisible);
-        Assert.Contains("No check has been made", about.Status, StringComparison.Ordinal);
+        Assert.Equal(string.Empty, about.Status);     // the line stays empty until a check answers
 
         _host.Do(() => window.Close());
     }
@@ -216,7 +216,7 @@ public class AboutLinksAndReleaseCheckTests
         await _host.Do(() => window.CheckForUpdateAsync());
         AboutState about = Read(window);
 
-        Assert.Contains("No release check", about.Status, StringComparison.Ordinal);
+        Assert.Contains("Release check failed", about.Status, StringComparison.Ordinal);
         Assert.Contains("no route to host", about.Status, StringComparison.Ordinal);
         Assert.False(about.ReleaseLinkVisible);
         Assert.False(about.Checking);
@@ -233,7 +233,7 @@ public class AboutLinksAndReleaseCheckTests
 
         await _host.Do(() => window.CheckForUpdateAsync());
 
-        Assert.Contains("could not read", Read(window).Status, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("not a release", Read(window).Status, StringComparison.OrdinalIgnoreCase);
 
         _host.Do(() => window.Close());
     }
@@ -331,7 +331,6 @@ public class AboutLinksAndReleaseCheckTests
         AboutState about = Read(window);
 
         Assert.Equal(4, about.TabCount);
-        Assert.Contains("Nothing is fetched or sent", _host.Do(() => window.AboutOperation), StringComparison.Ordinal);
 
         _host.Do(() => window.Close());
     }

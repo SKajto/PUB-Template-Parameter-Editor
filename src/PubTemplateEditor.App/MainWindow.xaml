@@ -1055,11 +1055,8 @@
                         <TextBlock x:Name="StagedSummaryText" Text="{Binding StagedSummary}" FontSize="11"
                                    Style="{StaticResource DirtyBadgeStyle}"/>
                     </Border>
-                    <TextBlock Margin="8,0,0,0" Text="Review and save in the top bar"
-                               Foreground="{DynamicResource MutedForegroundBrush}" VerticalAlignment="Center"
-                               FontSize="11"/>
                     <!-- The keys are listed where the work is reported, so they are found without a help page. -->
-                    <TextBlock Margin="14,0,0,0" Text="Ctrl+Enter stage · Ctrl+Z undo staged · Ctrl+S review · Esc close panel"
+                    <TextBlock Margin="8,0,0,0" Text="Ctrl+Enter stage · Ctrl+Z undo staged · Ctrl+S review · Esc close panel"
                                Foreground="{DynamicResource MutedForegroundBrush}" VerticalAlignment="Center"
                                FontSize="11"/>
                 </StackPanel>

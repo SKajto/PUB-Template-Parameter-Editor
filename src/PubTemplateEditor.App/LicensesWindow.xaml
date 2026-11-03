@@ -9,9 +9,6 @@
         Background="{DynamicResource WindowBackgroundBrush}"
         FontSize="{DynamicResource UiFontSize}">
     <DockPanel TextElement.Foreground="{DynamicResource ForegroundBrush}">
-        <TextBlock x:Name="SourceLine" DockPanel.Dock="Bottom" Margin="10,8"
-                   TextWrapping="Wrap"
-                   Foreground="{DynamicResource MutedForegroundBrush}"/>
         <TabControl x:Name="NoticeTabs" BorderThickness="0" Background="{DynamicResource WindowBackgroundBrush}">
         <TabItem Header="About">
             <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12">
@@ -34,7 +31,6 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
                         <TextBlock Grid.Row="0" Grid.Column="0" Text="Version" Foreground="{DynamicResource MutedForegroundBrush}" Margin="0,2"/>
@@ -44,30 +40,27 @@
                                     Style="{StaticResource LinkButtonStyle}"
                                     Click="CheckUpdate_Click" Margin="14,0,0,0" Padding="2,0"
                                     VerticalAlignment="Center"
-                                    ToolTip="Asks the release service for the newest published version number. Nothing is downloaded, and no request is made unless you click here."/>
+                                    ToolTip="Asks once for the newest published version number"/>
                         </StackPanel>
                         <TextBlock Grid.Row="1" Grid.Column="1" x:Name="UpdateStatusText" Margin="0,2" TextWrapping="Wrap"
-                                   Foreground="{DynamicResource MutedForegroundBrush}"
-                                   ToolTip="A release check is one anonymous request for a version number. The program makes no other request and uploads nothing."><Run x:Name="UpdateStatusRun"/><Hyperlink x:Name="ReleaseLink" RequestNavigate="OnLinkNavigate"><Run x:Name="ReleaseLinkText"/></Hyperlink></TextBlock>
+                                   Foreground="{DynamicResource MutedForegroundBrush}"><Run x:Name="UpdateStatusRun"/><Hyperlink x:Name="ReleaseLink" RequestNavigate="OnLinkNavigate"><Run x:Name="ReleaseLinkText"/></Hyperlink></TextBlock>
 
                         <TextBlock Grid.Row="2" Grid.Column="0" Text="Licence" Foreground="{DynamicResource MutedForegroundBrush}" Margin="0,2"/>
                         <TextBlock Grid.Row="2" Grid.Column="1" x:Name="AboutLicenseText" Margin="0,2"/>
                         <TextBlock Grid.Row="3" Grid.Column="0" Text="Copyright" Foreground="{DynamicResource MutedForegroundBrush}" Margin="0,2"/>
                         <TextBlock Grid.Row="3" Grid.Column="1" x:Name="AboutCopyrightText" Margin="0,2" TextWrapping="Wrap"/>
-                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Operation" Foreground="{DynamicResource MutedForegroundBrush}" Margin="0,2"/>
-                        <TextBlock Grid.Row="4" Grid.Column="1" x:Name="AboutOperationText" Margin="0,2" TextWrapping="Wrap"/>
-                        <TextBlock Grid.Row="5" Grid.Column="0" Text="Runtime" Foreground="{DynamicResource MutedForegroundBrush}" Margin="0,2"/>
-                        <TextBlock Grid.Row="5" Grid.Column="1" x:Name="AboutRuntimeText" Margin="0,2" TextWrapping="Wrap"/>
-                        <TextBlock Grid.Row="6" Grid.Column="0" Text="Project" Foreground="{DynamicResource MutedForegroundBrush}" Margin="0,2"/>
-                        <TextBlock Grid.Row="6" Grid.Column="1" Margin="0,2">
+                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Runtime" Foreground="{DynamicResource MutedForegroundBrush}" Margin="0,2"/>
+                        <TextBlock Grid.Row="4" Grid.Column="1" x:Name="AboutRuntimeText" Margin="0,2" TextWrapping="Wrap"/>
+                        <TextBlock Grid.Row="5" Grid.Column="0" Text="Project" Foreground="{DynamicResource MutedForegroundBrush}" Margin="0,2"/>
+                        <TextBlock Grid.Row="5" Grid.Column="1" Margin="0,2">
                             <Hyperlink x:Name="RepositoryLink" RequestNavigate="OnLinkNavigate"><Run x:Name="RepositoryLinkText"/></Hyperlink>
                         </TextBlock>
-                        <TextBlock Grid.Row="7" Grid.Column="0" Text="Source of this version" Foreground="{DynamicResource MutedForegroundBrush}" Margin="0,2"/>
-                        <TextBlock Grid.Row="7" Grid.Column="1" Margin="0,2">
+                        <TextBlock Grid.Row="6" Grid.Column="0" Text="Source of this version" Foreground="{DynamicResource MutedForegroundBrush}" Margin="0,2"/>
+                        <TextBlock Grid.Row="6" Grid.Column="1" Margin="0,2">
                             <Hyperlink x:Name="SourceLink" RequestNavigate="OnLinkNavigate"><Run x:Name="SourceLinkText"/></Hyperlink>
                         </TextBlock>
-                        <TextBlock Grid.Row="8" Grid.Column="0" Text="Problems and questions" Foreground="{DynamicResource MutedForegroundBrush}" Margin="0,2"/>
-                        <TextBlock Grid.Row="8" Grid.Column="1" Margin="0,2">
+                        <TextBlock Grid.Row="7" Grid.Column="0" Text="Problems and questions" Foreground="{DynamicResource MutedForegroundBrush}" Margin="0,2"/>
+                        <TextBlock Grid.Row="7" Grid.Column="1" Margin="0,2">
                             <Hyperlink x:Name="IssuesLink" RequestNavigate="OnLinkNavigate"><Run x:Name="IssuesLinkText"/></Hyperlink>
                         </TextBlock>
                     </Grid>
