@@ -1580,6 +1580,50 @@ meantime (rewrite the entry with backslashes or drop it). `PLAN.md` milestone S5
 desktop review remain open as before.
 
 
+### 2026-11-03 - The About view links to the project, and can be asked whether a newer release exists
+
+The About window's project and source addresses were text to copy; they are hyperlinks now, and a
+*Check for a new version* action was added next to the version. Both are deliberately the only ways this
+application can reach outside, and neither is automatic.
+
+- `Themes/Controls.xaml` gains an implicit `Hyperlink` style: the accent colour of the current palette,
+  a hand cursor, and an underline only under the pointer or keyboard focus - WPF's fixed link blue
+  ignores both themes. About rows: `Project` (repository), `Source of this version` (the archive of this
+  exact tag, which is the GPL line, previously buried in a paragraph), `Problems and questions` (issues).
+  The same address text also stops being repeated in the window's footer.
+- Release check: `Core/Updates/ReleaseInfo.cs` reads a release document and compares version numbers;
+  `Infrastructure/ReleaseFeed.cs` is one anonymous `GET` for the newest published release of this
+  project's own GitHub page, with a 10-second limit, a user agent naming only the program, no body, no
+  cookies, and a refusal reason instead of an exception. The endpoint is derived from `ProductInfo` and
+  any address that is not a two-segment `github.com` project page is refused.
+- `App/Infrastructure/LinkOpener.cs` hands an address to the shell so the user's own browser and policy
+  apply; a machine with no associated program is told so in the window, with the address written out.
+- `LicensesWindow` composes them: one request per click, no request on opening and none in the
+  background, a second click while one is running cannot land (the button is disabled), closing the
+  window cancels, and an answer that is not a release - a proxy login page, for instance - is reported
+  as unreadable rather than turned into a version. A newer release is named with a link to the release
+  page; nothing is downloaded and nothing is installed, which stays a user decision.
+- Found while testing: a local build reports `1.0.0+<commit>` as its informational version, so the check
+  answered "cannot read as a version". `ProductInfo.Version` now strips that build metadata (and
+  `FullVersion` keeps the full string for a bug report), and the comparison tolerates it too.
+- Requirements: GEN-06 already permitted network use for acquisition and updates while forbidding
+  uploading template content, and LIC-02 keeps the licence reachable offline; both still hold. README's
+  privacy bullet and SECURITY.md gained a short "the one request the user can start" section, because
+  "no network capability at all" is no longer the whole truth.
+
+Tests: **322** (was 275) - `ReleaseInfoTests` (the release document is untrusted text: parse, refuse to
+guess, four-part tags, `+commit` metadata, pre-release flag), `ReleaseFeedTests` (endpoint derivation,
+refusing non-GitHub addresses, refusal as a reason), and 13 `AboutLinksAndReleaseCheckTests` in the WPF
+host: links carry the right addresses and are clicked through WPF's own hyperlink invoke path with the
+browser replaced by a recording double, opening the window asks nothing, each answer state says what it
+means, double clicks make one request, close cancels, and the links follow the palette under both themes.
+
+Executed: `dotnet build -c Release` 0 warnings; `dotnet test` 113 + 102 + 107 = **322** green in the working tree, and 113 + 86 + 107 = 306 in a `git archive` tree (no samples, no `.git`). The live check was run against the real feed from this machine (throwaway probe, not a
+repo file): running `1.0.0` -> `UpToDate` with `tag=v1.0.0`; `0.9.0` -> `NewerAvailable`; `1.0.0+4698516…`
+-> `UpToDate`; `9.9.9` -> `UpToDate`. Not yet verified: an actual browser hand-off on a machine with a
+default-browser association, and what a corporate proxy answers to that request.
+
+
 ## Deferred scope
 
 Linux UI, additional architectures, parameter creation/deletion/renaming, presets, recursive folders, in-app PUB generation, browser hosting and custom installer/updater services are outside this initial Windows release. Keep the domain core independent without building a second UI.

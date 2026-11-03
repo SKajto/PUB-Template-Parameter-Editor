@@ -119,7 +119,7 @@ public class NoticeViewerTests
 
     /// <summary>
     /// The About view has to name where the source of this exact build is, because that is a GPL
-    /// obligation and not a marketing line.
+    /// obligation and not a marketing line. It is stated as a link the user can open.
     /// </summary>
     [Fact]
     public void AboutNamesTheRepositoryAndTheSourceOfThisVersion() => _host.Dispatcher.Invoke(() =>
@@ -127,8 +127,8 @@ public class NoticeViewerTests
         var window = new LicensesWindow();
         window.Show();
 
-        Assert.Contains("github.com/SKajto/PUB-Template-Parameter-Editor", window.AboutSource);
-        Assert.Contains("/releases/tag/v", window.AboutSource);
+        Assert.Contains("github.com/SKajto/PUB-Template-Parameter-Editor", window.AboutRepositoryUri);
+        Assert.Contains($"/releases/tag/v{ProductInfo.Version}", window.AboutSourceUri);
         window.Close();
     });
 }

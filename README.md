@@ -86,8 +86,12 @@ renamed away: that is what a fresh clone and CI see.
 
 ## Privacy, system changes, and signing
 
-- **Privacy:** no user data or any other data are collected or transferred by this
-  application. It has no network capability at all.
+- **Privacy:** no user data or any other data are collected or transferred by this application, and
+  nothing about your templates ever leaves the machine. It makes no request of its own: no service, no
+  background check, no telemetry, licence texts included in the executable. The two exceptions both
+  start with a click in the About window: a web link is handed to your own browser, and
+  *Check for a new version* sends one anonymous request for the newest published version number and
+  downloads nothing — you decide whether to open the release page it points to.
 - **System changes:** it does not alter the system — no installer, no service, no
   startup entry, no registry change, no elevation. It writes only the template files
   you confirm in Review Save, plus its own files under `%LOCALAPPDATA%\PubTemplateEditor` (settings,

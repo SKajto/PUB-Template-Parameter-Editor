@@ -24,6 +24,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The shell tests drive the real link and release-check wiring, which needs the named fields of
+         the windows; nothing outside this project's own test assembly is given access. -->
+    <InternalsVisibleTo Include="PubTemplateEditor.App.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Window and taskbar icon, resolved by pack URI from this assembly. -->
     <Resource Include="Assets\app.ico" />
     <Resource Include="..\..\LICENSE" Link="Assets\LICENSE.txt" />

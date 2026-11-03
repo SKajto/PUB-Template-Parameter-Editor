@@ -267,6 +267,26 @@
         <Setter Property="BorderBrush" Value="{DynamicResource DirtyBrush}"/>
     </Style>
 
+    <!-- A hyperlink follows the interface theme instead of WPF's fixed link blue, and takes the modern
+         desktop behaviour: an address shows as a link by its colour, and underlines only under the
+         pointer or the keyboard focus, so a line of links stays quiet until it is being used. -->
+    <Style TargetType="{x:Type Hyperlink}">
+        <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="TextDecorations" Value="{x:Null}"/>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="TextDecorations" Value="Underline"/>
+            </Trigger>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter Property="TextDecorations" Value="Underline"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Foreground" Value="{DynamicResource MutedForegroundBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
     <!-- Borderless text button used for inline commands (Select visible, Clear, dismiss). -->
     <Style x:Key="LinkButtonStyle" TargetType="{x:Type Button}" BasedOn="{StaticResource {x:Type Button}}">
         <Setter Property="Background" Value="Transparent"/>

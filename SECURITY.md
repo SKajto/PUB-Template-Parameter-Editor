@@ -14,8 +14,9 @@ The program is offline by design, so the interesting attack surface is *the file
 
 - **A template file is untrusted input.** It is parsed with `XmlReader` with
   `DtdProcessing.Prohibit` and `XmlResolver = null`, so a document type declaration, external
-  entity or external parameter entity is refused rather than fetched. There is no network
-  capability in the manifest, so "refused rather than fetched" is not the only line of defence.
+  entity or external parameter entity is refused rather than fetched. The application asks nothing
+  over the network unless the user starts a release check from the About window, so "refused rather
+  than fetched" is not the only line of defence.
 - **Parameter names, descriptions and values are text.** They are never evaluated, never turned
   into XAML, never passed to a shell, and never used to construct a path on their own. Display
   paths are taken from the folder the user picked, not from file content.
@@ -37,6 +38,15 @@ The program is offline by design, so the interesting attack surface is *the file
   source archive is unsigned, and the SHA-256 published with a release is the one of the signed file.
   A hash that does not match, or a published copy that reports
   `HashMismatch`, is a supply-chain problem - please report it privately as described below.
+
+## The one request the user can start
+
+The About window's *Check for a new version* button sends exactly one anonymous `GET` to
+`api.github.com` for the newest published version number of this project's own repository, and the
+link in the answer is only an address: nothing is downloaded, nothing is installed, no identifier of
+the machine or the user is sent beyond a user agent naming this program, and no request happens on its
+own. It is there because GEN-06 allows updates to reach the network while the application uploads no
+template content; if that boundary ever moves, this section and `docs/RELEASE_PACKAGING.md` change with it.
 
 ## Reporting a problem
 
