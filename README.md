@@ -66,7 +66,7 @@ dotnet publish src/PubTemplateEditor.App/PubTemplateEditor.App.csproj `
   -c Release -p:PublishProfile=PortableWin_x64 -o artifacts/publish/portable-win-x64
 
 # optional: package the app locally (not a distribution channel)
-powershell -File packaging/build-msix.ps1 -Version 1.0.0 -Mode Draft
+powershell -File packaging/build-msix.ps1 -Version 1.0.1 -Mode Draft
 ```
 
 The shipped artifact is `PUB_Template_Parameter_Editor.exe` - a single self-contained

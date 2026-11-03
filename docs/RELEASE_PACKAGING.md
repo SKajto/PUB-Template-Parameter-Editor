@@ -107,7 +107,7 @@ program that runs with no runtime files at all.
 
 ```powershell
 .\packaging\generate-placeholder-assets.ps1
-.\packaging\build-msix.ps1 -Version 1.0.0 -Mode Draft   # local layout/deployment test only
+.\packaging\build-msix.ps1 -Version 1.0.1 -Mode Draft   # local layout/deployment test only
 ```
 
 `Mode Strict` refuses to run while identity values are unresolved. The manifest declares

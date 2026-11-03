@@ -1653,6 +1653,43 @@ Executed: `dotnet build src/PubTemplateEditor.App -c Release` 0 warnings; `dotne
 embedded-NOTICE assertion still insists on `GPL-3.0-only`. Not yet looked at by the owner.
 
 
+### 2026-11-03 - v1.0.1 released, again with a single signing operation
+
+v1.0.1 - one signing operation, and the first signed build the other machine can actually run.
+
+Released commit `70b6e98` (tag `v1.0.1`): the folder-dialog fault fix (`4698516`), the About links and
+opt-in release check (`a5f9589`), and the interface-text trimming (`5f2630f`).
+
+Payload, in the order that keeps the signature count at one per release:
+`dotnet publish -p:PublishProfile=PortableWin_x64 -p:Version=1.0.1 -p:AssemblyVersion=1.0.1
+-p:FileVersion=1.0.1 -p:InformationalVersion=1.0.1 -p:IncludeSourceRevisionInInformationalVersion=false`,
+metadata read back as `productVersion=1.0.1 fileVersion=1.0.1`, `NotSigned`, 131,296,891 bytes,
+sha256 `C024B821...E272` before signing. Then `tools/signing/certum-sign.ps1` once (`/fd sha256
+/td sha256 /tr http://time.certum.pl`), read back `Valid`, `CN=Certum Timestamp 2026`,
+`signtool verify /pa /all` Successfully verified, 131,307,544 bytes, published sha256
+`4F50E7B1CFC1E5BF9485BC49BE96FAB7E9657278EB5604F5FAA370BDFC42AD56`. No other key was used and the
+payload was not signed twice.
+
+Release `v1.0.1` (id 432996118) carries five assets: the signed executable,
+`PUB_Template_Parameter_Editor-1.0.1-source.tar.gz` from `git archive v1.0.1` (199 entries, no
+samples), `SHA256SUMS.txt`, `SIGNING-STATUS.txt`, `file-metadata.txt`. Downloaded back and re-hashed:
+both files match the published hashes, and the executable reports `Valid` with the recorded
+thumbprint `E3C2...4A3E`. Notes describe the fixes, the hash and how to read the signature back.
+
+CI on the released commit: `CI validation` success, `Release packaging` success with every payload step
+green and its `Publish the release on GitHub` job skipped, because the signing configuration records a
+certificate and CI must not attach an unsigned executable to a release.
+
+Before tagging, the new build was driven on this machine through UIAutomation: with a settings file
+holding `LastFolder` written as `C:/Users/...`, Choose folder opened the shell dialog and the process
+survived it, and the About window showed the trimmed text (`Licence | GPL-3.0`, an empty status line
+until the check answered, `1.0.0 is the newest published release.` afterwards).
+
+Still open: running 1.0.1 on the Enterprise host that reported the fault (possible now that the payload
+is signed), the interactive desktop review gate, and the native PUB round trip (S5). The certificate
+expires 2027-11-02; renewal is planned before then, not at first use.
+
+
 ## Deferred scope
 
 Linux UI, additional architectures, parameter creation/deletion/renaming, presets, recursive folders, in-app PUB generation, browser hosting and custom installer/updater services are outside this initial Windows release. Keep the domain core independent without building a second UI.
