@@ -26,7 +26,7 @@ on:
       appVersion:
         description: App version MAJOR.MINOR.PATCH (becomes the release tag's version and the file metadata)
         required: true
-        default: 1.0.0
+        default: 1.0.1
       buildMsix:
         description: Also build an MSIX (packaged-app testing only - not a distribution channel, and it needs resolved packaging identity values)
         type: choice
